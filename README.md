@@ -1,73 +1,70 @@
-# Welcome to your Lovable project
+# devprbtt-roehn-project-manager-react
 
-## Project info
+Este repositório contém o frontend do **Roehn Project Manager**, uma aplicação desenvolvida em React e TypeScript para gerenciamento de projetos. O objetivo do projeto é fornecer uma interface intuitiva para gerenciar áreas, tarefas e equipes, facilitando o acompanhamento e a organização dos projetos.
 
-**URL**: https://lovable.dev/projects/ec23064a-da1e-40a0-86e1-7a0e1c5b5e5f
+## Tecnologias Utilizadas
 
-## How can I edit this code?
+- **React**: Biblioteca principal para criação de interfaces de usuário.
+- **TypeScript**: Superset do JavaScript que adiciona tipagem estática, aumentando a segurança do código.
+- **CSS**: Estilização dos componentes da aplicação.
 
-There are several ways of editing your application.
+## Funcionalidades
 
-**Use Lovable**
+- Cadastro e visualização de projetos e áreas.
+- Gerenciamento de tarefas.
+- Controle de membros e equipes.
+- Visualização de progresso dos projetos.
+- Interface responsiva e fácil de usar.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/ec23064a-da1e-40a0-86e1-7a0e1c5b5e5f) and start prompting.
+## Como rodar o projeto
 
-Changes made via Lovable will be committed automatically to this repo.
+1. **Clone o repositório:**
+   ```bash
+   git clone https://github.com/devprbtt/devprbtt-roehn-project-manager-react.git
+   cd devprbtt-roehn-project-manager-react
+   ```
 
-**Use your preferred IDE**
+2. **Instale as dependências:**
+   ```bash
+   npm install
+   # ou
+   yarn install
+   ```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+3. **Inicie o servidor de desenvolvimento:**
+   ```bash
+   npm start
+   # ou
+   yarn start
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+4. **Acesse:**  
+   Abra [http://localhost:3000](http://localhost:3000) no seu navegador.
 
-Follow these steps:
+## Estrutura de Pastas
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+src/
+├── components/         # Componentes reutilizáveis
+├── pages/              # Páginas principais
+├── services/           # Serviços e integrações com API
+├── styles/             # Arquivos de estilo
+├── utils/              # Utilitários e helpers
+└── App.tsx             # Componente principal
 ```
 
-**Edit a file directly in GitHub**
+## Contribuição
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. Fork este repositório.
+2. Crie uma branch para sua feature/fix (`git checkout -b minha-feature`).
+3. Commit suas alterações (`git commit -am 'Adiciona minha feature'`).
+4. Faça push para a branch (`git push origin minha-feature`).
+5. Abra um Pull Request.
 
-**Use GitHub Codespaces**
+## Licença
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
-## What technologies are used for this project?
+---
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/ec23064a-da1e-40a0-86e1-7a0e1c5b5e5f) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+**Autor:** [devprbtt](https://github.com/devprbtt)
