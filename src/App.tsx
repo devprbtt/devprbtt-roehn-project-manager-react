@@ -4,9 +4,10 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import AdminRoute from "@/routes/AdminRoute";
 
 import Login from "./pages/Login";
-import Index from "./pages/Index";
+import Dashboard from "./pages/Dashboard";
 import Areas from "./pages/Areas";
 import Ambientes from "./pages/Ambientes";
 import Circuitos from "./pages/Circuitos";
@@ -34,7 +35,7 @@ function AppInner() {
         path="/"
         element={
           <RequireAuth>
-            <Index />
+            <Dashboard />
           </RequireAuth>
         }
       />
@@ -93,27 +94,10 @@ function AppInner() {
         }
       />
 
-      <Route
-        path="/usuarios"
-        element={
-          <RequireAuth>
-            <RequireAdmin>
-              <Usuarios />
-            </RequireAdmin>
-          </RequireAuth>
-        }
-      />
-
-      <Route
-        path="/usuarios/novo"
-        element={
-          <RequireAuth>
-            <RequireAdmin>
-              <UsuarioNovo />
-            </RequireAdmin>
-          </RequireAuth>
-        }
-      />
+      <Route element={<AdminRoute />}>
+        <Route path="/usuarios" element={<Usuarios />} />
+        <Route path="/usuarios/novo" element={<UsuarioNovo />} />
+      </Route>
 
       <Route path="*" element={<NotFound />} />
     </Routes>

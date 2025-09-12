@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
+import { useProject } from "@/store/project";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,12 +12,33 @@ import { UserPlus, ArrowLeft } from "lucide-react";
 export default function UsuarioNovo() {
   const { toast } = useToast();
   const navigate = useNavigate();
-
+  const { projeto } = useProject();
+  const projetoSelecionado = !!projeto?.id;
   const [username, setUsername] = useState("");
   const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole]       = useState<"user" | "admin">("user");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const s = await fetch("/api/session", { credentials: "include" });
+        const sd = await s.json();
+        if (!sd?.authenticated) {
+          navigate("/login", { replace: true });
+          return;
+        }
+        if (sd?.user?.role !== "admin") {
+          toast({ variant: "destructive", title: "Acesso negado", description: "Somente administradores podem criar usuários." });
+          navigate("/usuarios", { replace: true });
+          return;
+        }
+      } catch {
+        navigate("/", { replace: true });
+      }
+    })();
+  }, [navigate, toast]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -43,7 +65,7 @@ export default function UsuarioNovo() {
   }
 
   return (
-    <Layout projectSelected={false}>
+    <Layout projectSelected={projetoSelecionado}>
       <div className="max-w-lg mx-auto">
         <Card className="border-0 shadow-lg rounded-3xl">
           <CardHeader className="border-0">
