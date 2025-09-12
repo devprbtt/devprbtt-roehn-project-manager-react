@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Layout from "@/components/Layout";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, PlusCircle, Server, Layers, DoorOpen } from "lucide-react";
+import { Trash2, PlusCircle, Server, Zap, DoorOpen } from "lucide-react";
 import { useProject } from "@/store/project";
 
 type Ambiente = { id: number; nome: string; area?: { id: number; nome: string } };
@@ -45,7 +46,7 @@ export default function Circuitos() {
       const circData = await circRes.json();
       setAmbientes(ambData?.ambientes || []);
       setCircuitos(circData?.circuitos || []);
-    } catch (e) {
+    } catch {
       toast({ variant: "destructive", title: "Erro", description: "Falha ao carregar dados." });
     } finally {
       setLoading(false);
@@ -131,130 +132,159 @@ export default function Circuitos() {
 
   return (
     <Layout projectSelected={projetoSelecionado}>
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Server className="h-5 w-5" /> Gerenciar Circuitos
-          </h2>
-          <p className="text-sm text-muted-foreground">Cadastre os circuitos com seus identificadores e tipos.</p>
-        </div>
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          {/* Header no padrão Áreas/Ambientes */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-2">
+              <Zap className="h-8 w-8 text-primary" />
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">Gerenciar Circuitos do Projeto</h1>
+                <p className="text-muted-foreground mt-1">Cadastre e liste seus circuitos.</p>
+              </div>
+            </div>
+            <div className="h-1 w-24 bg-gradient-to-r from-primary to-primary-glow rounded-full" />
+          </div>
 
-        {!projetoSelecionado && (
-          <Alert className="mb-6">
-            <AlertDescription>Selecione um projeto na página inicial para cadastrar circuitos.</AlertDescription>
-          </Alert>
-        )}
+          {!projetoSelecionado && (
+            <Alert className="mb-6">
+              <AlertDescription>Selecione um projeto na página inicial para cadastrar circuitos.</AlertDescription>
+            </Alert>
+          )}
 
-        <div className="grid md:grid-cols-2 gap-4">
-          <Card className="border-0 shadow-sm rounded-3xl">
-            <CardHeader className="border-0">Adicionar Novo Circuito</CardHeader>
-            <CardContent>
-              <form className="space-y-3" onSubmit={handleCreate}>
-                <div>
-                  <Label htmlFor="identificador" className="text-muted-foreground">Identificador</Label>
-                  <Input
-                    id="identificador"
-                    value={identificador}
-                    onChange={(e) => setIdentificador(e.target.value)}
-                    required
-                    disabled={!projetoSelecionado}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="nome" className="text-muted-foreground">Nome do Circuito</Label>
-                  <Input
-                    id="nome"
-                    value={nome}
-                    onChange={(e) => setNome(e.target.value)}
-                    required
-                    disabled={!projetoSelecionado}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="tipo" className="text-muted-foreground">Tipo</Label>
-                  <select
-                    id="tipo"
-                    className="w-full h-10 px-3 rounded-md border bg-background"
-                    value={tipo}
-                    onChange={(e) => setTipo(e.target.value as any)}
-                    required
-                    disabled={!projetoSelecionado}
-                  >
-                    <option value="">Selecione o tipo</option>
-                    <option value="luz">Luz</option>
-                    <option value="persiana">Persiana</option>
-                    <option value="hvac">HVAC</option>
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="ambiente_id" className="text-muted-foreground">Ambiente</Label>
-                  <select
-                    id="ambiente_id"
-                    className="w-full h-10 px-3 rounded-md border bg-background"
-                    value={ambienteId as any}
-                    onChange={(e) => setAmbienteId(Number(e.target.value))}
-                    required
-                    disabled={!projetoSelecionado}
-                  >
-                    <option value="">Selecione um ambiente</option>
-                    {ambienteOptions.map((opt) => (
-                      <option key={opt.id} value={opt.id}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Form */}
+            <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Server className="h-5 w-5 text-primary" />
+                  Adicionar Novo Circuito
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form className="space-y-4" onSubmit={handleCreate}>
+                  <div>
+                    <Label htmlFor="identificador">Identificador</Label>
+                    <Input
+                      id="identificador"
+                      value={identificador}
+                      onChange={(e) => setIdentificador(e.target.value)}
+                      required
+                      disabled={!projetoSelecionado}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="nome">Nome do Circuito</Label>
+                    <Input
+                      id="nome"
+                      value={nome}
+                      onChange={(e) => setNome(e.target.value)}
+                      required
+                      disabled={!projetoSelecionado}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="tipo">Tipo</Label>
+                    <select
+                      id="tipo"
+                      className="mt-1 w-full h-10 px-3 rounded-md border bg-background"
+                      value={tipo}
+                      onChange={(e) => setTipo(e.target.value as any)}
+                      required
+                      disabled={!projetoSelecionado}
+                    >
+                      <option value="">Selecione o tipo</option>
+                      <option value="luz">Luz</option>
+                      <option value="persiana">Persiana</option>
+                      <option value="hvac">HVAC</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="ambiente_id">Ambiente</Label>
+                    <select
+                      id="ambiente_id"
+                      className="mt-1 w-full h-10 px-3 rounded-md border bg-background"
+                      value={ambienteId as any}
+                      onChange={(e) => setAmbienteId(Number(e.target.value))}
+                      required
+                      disabled={!projetoSelecionado}
+                    >
+                      <option value="">Selecione um ambiente</option>
+                      {ambienteOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                <Button type="submit" className="w-full" disabled={!projetoSelecionado}>
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Adicionar Circuito
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+                  <Button type="submit" className="w-full" disabled={!projetoSelecionado}>
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Adicionar Circuito
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
 
-          <Card className="border-0 shadow-sm rounded-3xl">
-            <CardHeader className="border-0">Circuitos Cadastrados</CardHeader>
-            <CardContent>
-              {loading ? (
-                <p className="text-sm text-muted-foreground">Carregando…</p>
-              ) : circuitos.length === 0 ? (
-                <p className="text-muted-foreground text-center py-6">Nenhum circuito cadastrado ainda.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {circuitos.map((c) => (
-                    <li key={c.id} className="flex items-start justify-between rounded-lg border p-3">
-                      <div className="mr-4">
-                        <div className="font-semibold">
-                          {c.identificador} — {c.nome} ({c.tipo})
+            {/* Lista */}
+            <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center justify-between text-xl">
+                  <span className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-primary" />
+                    Circuitos Cadastrados
+                  </span>
+                  <Badge variant="secondary" className="text-xs">
+                    {circuitos.length} {circuitos.length === 1 ? "circuito" : "circuitos"}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <p className="text-sm text-muted-foreground">Carregando…</p>
+                ) : circuitos.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Zap className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-muted-foreground">Nenhum circuito cadastrado ainda.</p>
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
+                    {circuitos.map((c) => (
+                      <li key={c.id} className="flex items-start justify-between rounded-lg border p-3 bg-card hover:bg-accent/50 transition-colors group">
+                        <div className="mr-4">
+                          <div className="font-semibold">
+                            {c.identificador} — {c.nome} ({c.tipo})
+                          </div>
+                          <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+                            <DoorOpen className="h-4 w-4" />
+                            Ambiente: {c.ambiente?.nome}
+                            {c.ambiente?.area?.nome ? <> (Área: {c.ambiente.area.nome})</> : null}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            SAK:{" "}
+                            {c.tipo !== "hvac"
+                              ? (c.sak ?? <span className="italic opacity-60">—</span>)
+                              : <span className="opacity-60">Não aplicável</span>}
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground flex items-center gap-2">
-                          <DoorOpen className="h-4 w-4" />
-                          Ambiente: {c.ambiente?.nome}
-                          {c.ambiente?.area?.nome ? <> (Área: {c.ambiente.area.nome})</> : null}
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          SAK:{" "}
-                          {c.tipo !== "hvac"
-                            ? (c.sak ?? <span className="italic opacity-60">—</span>)
-                            : <span className="opacity-60">Não aplicável</span>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
                         <Button
-                          variant="outline"
-                          className="text-red-600 border-red-600 hover:bg-red-50"
+                          variant="destructive"
+                          size="sm"
                           onClick={() => handleDelete(c.id)}
                           disabled={!projetoSelecionado}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Excluir
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </Layout>
