@@ -1,0 +1,182 @@
+import React, { useState, useEffect } from "react";
+import Layout from "../components/Layout";
+import CreateProjectForm from "@/components/dashboard/CreateProjectForm";
+import ProjectGrid from "@/components/dashboard/ProjectGrid";
+import CurrentProjectAlert from "@/components/dashboard/CurrentProjectAlert";
+import ImportProjectSection from "@/components/dashboard/ImportProjectSection";
+import NavigationGuide from "@/components/dashboard/NavigationGuide";
+
+// Tipagem do projeto conforme backend Flask
+export type Project = {
+  id: number;
+  nome: string;
+  selected?: boolean;
+};
+
+const Dashboard: React.FC = () => {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [currentProject, setCurrentProject] = useState<Project | undefined>();
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Carregar projetos e projeto atual
+  const loadProjects = async () => {
+    setIsLoading(true);
+    try {
+      const projRes = await fetch("/api/projetos", { credentials: "include" });
+      const projData = await projRes.json();
+      if (projData.ok && Array.isArray(projData.projetos)) {
+        setProjects(projData.projetos);
+      }
+
+      // Buscar o projeto atual
+      const currentRes = await fetch("/api/projeto_atual", { credentials: "include" });
+      const currentData = await currentRes.json();
+      if (currentData.ok && currentData.projeto_atual) {
+        setCurrentProject(currentData.projeto_atual);
+      } else {
+        setCurrentProject(undefined);
+      }
+    } catch (error) {
+      // Trate o erro se necessário
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  // Criar novo projeto
+  const handleProjectCreated = async (formData: { name: string; description?: string; status: string }) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/projetos", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome: formData.name }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        // Seleciona automaticamente o projeto criado
+        await fetch("/api/projeto_atual", {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projeto_id: data.id }),
+        });
+        await loadProjects();
+      }
+    } catch (error) {}
+    setShowCreateForm(false);
+    setIsLoading(false);
+  };
+
+  // Selecionar projeto
+  const handleSelectProject = async (project: Project) => {
+    setIsLoading(true);
+    try {
+      await fetch("/api/projeto_atual", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projeto_id: project.id }),
+      });
+      await loadProjects();
+    } catch (error) {}
+    setIsLoading(false);
+  };
+
+  // Excluir projeto
+  const handleDeleteProject = async (projectId: number) => {
+    setIsLoading(true);
+    try {
+      await fetch(`/api/projetos/${projectId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      await loadProjects();
+    } catch (error) {}
+    setIsLoading(false);
+  };
+
+  async function handleUpdateProject(projectId: number, data: Partial<Project>) {
+    await fetch(`/api/projetos/${projectId}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome: data.nome }),
+    });
+
+    // Atualiza lista de projetos
+    const res = await fetch("/api/projetos", { credentials: "include" });
+    const projetosData = await res.json();
+    if (projetosData.ok && Array.isArray(projetosData.projetos)) {
+      setProjects(projetosData.projetos);
+    }
+
+    // Atualiza o projeto atual!
+    const currentRes = await fetch("/api/projeto_atual", { credentials: "include" });
+    const currentData = await currentRes.json();
+    if (currentData.ok && currentData.projeto_atual) {
+      setCurrentProject(currentData.projeto_atual);
+    }
+  }
+
+  return (
+    <Layout projectSelected={!!currentProject} projectId={currentProject?.id}>
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
+          <div>
+            <h1 className="text-4xl font-bold text-slate-900 mb-2">
+              Gerenciador de Projetos
+            </h1>
+            <p className="text-lg text-slate-600 max-w-2xl">
+              Gerencie seus projetos com elegância e eficiência. 
+              Crie, organize e acompanhe o progresso de todos os seus projetos em um só lugar.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3"
+            style={{ fontSize: "1rem" }}
+          >
+            Novo Projeto
+          </button>
+        </div>
+
+        {/* Current Project Alert */}
+        <CurrentProjectAlert currentProject={currentProject} />
+
+        {/* Create Project Form */}
+        {showCreateForm && (
+          <CreateProjectForm 
+            onSubmit={handleProjectCreated}
+            onCancel={() => setShowCreateForm(false)}
+          />
+        )}
+
+        {/* Projects Grid */}
+        <ProjectGrid 
+          projects={projects}
+          currentProject={currentProject}
+          isLoading={isLoading}
+          onSelectProject={handleSelectProject}
+          onDeleteProject={handleDeleteProject}
+          onUpdateProject={(projectId, data) => handleUpdateProject(projectId, { nome: data.nome })}
+
+        />
+
+        {/* Import Section */}
+        <ImportProjectSection onProjectImported={loadProjects} />
+
+        {/* Navigation Guide */}
+        {currentProject && <NavigationGuide />}
+      </div>
+    </Layout>
+  );
+};
+
+export default Dashboard;
