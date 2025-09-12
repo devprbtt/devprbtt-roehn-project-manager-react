@@ -4,10 +4,15 @@ import csv
 import uuid
 import io
 from datetime import datetime
+from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao
 
 class RoehnProjectConverter:
-    def __init__(self):
-        self.project_data = None
+    # --- AQUI ESTÁ A CORREÇÃO ---
+    # O construtor agora aceita o ID do usuário logado
+    def __init__(self, projeto_data, db_session, user_id):
+        self.project_data = projeto_data
+        self.db_session = db_session
+        self.user_id = user_id # Armazena o ID do usuário
         self.modules_info = {
             'ADP-RL12': {'driver_guid': '80000000-0000-0000-0000-000000000006', 'slots': {'Load ON/OFF': 12}},
             'RL4': {'driver_guid': '80000000-0000-0000-0000-000000000010', 'slots': {'Load ON/OFF': 4}},
@@ -15,6 +20,72 @@ class RoehnProjectConverter:
             'SA1': {'driver_guid': '80000000-0000-0000-0000-000000000013', 'slots': {'IR': 1}},
             'DIM8': {'driver_guid': '80000000-0000-0000-0000-000000000001', 'slots': {'Load Dim': 8}}
         }
+
+    def process_json_project(self):
+        try:
+            # Obtenha os dados do projeto exportado (apenas para nome, etc.)
+            project_info = self.project_data.get('projeto', {})
+            project_name = project_info.get('nome')
+            
+            if not project_name:
+                raise Exception("O nome do projeto não foi encontrado no JSON. Verifique se o arquivo é válido.")
+
+            # --- AQUI ESTÁ A CORREÇÃO ---
+            # Crie o novo projeto e use o ID do usuário logado
+            projeto = Projeto(nome=project_name, user_id=self.user_id)
+            self.db_session.add(projeto)
+            self.db_session.flush()
+
+            # ... (o restante da sua lógica de importação de áreas, ambientes, etc.)
+
+            # Processamento de Áreas
+            for area_data in self.project_data.get('areas', []):
+                area = Area(nome=area_data.get('nome'), projeto_id=projeto.id)
+                self.db_session.add(area)
+                self.db_session.flush()
+
+                # Processamento de Ambientes
+                for ambiente_data in self.project_data.get('ambientes', []):
+                    if ambiente_data.get('area_id') == area_data.get('id'):
+                        ambiente = Ambiente(nome=ambiente_data.get('nome'), area_id=area.id)
+                        self.db_session.add(ambiente)
+                        self.db_session.flush()
+
+                        # Processamento de Circuitos
+                        for circuito_data in self.project_data.get('circuitos', []):
+                            if circuito_data.get('ambiente_id') == ambiente_data.get('id'):
+                                circuito = Circuito(
+                                    identificador=circuito_data.get('identificador'),
+                                    nome=circuito_data.get('nome'),
+                                    tipo=circuito_data.get('tipo'),
+                                    ambiente_id=ambiente.id,
+                                    sak=circuito_data.get('sak')
+                                )
+                                self.db_session.add(circuito)
+                                self.db_session.flush()
+
+            # Processamento de Módulos (fora do loop de ambientes)
+            for modulo_data in self.project_data.get('modulos', []):
+                modulo = Modulo(
+                    nome=modulo_data.get('nome'),
+                    tipo=modulo_data.get('tipo'),
+                    quantidade_canais=modulo_data.get('quantidade_canais'),
+                    projeto_id=projeto.id
+                )
+                self.db_session.add(modulo)
+
+            # Processamento de Vinculacoes (fora do loop)
+            for vinculacao_data in self.project_data.get('vinculacoes', []):
+                # ... (sua lógica para criar a vinculacao)
+                pass # ou adicione sua lógica aqui
+
+            self.db_session.commit()
+            print("Importação concluída com sucesso!")
+
+        except Exception as e:
+            self.db_session.rollback()
+            raise Exception(f"Erro ao processar dados do JSON: {e}")
+
 
     def process_db_project(self, projeto):
         """Processa os dados do projeto do banco de dados para o formato Roehn"""

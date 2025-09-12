@@ -1,26 +1,27 @@
-// src/components/RequireAdmin.tsx
+// RequireAdmin.tsx
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { useAuth } from "@/store/auth";
 
 export default function RequireAdmin({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<"loading" | "ok" | "login" | "forbidden">("loading");
+  const { user, loading } = useAuth();
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/session", { credentials: "include" });
-        const data = await res.json();
-        if (!data?.authenticated) return setState("login");
-        if (data?.user?.role !== "admin") return setState("forbidden");
-        setState("ok");
-      } catch {
-        setState("login");
+    if (!loading) {
+      if (!user) {
+        setChecked(true);
+      } else if (user.role !== "admin") {
+        setChecked(true);
+      } else {
+        setChecked(true);
       }
-    })();
-  }, []);
+    }
+  }, [user, loading]);
 
-  if (state === "loading") return <div className="p-6 text-sm text-muted-foreground">Verificando permissões…</div>;
-  if (state === "login") return <Navigate to="/login" replace />;
-  if (state === "forbidden") return <Navigate to="/" replace />;
+  if (loading) return <div className="p-6 text-sm text-muted-foreground">Verificando permissões…</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "admin") return <Navigate to="/" replace />;
+  
   return <>{children}</>;
 }

@@ -36,25 +36,55 @@ export default function Circuitos() {
   const projetoSelecionado = !!projeto?.id;
 
   const fetchData = async () => {
+    if (!projetoSelecionado) {
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
       const [ambRes, circRes] = await Promise.all([
         fetch("/api/ambientes", { credentials: "same-origin" }),
         fetch("/api/circuitos", { credentials: "same-origin" }),
       ]);
+      
+      // Verificar se as respostas são válidas
+      if (!ambRes.ok || !circRes.ok) {
+        throw new Error("Falha ao carregar dados");
+      }
+      
       const ambData = await ambRes.json();
       const circData = await circRes.json();
-      setAmbientes(ambData?.ambientes || []);
-      setCircuitos(circData?.circuitos || []);
-    } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Falha ao carregar dados." });
+      
+      // Verificar a estrutura das respostas
+      setAmbientes(ambData?.ambientes || ambData || []);
+      setCircuitos(circData?.circuitos || circData || []);
+    } catch (error) {
+      console.error("Erro ao carregar dados:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "Erro", 
+        description: "Falha ao carregar dados. Verifique se há um projeto selecionado." 
+      });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (projetoSelecionado) fetchData();
+    // Adicionar tratamento de erro global para promises não tratadas
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled promise rejection:', event.reason);
+      event.preventDefault(); // Previne o log padrão do navegador
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    fetchData();
+
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
   }, [projetoSelecionado]);
 
   const ambienteOptions = useMemo(
@@ -84,14 +114,22 @@ export default function Circuitos() {
           ambiente_id: ambienteId,
         }),
       });
-      let data: any = null;
-      try { data = await res.json(); } catch {}
-      if (res.ok && (data?.ok || data?.success)) {
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      if (data?.ok || data?.success) {
         setIdentificador("");
         setNome("");
         setTipo("");
         setAmbienteId("");
-        await fetchData();
+        // Usar then/catch em vez de await para evitar possíveis problemas
+        fetchData().catch(error => {
+          console.error("Erro ao recarregar dados:", error);
+        });
         toast({ title: "Sucesso!", description: "Circuito adicionado." });
       } else {
         toast({
@@ -100,8 +138,13 @@ export default function Circuitos() {
           description: data?.error || data?.message || "Falha ao adicionar circuito.",
         });
       }
-    } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Falha ao se conectar ao servidor." });
+    } catch (error) {
+      console.error("Erro ao criar circuito:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "Erro", 
+        description: "Falha ao se conectar ao servidor." 
+      });
     }
   }
 
@@ -113,9 +156,14 @@ export default function Circuitos() {
         credentials: "same-origin",
         headers: { Accept: "application/json" },
       });
-      let data: any = null;
-      try { data = await res.json(); } catch {}
-      if (res.ok && (data?.ok || data?.success)) {
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      
+      if (data?.ok || data?.success) {
         setCircuitos((prev) => prev.filter((c) => c.id !== id));
         toast({ title: "Sucesso!", description: "Circuito excluído." });
       } else {
@@ -125,8 +173,13 @@ export default function Circuitos() {
           description: data?.error || data?.message || "Falha ao excluir circuito.",
         });
       }
-    } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Falha ao se conectar ao servidor." });
+    } catch (error) {
+      console.error("Erro ao excluir circuito:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "Erro", 
+        description: "Falha ao se conectar ao servidor." 
+      });
     }
   }
 
@@ -209,7 +262,7 @@ export default function Circuitos() {
                       value={ambienteId as any}
                       onChange={(e) => setAmbienteId(Number(e.target.value))}
                       required
-                      disabled={!projetoSelecionado}
+                      disabled={!projetoSelecionado || ambienteOptions.length === 0}
                     >
                       <option value="">Selecione um ambiente</option>
                       {ambienteOptions.map((opt) => (
@@ -218,9 +271,18 @@ export default function Circuitos() {
                         </option>
                       ))}
                     </select>
+                    {ambienteOptions.length === 0 && projetoSelecionado && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Nenhum ambiente disponível. Crie ambientes primeiro.
+                      </p>
+                    )}
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={!projetoSelecionado}>
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={!projetoSelecionado || ambienteOptions.length === 0}
+                  >
                     <PlusCircle className="h-4 w-4 mr-2" />
                     Adicionar Circuito
                   </Button>
@@ -243,11 +305,18 @@ export default function Circuitos() {
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <p className="text-sm text-muted-foreground">Carregando…</p>
+                  <div className="flex justify-center items-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="ml-2 text-sm text-muted-foreground">Carregando...</p>
+                  </div>
                 ) : circuitos.length === 0 ? (
                   <div className="text-center py-8">
                     <Zap className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-muted-foreground">Nenhum circuito cadastrado ainda.</p>
+                    <p className="text-muted-foreground">
+                      {projetoSelecionado 
+                        ? "Nenhum circuito cadastrado ainda." 
+                        : "Selecione um projeto para ver os circuitos."}
+                    </p>
                   </div>
                 ) : (
                   <ul className="space-y-3">

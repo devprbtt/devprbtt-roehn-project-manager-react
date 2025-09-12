@@ -5,6 +5,7 @@ import ProjectGrid from "@/components/dashboard/ProjectGrid";
 import CurrentProjectAlert from "@/components/dashboard/CurrentProjectAlert";
 import ImportProjectSection from "@/components/dashboard/ImportProjectSection";
 import NavigationGuide from "@/components/dashboard/NavigationGuide";
+import { Download, Plus } from "lucide-react";
 
 // Tipagem do projeto conforme backend Flask
 export type Project = {
@@ -18,6 +19,7 @@ const Dashboard: React.FC = () => {
   const [currentProject, setCurrentProject] = useState<Project | undefined>();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Carregar projetos e projeto atual
   const loadProjects = async () => {
@@ -47,6 +49,52 @@ const Dashboard: React.FC = () => {
     loadProjects();
   }, []);
 
+
+  // Função para exportar projeto em JSON
+  const handleExportProject = async () => {
+    if (!currentProject) return;
+    
+    setIsExporting(true);
+    try {
+      // CORREÇÃO: Usar a rota correta do backend sem o prefixo /api/
+      const response = await fetch(`/exportar-projeto/${currentProject.id}`, {
+        credentials: "include",
+      });
+      
+      if (response.ok) {
+        // Obter o nome do arquivo do header Content-Disposition
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = `projeto_${currentProject.nome}_${new Date().toISOString().split('T')[0]}.json`;
+        
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
+          }
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.style.display = "none";
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        console.error("Falha ao exportar projeto");
+        alert("Erro ao exportar projeto. Verifique se o projeto existe e tente novamente.");
+      }
+    } catch (error) {
+      console.error("Erro ao exportar projeto:", error);
+      alert("Erro ao exportar projeto. Tente novamente.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Criar novo projeto
   const handleProjectCreated = async (formData: { name: string; description?: string; status: string }) => {
     setIsLoading(true);
@@ -66,7 +114,11 @@ const Dashboard: React.FC = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ projeto_id: data.id }),
         });
-        await loadProjects();
+        
+        // Atualiza localmente sem recarregar tudo
+        const newProject = { id: data.id, nome: formData.name, selected: true };
+        setProjects(prev => [...prev, newProject]);
+        setCurrentProject(newProject);
       }
     } catch (error) {}
     setShowCreateForm(false);
@@ -83,7 +135,13 @@ const Dashboard: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projeto_id: project.id }),
       });
-      await loadProjects();
+      
+      // Atualiza localmente sem recarregar tudo
+      setProjects(prev => prev.map(p => ({
+        ...p,
+        selected: p.id === project.id
+      })));
+      setCurrentProject(project);
     } catch (error) {}
     setIsLoading(false);
   };
@@ -96,12 +154,19 @@ const Dashboard: React.FC = () => {
         method: "DELETE",
         credentials: "include",
       });
-      await loadProjects();
+      
+      // Atualiza localmente sem recarregar tudo
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+      
+      // Se era o projeto atual, limpa a seleção
+      if (currentProject?.id === projectId) {
+        setCurrentProject(undefined);
+      }
     } catch (error) {}
     setIsLoading(false);
   };
 
-  async function handleUpdateProject(projectId: number, data: Partial<Project>) {
+  const handleUpdateProject = async (projectId: number, data: Partial<Project>) => {
     await fetch(`/api/projetos/${projectId}`, {
       method: "PUT",
       credentials: "include",
@@ -109,20 +174,16 @@ const Dashboard: React.FC = () => {
       body: JSON.stringify({ nome: data.nome }),
     });
 
-    // Atualiza lista de projetos
-    const res = await fetch("/api/projetos", { credentials: "include" });
-    const projetosData = await res.json();
-    if (projetosData.ok && Array.isArray(projetosData.projetos)) {
-      setProjects(projetosData.projetos);
-    }
+    // Atualiza localmente sem recarregar tudo
+    setProjects(prev => prev.map(p => 
+      p.id === projectId ? { ...p, nome: data.nome || p.nome } : p
+    ));
 
-    // Atualiza o projeto atual!
-    const currentRes = await fetch("/api/projeto_atual", { credentials: "include" });
-    const currentData = await currentRes.json();
-    if (currentData.ok && currentData.projeto_atual) {
-      setCurrentProject(currentData.projeto_atual);
+    // Se era o projeto atual, atualiza também
+    if (currentProject?.id === projectId) {
+      setCurrentProject(prev => prev ? { ...prev, nome: data.nome || prev.nome } : prev);
     }
-  }
+  };
 
   return (
     <Layout projectSelected={!!currentProject} projectId={currentProject?.id}>
@@ -138,13 +199,25 @@ const Dashboard: React.FC = () => {
               Crie, organize e acompanhe o progresso de todos os seus projetos em um só lugar.
             </p>
           </div>
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3"
-            style={{ fontSize: "1rem" }}
-          >
-            Novo Projeto
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            {currentProject && (
+              <button
+                onClick={handleExportProject}
+                disabled={isExporting}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3 disabled:opacity-50"
+              >
+                <Download className="w-5 h-5" />
+                {isExporting ? 'Exportando...' : 'Exportar JSON'}
+              </button>
+            )}
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3"
+            >
+              <Plus className="w-5 h-5" />
+              Novo Projeto
+            </button>
+          </div>
         </div>
 
         {/* Current Project Alert */}
@@ -166,7 +239,6 @@ const Dashboard: React.FC = () => {
           onSelectProject={handleSelectProject}
           onDeleteProject={handleDeleteProject}
           onUpdateProject={(projectId, data) => handleUpdateProject(projectId, { nome: data.nome })}
-
         />
 
         {/* Import Section */}

@@ -1269,22 +1269,30 @@ def exportar_projeto(projeto_id):
 @login_required
 def import_roehn():
     if 'file' not in request.files:
-        return jsonify({"success": False, "message": "Nenhum arquivo enviado."}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"success": False, "message": "Nome de arquivo inválido."}), 400
+        return jsonify({"success": False, "error": "Nenhum arquivo enviado"}), 400
 
-    if not file.filename.endswith('.json'):
-        return jsonify({"success": False, "message": "Formato de arquivo inválido. Por favor, use um arquivo JSON."}), 400
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({"success": False, "error": "Nenhum arquivo selecionado"}), 400
+
+    if file and file.filename.endswith('.json'):
+        try:
+            project_json_data = json.load(file)
+            
+            # --- AQUI ESTÁ A CORREÇÃO ---
+            # Passe o ID do usuário logado para a classe RoehnProjectConverter
+            converter = RoehnProjectConverter(project_json_data, db.session, current_user.id)
+            converter.process_json_project()
+            
+            return jsonify({"success": True, "message": "Importação concluída com sucesso."})
+
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Erro na importação: {e}")
+            return jsonify({"success": False, "error": f"Erro na importação: {e}"}), 500
     
-    try:
-        converter = RoehnProjectConverter(db.session, current_user.id)
-        converter.import_project(file)
-        return jsonify({"success": True, "message": "Projeto importado com sucesso."})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+    return jsonify({"success": False, "error": "Tipo de arquivo não suportado"}), 400
 
 @app.route('/user/change-password', methods=['POST'])
 @login_required

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
-import { useProject } from "@/store/project";
+import { useAuth } from "@/store/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -11,8 +11,7 @@ import { Badge } from "@/components/ui/badge";
 type UserRow = { id: number; username: string; email: string; role: "admin" | "user"; is_current?: boolean };
 
 export default function Usuarios() {
-  const { projeto } = useProject();
-  const projetoSelecionado = !!projeto?.id;
+  const { user: sessionUser } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -20,40 +19,44 @@ export default function Usuarios() {
 
   useEffect(() => {
     (async () => {
-      try {
-        const s = await fetch("/api/session", { credentials: "include" });
-        const sd = await s.json();
-        if (!sd?.authenticated) {
-          navigate("/login", { replace: true });
-          return;
-        }
-        if (sd?.user?.role !== "admin") {
-          toast({ variant: "destructive", title: "Acesso negado", description: "A página de usuários é restrita a administradores." });
-          navigate("/", { replace: true });
-          return;
-        }
-        await fetchUsers();
-      } catch {
+      if (sessionUser?.role !== "admin") {
+        toast({ 
+          variant: "destructive", 
+          title: "Acesso negado", 
+          description: "A página de usuários é restrita a administradores." 
+        });
         navigate("/", { replace: true });
+        return;
       }
+      await fetchUsers();
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sessionUser]);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/users", { credentials: "same-origin" });
-      if (res.status === 401) { navigate("/login", { replace: true }); return; }
+      if (res.status === 401) { 
+        navigate("/login", { replace: true }); 
+        return; 
+      }
       if (res.status === 403) {
-        toast({ variant: "destructive", title: "Acesso negado", description: "A página de usuários é restrita a administradores." });
+        toast({ 
+          variant: "destructive", 
+          title: "Acesso negado", 
+          description: "A página de usuários é restrita a administradores." 
+        });
         navigate("/", { replace: true });
         return;
       }
       const data = await res.json();
       setUsers(data?.users || []);
     } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Falha ao carregar usuários." });
+      toast({ 
+        variant: "destructive", 
+        title: "Erro", 
+        description: "Falha ao carregar usuários." 
+      });
     } finally {
       setLoading(false);
     }
@@ -72,18 +75,25 @@ export default function Usuarios() {
         setUsers(prev => prev.filter(u => u.id !== id));
         toast({ title: "Sucesso!", description: "Usuário excluído." });
       } else {
-        toast({ variant: "destructive", title: "Erro", description: data?.error || data?.message || "Falha ao excluir usuário." });
+        toast({ 
+          variant: "destructive", 
+          title: "Erro", 
+          description: data?.error || data?.message || "Falha ao excluir usuário." 
+        });
       }
     } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Falha ao se conectar ao servidor." });
+      toast({ 
+        variant: "destructive", 
+        title: "Erro", 
+        description: "Falha ao se conectar ao servidor." 
+      });
     }
   }
 
   return (
-    <Layout projectSelected={projetoSelecionado}>
+    <Layout>
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
-          {/* Header no padrão */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
               <Shield className="h-8 w-8 text-primary" />
@@ -97,7 +107,12 @@ export default function Usuarios() {
 
           <div className="flex items-center justify-between mb-4">
             <div className="h-10" />
-            <Button asChild><Link to="/usuarios/novo"><UserPlus className="h-4 w-4 mr-2" />Novo Usuário</Link></Button>
+            <Button asChild>
+              <Link to="/usuarios/novo">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Novo Usuário
+              </Link>
+            </Button>
           </div>
 
           <Card className="border-0 shadow-sm rounded-3xl bg-card/50 backdrop-blur-sm">

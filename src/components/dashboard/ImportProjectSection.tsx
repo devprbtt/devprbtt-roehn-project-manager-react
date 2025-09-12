@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Upload, FileUp, Info } from "lucide-react";
 import { motion } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
 
 type Props = {
   onProjectImported: () => void;
@@ -13,6 +14,7 @@ type Props = {
 const ImportProjectSection: React.FC<Props> = ({ onProjectImported }) => {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -22,13 +24,45 @@ const ImportProjectSection: React.FC<Props> = ({ onProjectImported }) => {
 
   const handleImport = async () => {
     if (!importFile) return;
+    
     setIsImporting(true);
-    // Aqui você pode fazer o upload real do arquivo para o backend
-    setTimeout(() => {
+    
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+
+      const response = await fetch("/import_roehn", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast({
+          title: "Sucesso!",
+          description: "Projeto importado com sucesso.",
+        });
+        onProjectImported();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erro na importação",
+          description: data.message || "Falha ao importar o projeto.",
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao importar projeto:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao conectar com o servidor.",
+      });
+    } finally {
       setIsImporting(false);
       setImportFile(null);
-      onProjectImported();
-    }, 2000);
+    }
   };
 
   return (

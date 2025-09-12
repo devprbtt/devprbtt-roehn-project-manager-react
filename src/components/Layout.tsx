@@ -1,7 +1,7 @@
-import React, { ReactNode, useMemo, useEffect, useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useProject } from "@/store/project";
-
+import { useAuth } from "@/store/auth"; // Importar do store
 import {
   FolderOpen,
   Home,
@@ -14,7 +14,6 @@ import {
   Users as UsersIcon,
   LogOut,
 } from "lucide-react";
-
 import {
   Sidebar,
   SidebarContent,
@@ -35,9 +34,8 @@ import { useToast } from "@/hooks/use-toast";
 const createPageUrl = (page: string) => "/" + page.toLowerCase();
 
 interface LayoutProps {
-  children: ReactNode;
+  children: React.ReactNode;
   user?: { username?: string; role?: string };
-  /** opcional; se não vier, uso o store/localStorage */
   projectSelected?: boolean;
   projectId?: number;
 }
@@ -61,46 +59,22 @@ const baseItems: NavItem[] = [
 
 const Layout: React.FC<LayoutProps> = ({
   children,
-  user,
   projectSelected: projectSelectedProp,
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  // 1) Tentamos o store
   const { projeto } = useProject();
+  const { user: sessionUser, loading: sessionLoading, logout } = useAuth();
 
-  // 2) Backup: às vezes o store ainda não hidrata; tentamos localStorage (se você salvar algo como "projectId")
   const lsProjectId = (() => {
     try { return Number(localStorage.getItem("projectId") || 0) || 0; } catch { return 0; }
   })();
 
-  // 3) projectSelected final
   const projectSelected =
     projectSelectedProp ??
     Boolean(projeto?.id) ??
     Boolean(lsProjectId);
-
-  // Sessão para saber se é admin quando `user` não vem por prop
-  const [sessionUser, setSessionUser] = useState(user ?? null);
-  useEffect(() => { setSessionUser(user ?? null); }, [user]);
-  useEffect(() => {
-    if (user) return;
-    (async () => {
-      try {
-        const res = await fetch("/api/session", { credentials: "include" });
-        const data = await res.json();
-        if (data?.authenticated && data?.user) {
-          setSessionUser({ username: data.user.username, role: data.user.role });
-        } else {
-          setSessionUser(null);
-        }
-      } catch {
-        setSessionUser(null);
-      }
-    })();
-  }, [user]);
 
   const isAdmin = sessionUser?.role === "admin";
 
@@ -113,11 +87,12 @@ const Layout: React.FC<LayoutProps> = ({
   }, [isAdmin]);
 
   const [loggingOut, setLoggingOut] = useState(false);
+
   const handleLogout = async () => {
     if (loggingOut) return;
     setLoggingOut(true);
     try {
-      await fetch("/api/logout", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" } });
+      await logout();
       toast({ title: "Sessão encerrada" });
     } catch {
       // segue pro login mesmo assim
@@ -155,9 +130,6 @@ const Layout: React.FC<LayoutProps> = ({
                       location.pathname === item.url ||
                       location.pathname.startsWith(item.url + "/");
 
-                    // IMPORTANTE:
-                    // - Só "esmaecemos" quando realmente não há projeto
-                    // - Não bloqueamos clique para admins (fica apenas visual) — evita travar navegação em /usuarios
                     const disableByProject = item.requiresProject && !projectSelected;
                     const classNames = [
                       "transition-all duration-200 rounded-xl h-11",
@@ -165,7 +137,7 @@ const Layout: React.FC<LayoutProps> = ({
                       active
                         ? "bg-slate-900 text-white hover:bg-slate-800 hover:text-white shadow-lg"
                         : "text-slate-600",
-                      disableByProject ? "opacity-60" : "", // <- tiramos pointer-events-none aqui
+                      disableByProject ? "opacity-60" : "",
                     ].join(" ");
 
                     return (
@@ -175,7 +147,6 @@ const Layout: React.FC<LayoutProps> = ({
                             to={item.url}
                             onClick={(e) => {
                               if (disableByProject) {
-                                // feedback elegante + navega pra dashboard
                                 e.preventDefault();
                                 toast({
                                   title: "Selecione um projeto",
@@ -202,15 +173,15 @@ const Layout: React.FC<LayoutProps> = ({
             <div className="flex items-center gap-3 px-2 mb-3">
               <div className="w-9 h-9 bg-gradient-to-br from-slate-100 to-slate-200 rounded-full flex items-center justify-center">
                 <span className="text-slate-600 font-semibold text-sm">
-                  {sessionUser?.username?.charAt(0)?.toUpperCase() || "U"}
+                  {sessionLoading ? "" : sessionUser?.username?.charAt(0)?.toUpperCase() || "U"}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-slate-900 text-sm truncate">
-                  {sessionUser?.username || "Usuário"}
+                  {sessionLoading ? "Carregando..." : sessionUser?.username || "Usuário"}
                 </p>
                 <p className="text-xs text-slate-500 truncate">
-                  {sessionUser?.role ? `Função: ${sessionUser.role}` : "Gerenciar projetos"}
+                  {sessionLoading ? "" : (sessionUser?.role ? `Função: ${sessionUser.role}` : "Gerenciar projetos")}
                 </p>
               </div>
             </div>
