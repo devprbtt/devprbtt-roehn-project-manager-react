@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, PlusCircle, Server, Zap, DoorOpen } from "lucide-react";
+import { Trash2, PlusCircle, Zap, DoorOpen, Sparkles } from "lucide-react";
 import { useProject } from "@/store/project";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Ambiente = { id: number; nome: string; area?: { id: number; nome: string } };
 type Circuito = {
@@ -26,6 +27,7 @@ export default function Circuitos() {
   const [ambientes, setAmbientes] = useState<Ambiente[]>([]);
   const [circuitos, setCircuitos] = useState<Circuito[]>([]);
   const [loading, setLoading] = useState(true);
+  const [projetoSelecionado, setProjetoSelecionado] = useState(false);
 
   // form
   const [identificador, setIdentificador] = useState("");
@@ -33,59 +35,62 @@ export default function Circuitos() {
   const [tipo, setTipo] = useState<"luz" | "persiana" | "hvac" | "">("");
   const [ambienteId, setAmbienteId] = useState<number | "">("");
 
-  const projetoSelecionado = !!projeto?.id;
-
-  const fetchData = async () => {
-    if (!projetoSelecionado) {
-      setLoading(false);
-      return;
-    }
-    
+  const checkAndFetchData = async () => {
     setLoading(true);
     try {
-      const [ambRes, circRes] = await Promise.all([
-        fetch("/api/ambientes", { credentials: "same-origin" }),
-        fetch("/api/circuitos", { credentials: "same-origin" }),
-      ]);
-      
-      // Verificar se as respostas são válidas
-      if (!ambRes.ok || !circRes.ok) {
-        throw new Error("Falha ao carregar dados");
-      }
-      
-      const ambData = await ambRes.json();
-      const circData = await circRes.json();
-      
-      // Verificar a estrutura das respostas
-      setAmbientes(ambData?.ambientes || ambData || []);
-      setCircuitos(circData?.circuitos || circData || []);
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error);
-      toast({ 
-        variant: "destructive", 
-        title: "Erro", 
-        description: "Falha ao carregar dados. Verifique se há um projeto selecionado." 
+      const response = await fetch("/api/projeto_atual", {
+        credentials: "same-origin",
       });
+      const projectData = await response.json();
+
+      if (projectData.ok && projectData.projeto_atual) {
+        setProjetoSelecionado(true);
+        const [ambRes, circRes] = await Promise.all([
+          fetch("/api/ambientes", { credentials: "same-origin" }),
+          fetch("/api/circuitos", { credentials: "same-origin" }),
+        ]);
+
+        if (!ambRes.ok || !circRes.ok) {
+          throw new Error("Falha ao carregar dados");
+        }
+
+        const ambData = await ambRes.json();
+        const circData = await circRes.json();
+
+        setAmbientes(ambData?.ambientes || ambData || []);
+        setCircuitos(circData?.circuitos || circData || []);
+      } else {
+        setProjetoSelecionado(false);
+        setAmbientes([]);
+        setCircuitos([]);
+      }
+    } catch (error) {
+      console.error("Erro ao verificar/carregar dados do projeto:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Falha ao carregar dados. Verifique se há um projeto selecionado.",
+      });
+      setProjetoSelecionado(false);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Adicionar tratamento de erro global para promises não tratadas
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error('Unhandled promise rejection:', event.reason);
-      event.preventDefault(); // Previne o log padrão do navegador
+      console.error("Unhandled promise rejection:", event.reason);
+      event.preventDefault();
     };
 
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
 
-    fetchData();
+    checkAndFetchData();
 
     return () => {
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
     };
-  }, [projetoSelecionado]);
+  }, []);
 
   const ambienteOptions = useMemo(
     () =>
@@ -93,7 +98,7 @@ export default function Circuitos() {
         id: a.id,
         label: a.area?.nome ? `${a.nome} (${a.area.nome})` : a.nome,
       })),
-    [ambientes]
+    [ambientes],
   );
 
   async function handleCreate(e: React.FormEvent) {
@@ -114,20 +119,19 @@ export default function Circuitos() {
           ambiente_id: ambienteId,
         }),
       });
-      
+
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
-      
+
       const data = await res.json();
-      
+
       if (data?.ok || data?.success) {
         setIdentificador("");
         setNome("");
         setTipo("");
         setAmbienteId("");
-        // Usar then/catch em vez de await para evitar possíveis problemas
-        fetchData().catch(error => {
+        checkAndFetchData().catch((error) => {
           console.error("Erro ao recarregar dados:", error);
         });
         toast({ title: "Sucesso!", description: "Circuito adicionado." });
@@ -140,10 +144,10 @@ export default function Circuitos() {
       }
     } catch (error) {
       console.error("Erro ao criar circuito:", error);
-      toast({ 
-        variant: "destructive", 
-        title: "Erro", 
-        description: "Falha ao se conectar ao servidor." 
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Falha ao se conectar ao servidor.",
       });
     }
   }
@@ -156,13 +160,13 @@ export default function Circuitos() {
         credentials: "same-origin",
         headers: { Accept: "application/json" },
       });
-      
+
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
-      
+
       const data = await res.json();
-      
+
       if (data?.ok || data?.success) {
         setCircuitos((prev) => prev.filter((c) => c.id !== id));
         toast({ title: "Sucesso!", description: "Circuito excluído." });
@@ -175,184 +179,264 @@ export default function Circuitos() {
       }
     } catch (error) {
       console.error("Erro ao excluir circuito:", error);
-      toast({ 
-        variant: "destructive", 
-        title: "Erro", 
-        description: "Falha ao se conectar ao servidor." 
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Falha ao se conectar ao servidor.",
       });
     }
   }
 
   return (
     <Layout projectSelected={projetoSelecionado}>
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
-          {/* Header no padrão Áreas/Ambientes */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <Zap className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold text-foreground">Gerenciar Circuitos do Projeto</h1>
-                <p className="text-muted-foreground mt-1">Cadastre e liste seus circuitos.</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
+            <div>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                  <Zap className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Circuitos</h1>
+                  <p className="text-lg text-slate-600 max-w-2xl">
+                    Cadastre e organize os circuitos elétricos do seu projeto com elegância e eficiência.
+                  </p>
+                </div>
               </div>
+              <div className="h-1 w-32 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-sm" />
             </div>
-            <div className="h-1 w-24 bg-gradient-to-r from-primary to-primary-glow rounded-full" />
           </div>
 
-          {!projetoSelecionado && (
-            <Alert className="mb-6">
-              <AlertDescription>Selecione um projeto na página inicial para cadastrar circuitos.</AlertDescription>
-            </Alert>
+          {!projetoSelecionado && !loading && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+              <Alert className="bg-amber-50 border-amber-200 shadow-sm">
+                <Sparkles className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  Selecione um projeto na página inicial para cadastrar circuitos.
+                </AlertDescription>
+              </Alert>
+            </motion.div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Form */}
-            <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Server className="h-5 w-5 text-primary" />
-                  Adicionar Novo Circuito
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form className="space-y-4" onSubmit={handleCreate}>
-                  <div>
-                    <Label htmlFor="identificador">Identificador</Label>
-                    <Input
-                      id="identificador"
-                      value={identificador}
-                      onChange={(e) => setIdentificador(e.target.value)}
-                      required
-                      disabled={!projetoSelecionado}
-                      className="mt-1"
-                    />
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+                <CardHeader className="pb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <PlusCircle className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-2xl font-bold text-slate-900">Adicionar Novo Circuito</CardTitle>
+                      <p className="text-slate-600 mt-1">Preencha as informações do circuito</p>
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="nome">Nome do Circuito</Label>
-                    <Input
-                      id="nome"
-                      value={nome}
-                      onChange={(e) => setNome(e.target.value)}
-                      required
-                      disabled={!projetoSelecionado}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="tipo">Tipo</Label>
-                    <select
-                      id="tipo"
-                      className="mt-1 w-full h-10 px-3 rounded-md border bg-background"
-                      value={tipo}
-                      onChange={(e) => setTipo(e.target.value as any)}
-                      required
-                      disabled={!projetoSelecionado}
-                    >
-                      <option value="">Selecione o tipo</option>
-                      <option value="luz">Luz</option>
-                      <option value="persiana">Persiana</option>
-                      <option value="hvac">HVAC</option>
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="ambiente_id">Ambiente</Label>
-                    <select
-                      id="ambiente_id"
-                      className="mt-1 w-full h-10 px-3 rounded-md border bg-background"
-                      value={ambienteId as any}
-                      onChange={(e) => setAmbienteId(Number(e.target.value))}
-                      required
-                      disabled={!projetoSelecionado || ambienteOptions.length === 0}
-                    >
-                      <option value="">Selecione um ambiente</option>
-                      {ambienteOptions.map((opt) => (
-                        <option key={opt.id} value={opt.id}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                    {ambienteOptions.length === 0 && projetoSelecionado && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Nenhum ambiente disponível. Crie ambientes primeiro.
-                      </p>
-                    )}
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
-                    disabled={!projetoSelecionado || ambienteOptions.length === 0}
-                  >
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    Adicionar Circuito
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            {/* Lista */}
-            <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center justify-between text-xl">
-                  <span className="flex items-center gap-2">
-                    <Zap className="h-5 w-5 text-primary" />
-                    Circuitos Cadastrados
-                  </span>
-                  <Badge variant="secondary" className="text-xs">
-                    {circuitos.length} {circuitos.length === 1 ? "circuito" : "circuitos"}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="flex justify-center items-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    <p className="ml-2 text-sm text-muted-foreground">Carregando...</p>
-                  </div>
-                ) : circuitos.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Zap className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-muted-foreground">
-                      {projetoSelecionado 
-                        ? "Nenhum circuito cadastrado ainda." 
-                        : "Selecione um projeto para ver os circuitos."}
-                    </p>
-                  </div>
-                ) : (
-                  <ul className="space-y-3">
-                    {circuitos.map((c) => (
-                      <li key={c.id} className="flex items-start justify-between rounded-lg border p-3 bg-card hover:bg-accent/50 transition-colors group">
-                        <div className="mr-4">
-                          <div className="font-semibold">
-                            {c.identificador} — {c.nome} ({c.tipo})
-                          </div>
-                          <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
-                            <DoorOpen className="h-4 w-4" />
-                            Ambiente: {c.ambiente?.nome}
-                            {c.ambiente?.area?.nome ? <> (Área: {c.ambiente.area.nome})</> : null}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            SAK:{" "}
-                            {c.tipo !== "hvac"
-                              ? (c.sak ?? <span className="italic opacity-60">—</span>)
-                              : <span className="opacity-60">Não aplicável</span>}
-                          </div>
-                        </div>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(c.id)}
+                </CardHeader>
+                <CardContent>
+                  <form className="space-y-6" onSubmit={handleCreate}>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="identificador" className="text-sm font-semibold text-slate-700">
+                          Identificador *
+                        </Label>
+                        <Input
+                          id="identificador"
+                          placeholder="Ex: C001, L01..."
+                          value={identificador}
+                          onChange={(e) => setIdentificador(e.target.value)}
+                          required
                           disabled={!projetoSelecionado}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-12 px-4 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="nome" className="text-sm font-semibold text-slate-700">
+                          Nome do Circuito *
+                        </Label>
+                        <Input
+                          id="nome"
+                          placeholder="Digite o nome do circuito..."
+                          value={nome}
+                          onChange={(e) => setNome(e.target.value)}
+                          required
+                          disabled={!projetoSelecionado}
+                          className="h-12 px-4 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="tipo" className="text-sm font-semibold text-slate-700">
+                          Tipo *
+                        </Label>
+                        <select
+                          id="tipo"
+                          className="h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          value={tipo}
+                          onChange={(e) => setTipo(e.target.value as any)}
+                          required
+                          disabled={!projetoSelecionado}
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
+                          <option value="">Selecione o tipo</option>
+                          <option value="luz">💡 Luz</option>
+                          <option value="persiana">🪟 Persiana</option>
+                          <option value="hvac">❄️ HVAC</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ambiente_id" className="text-sm font-semibold text-slate-700">
+                          Ambiente *
+                        </Label>
+                        <select
+                          id="ambiente_id"
+                          className="h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          value={ambienteId as any}
+                          onChange={(e) => setAmbienteId(Number(e.target.value))}
+                          required
+                          disabled={!projetoSelecionado || ambientes.length === 0}
+                        >
+                          <option value="">Selecione um ambiente</option>
+                          {ambienteOptions.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                        {ambientes.length === 0 && projetoSelecionado && (
+                          <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" />
+                            Nenhum ambiente disponível. Crie ambientes primeiro.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                      disabled={!projetoSelecionado || ambientes.length === 0}
+                    >
+                      <PlusCircle className="h-5 w-5" />
+                      Adicionar Circuito
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+                <CardHeader className="pb-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                        <Zap className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-2xl font-bold text-slate-900">Circuitos Cadastrados</CardTitle>
+                        <p className="text-slate-600 mt-1">Lista de todos os circuitos</p>
+                      </div>
+                    </div>
+                    <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-medium px-3 py-1">
+                      {circuitos.length} {circuitos.length === 1 ? "circuito" : "circuitos"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex flex-col justify-center items-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
+                      <p className="text-slate-600 font-medium">Carregando circuitos...</p>
+                    </div>
+                  ) : circuitos.length === 0 ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-center py-12"
+                    >
+                      <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Zap className="h-10 w-10 text-slate-400" />
+                      </div>
+                      <h4 className="text-xl font-semibold text-slate-900 mb-2">
+                        {projetoSelecionado ? "Nenhum circuito cadastrado" : "Selecione um projeto"}
+                      </h4>
+                      <p className="text-slate-600 max-w-sm mx-auto">
+                        {projetoSelecionado
+                          ? "Comece adicionando seu primeiro circuito usando o formulário ao lado."
+                          : "Selecione um projeto para visualizar e gerenciar os circuitos."}
+                      </p>
+                    </motion.div>
+                  ) : (
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                      <AnimatePresence>
+                        {circuitos.map((c, index) => (
+                          <motion.div
+                            key={c.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 mr-4">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <Badge
+                                    className={`text-xs font-medium px-2 py-1 ${
+                                      c.tipo === "luz"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : c.tipo === "persiana"
+                                          ? "bg-blue-100 text-blue-800"
+                                          : "bg-green-100 text-green-800"
+                                    }`}
+                                  >
+                                    {c.tipo === "luz" ? "💡" : c.tipo === "persiana" ? "🪟" : "❄️"}{" "}
+                                    {c.tipo.toUpperCase()}
+                                  </Badge>
+                                  <span className="text-sm font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                    {c.identificador}
+                                  </span>
+                                </div>
+                                <h4 className="font-bold text-slate-900 text-lg mb-2">{c.nome}</h4>
+                                <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
+                                  <DoorOpen className="h-4 w-4 text-slate-400" />
+                                  <span className="font-medium">{c.ambiente?.nome}</span>
+                                  {c.ambiente?.area?.nome && (
+                                    <>
+                                      <span className="text-slate-400">•</span>
+                                      <span className="text-slate-500">Área: {c.ambiente.area.nome}</span>
+                                    </>
+                                  )}
+                                </div>
+                                <div className="text-xs text-slate-500">
+                                  <span className="font-medium">SAK: </span>
+                                  {c.tipo !== "hvac" ? (
+                                    (c.sak ?? <span className="italic opacity-60">Não definido</span>)
+                                  ) : (
+                                    <span className="opacity-60">Não aplicável</span>
+                                  )}
+                                </div>
+                              </div>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDelete(c.id)}
+                                disabled={!projetoSelecionado}
+                                className="opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
           </div>
         </div>
       </div>
