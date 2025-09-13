@@ -6,9 +6,18 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useProject } from "@/store/project";
-import { Link } from "react-router-dom";
-import { Link2, Trash2, Plug } from "lucide-react";
+import {
+  Link2,
+  Trash2,
+  Plug,
+  PlusCircle,
+  Zap,
+  Boxes,
+  Sparkles,
+  RefreshCcw,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Circuito = {
   id: number;
@@ -17,7 +26,9 @@ type Circuito = {
   tipo: "luz" | "persiana" | "hvac";
   area_nome?: string;
   ambiente_nome?: string;
+  vinculado?: boolean;
 };
+
 type Modulo = {
   id: number;
   nome: string;
@@ -25,6 +36,7 @@ type Modulo = {
   canais_disponiveis: number[];
   quantidade_canais?: number;
 };
+
 type Vinculacao = {
   id: number;
   circuito_id: number;
@@ -36,19 +48,16 @@ type Vinculacao = {
   modulo_tipo: string;
   canal: number;
 };
-type OptionsPayload = {
-  compat: Record<"luz" | "persiana" | "hvac", string[]>;
-  circuitos: Circuito[];
-  modulos: Modulo[];
-};
 
 export default function Vinculacao() {
+  const { toast } = useToast();
   const { projeto } = useProject();
   const projetoSelecionado = !!projeto?.id;
-  const { toast } = useToast();
 
-  const [options, setOptions] = useState<OptionsPayload>({ compat: { luz: [], persiana: [], hvac: [] }, circuitos: [], modulos: [] });
+  const [circuitos, setCircuitos] = useState<Circuito[]>([]);
+  const [modulos, setModulos] = useState<Modulo[]>([]);
   const [vinculacoes, setVinculacoes] = useState<Vinculacao[]>([]);
+  const [compat, setCompat] = useState<Record<"luz" | "persiana" | "hvac", string[]>>({ luz: [], persiana: [], hvac: [] });
   const [loading, setLoading] = useState(true);
 
   // form
@@ -56,245 +65,410 @@ export default function Vinculacao() {
   const [moduloId, setModuloId] = useState<number | "">("");
   const [canal, setCanal] = useState<number | "">("");
 
-  const circuitoSelecionado = useMemo(() => options.circuitos.find(c => c.id === circuitoId), [circuitoId, options.circuitos]);
+  const selectedCircuito = useMemo(
+    () => circuitos.find((c) => c.id === circuitoId),
+    [circuitoId, circuitos],
+  );
+  
   const modulosFiltrados = useMemo(() => {
-    if (!circuitoSelecionado) return options.modulos;
-    const compatList = options.compat[circuitoSelecionado.tipo] || [];
-    return options.modulos.filter(m => compatList.includes(m.tipo));
-  }, [circuitoSelecionado, options.modulos, options.compat]);
-  const canaisDisponiveis = useMemo(() => {
-    if (!moduloId) return [];
-    const m = options.modulos.find(mm => mm.id === moduloId);
-    return m?.canais_disponiveis ?? [];
-  }, [moduloId, options.modulos]);
+    if (!selectedCircuito) return modulos;
+    const compatList = compat[selectedCircuito.tipo] || [];
+    return modulos.filter(m => compatList.includes(m.tipo));
+  }, [selectedCircuito, modulos, compat]);
 
-  const fetchAll = async () => {
+  const selectedModulo = useMemo(
+    () => modulos.find((m) => m.id === moduloId),
+    [moduloId, modulos],
+  );
+
+  const canaisDisponiveis = useMemo(
+    () => selectedModulo?.canais_disponiveis || [],
+    [selectedModulo],
+  );
+
+  const circuitosNaoVinculados = useMemo(() => {
+    const circuitosVinculadosIds = new Set(vinculacoes.map(v => v.circuito_id));
+    return circuitos.filter(c => !circuitosVinculadosIds.has(c.id));
+  }, [circuitos, vinculacoes]);
+
+  const fetchAllData = async () => {
+    if (!projetoSelecionado) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [optRes, listRes] = await Promise.all([
         fetch("/api/vinculacao/options", { credentials: "same-origin" }),
         fetch("/api/vinculacoes", { credentials: "same-origin" }),
       ]);
-      const opt = await optRes.json();
-      const lst = await listRes.json();
-      setOptions({ compat: opt?.compat || { luz: [], persiana: [], hvac: [] }, circuitos: opt?.circuitos || [], modulos: opt?.modulos || [] });
-      setVinculacoes(lst?.vinculacoes || []);
-    } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Falha ao carregar dados de vinculação." });
+
+      const optData = await optRes.json();
+      const listData = await listRes.json();
+
+      if (optData?.ok || optData?.success) {
+        setCircuitos(optData?.circuitos || []);
+        setModulos(optData?.modulos || []);
+        setCompat(optData?.compat || { luz: [], persiana: [], hvac: [] });
+      }
+      if (listData?.ok || listData?.success) {
+        setVinculacoes(listData?.vinculacoes || []);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar dados:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Falha ao carregar dados. Tente recarregar a página.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { if (projetoSelecionado) fetchAll(); }, [projetoSelecionado]);
+  useEffect(() => {
+    fetchAllData();
+  }, [projetoSelecionado]);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!circuitoId || !moduloId || !canal) {
-      toast({ variant: "destructive", title: "Erro", description: "Preencha circuito, módulo e canal." });
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Preencha todos os campos para vincular.",
+      });
       return;
     }
+    setLoading(true);
     try {
       const res = await fetch("/api/vinculacoes", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ circuito_id: circuitoId, modulo_id: moduloId, canal }),
+        body: JSON.stringify({
+          circuito_id: circuitoId,
+          modulo_id: moduloId,
+          canal: canal,
+        }),
       });
-      let data: any = null; try { data = await res.json(); } catch {}
+
+      const data = await res.json().catch(() => null);
+
       if (res.ok && (data?.ok || data?.success)) {
-        setCircuitoId(""); setModuloId(""); setCanal("");
-        await fetchAll();
-        toast({ title: "Sucesso!", description: "Vinculação criada." });
+        setCircuitoId("");
+        setModuloId("");
+        setCanal("");
+        await fetchAllData();
+        toast({ title: "Sucesso!", description: "Circuito vinculado." });
       } else {
-        toast({ variant: "destructive", title: "Erro", description: data?.error || data?.message || "Falha ao criar vinculação." });
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: data?.error || data?.message || "Falha ao vincular circuito.",
+        });
       }
     } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Falha ao se conectar com o servidor." });
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Falha ao se conectar ao servidor.",
+      });
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
-  async function handleDelete(id: number) {
+  const handleDelete = async (id: number) => {
     if (!confirm("Tem certeza que deseja excluir esta vinculação?")) return;
+    setLoading(true);
     try {
       const res = await fetch(`/api/vinculacoes/${id}`, {
         method: "DELETE",
         credentials: "same-origin",
         headers: { Accept: "application/json" },
       });
-      let data: any = null; try { data = await res.json(); } catch {}
+
+      const data = await res.json().catch(() => null);
+
       if (res.ok && (data?.ok || data?.success)) {
-        setVinculacoes(prev => prev.filter(v => v.id !== id));
-        const optRes = await fetch("/api/vinculacao/options", { credentials: "same-origin" });
-        const opt = await optRes.json();
-        setOptions({ compat: opt?.compat || { luz: [], persiana: [], hvac: [] }, circuitos: opt?.circuitos || [], modulos: opt?.modulos || [] });
+        await fetchAllData();
         toast({ title: "Sucesso!", description: "Vinculação excluída." });
       } else {
-        toast({ variant: "destructive", title: "Erro", description: data?.error || data?.message || "Falha ao excluir vinculação." });
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: data?.error || data?.message || "Falha ao excluir vinculação.",
+        });
       }
     } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Falha ao se conectar com o servidor." });
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Falha ao se conectar ao servidor.",
+      });
+    } finally {
+      setLoading(false);
     }
-  }
+  };
+
+  const getTipoBadge = (tipo: string) => {
+    switch (tipo) {
+      case "luz":
+        return { label: "💡 Luz", color: "bg-yellow-100 text-yellow-800" };
+      case "persiana":
+        return { label: "🪟 Persiana", color: "bg-blue-100 text-blue-800" };
+      case "hvac":
+        return { label: "❄️ HVAC", color: "bg-green-100 text-green-800" };
+      default:
+        return { label: tipo, color: "bg-slate-100 text-slate-800" };
+    }
+  };
 
   return (
     <Layout projectSelected={projetoSelecionado}>
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
-          {/* Header no padrão */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <Plug className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold text-foreground">Vincular Circuitos a Módulos</h1>
-                <p className="text-muted-foreground mt-1">Associe seus circuitos a módulos e canais disponíveis.</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
+            <div>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                  <Link2 className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Vinculações</h1>
+                  <p className="text-lg text-slate-600 max-w-2xl">
+                    Conecte circuitos aos canais de seus módulos físicos.
+                  </p>
+                </div>
               </div>
+              <div className="h-1 w-32 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-sm" />
             </div>
-            <div className="h-1 w-24 bg-gradient-to-r from-primary to-primary-glow rounded-full" />
+            <Button
+              onClick={fetchAllData}
+              variant="outline"
+              className="group flex items-center gap-2 h-12 px-6 rounded-full border-slate-200 text-slate-600 hover:text-slate-900 transition-all duration-300"
+            >
+              <RefreshCcw className="h-4 w-4 group-hover:rotate-180 transition-transform duration-500" />
+              Recarregar
+            </Button>
           </div>
 
           {!projetoSelecionado && (
-            <Alert className="mb-6">
-              <AlertDescription>
-                Nenhum projeto selecionado. <Link to="/" className="underline">Volte à página inicial</Link> para selecionar ou criar um projeto.
-              </AlertDescription>
-            </Alert>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+              <Alert className="bg-amber-50 border-amber-200 shadow-sm">
+                <Sparkles className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  Selecione um projeto na página inicial para gerenciar as vinculações.
+                </AlertDescription>
+              </Alert>
+            </motion.div>
           )}
 
-          {/* Form */}
-          <Card className="border-0 shadow-sm rounded-3xl bg-card/50 backdrop-blur-sm mb-6">
-            <CardHeader className="border-0 pb-4">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Link2 className="h-5 w-5 text-primary" />
-                Vincular Circuito
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form className="grid md:grid-cols-5 gap-3 items-end" onSubmit={handleSubmit}>
-                <div className="md:col-span-2">
-                  <Label htmlFor="circuito_id">Circuito</Label>
-                  <select
-                    id="circuito_id"
-                    className="mt-1 w-full h-10 px-3 rounded-md border bg-background"
-                    value={circuitoId as any}
-                    onChange={(e) => { setCircuitoId(Number(e.target.value)); setModuloId(""); setCanal(""); }}
-                    disabled={!projetoSelecionado || loading}
-                    required
-                  >
-                    <option value="">Selecione um circuito</option>
-                    {options.circuitos.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.identificador} - {c.nome}
-                        {c.area_nome ? ` (Área: ${c.area_nome}` : ""}{c.ambiente_nome ? `, Ambiente: ${c.ambiente_nome}` : ""}{c.area_nome ? ")" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+                <CardHeader className="pb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <Plug className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-2xl font-bold text-slate-900">Nova Vinculação</CardTitle>
+                      <p className="text-slate-600 mt-1">Conecte um circuito a um módulo</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleCreate} className="space-y-6">
+                    <div>
+                      <Label htmlFor="circuito" className="text-sm font-semibold text-slate-700">
+                        Circuito *
+                      </Label>
+                      <select
+                        id="circuito"
+                        value={circuitoId as any}
+                        onChange={(e) => {
+                          setCircuitoId(Number(e.target.value));
+                          setModuloId("");
+                          setCanal("");
+                        }}
+                        required
+                        className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        disabled={!projetoSelecionado || circuitosNaoVinculados.length === 0}
+                      >
+                        <option value="">Selecione um circuito</option>
+                        {circuitosNaoVinculados.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.identificador} — {c.nome} ({c.ambiente_nome})
+                          </option>
+                        ))}
+                      </select>
+                      {circuitosNaoVinculados.length === 0 && projetoSelecionado && (
+                        <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" />
+                          Nenhum circuito disponível para vincular.
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="modulo" className="text-sm font-semibold text-slate-700">
+                        Módulo *
+                      </Label>
+                      <select
+                        id="modulo"
+                        value={moduloId as any}
+                        onChange={(e) => {
+                          setModuloId(Number(e.target.value));
+                          setCanal("");
+                        }}
+                        required
+                        className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                        disabled={!projetoSelecionado || modulosFiltrados.length === 0}
+                      >
+                        <option value="">Selecione um módulo</option>
+                        {modulosFiltrados.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.nome} ({m.tipo} - {m.quantidade_canais} canais)
+                          </option>
+                        ))}
+                      </select>
+                      {modulosFiltrados.length === 0 && projetoSelecionado && (
+                        <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" />
+                          Nenhum módulo disponível para vincular.
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="canal" className="text-sm font-semibold text-slate-700">
+                        Canal *
+                      </Label>
+                      <select
+                        id="canal"
+                        value={canal as any}
+                        onChange={(e) => setCanal(Number(e.target.value))}
+                        required
+                        className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                        disabled={!selectedModulo || canaisDisponiveis.length === 0}
+                      >
+                        <option value="">Selecione um canal</option>
+                        {canaisDisponiveis.map((c) => (
+                          <option key={c} value={c}>
+                            Canal {c}
+                          </option>
+                        ))}
+                      </select>
+                      {!selectedModulo && (
+                        <p className="text-sm text-slate-500 mt-1">Selecione um módulo para ver os canais.</p>
+                      )}
+                    </div>
+                    <Button
+                      type="submit"
+                      className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                      disabled={!projetoSelecionado || !selectedCircuito || !selectedModulo || canaisDisponiveis.length === 0}
+                    >
+                      <Plug className="h-5 w-5" />
+                      Vincular Circuito
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-                <div className="md:col-span-2">
-                  <Label htmlFor="modulo_id">Módulo</Label>
-                  <select
-                    id="modulo_id"
-                    className="mt-1 w-full h-10 px-3 rounded-md border bg-background"
-                    value={moduloId as any}
-                    onChange={(e) => { setModuloId(Number(e.target.value)); setCanal(""); }}
-                    disabled={!projetoSelecionado || !circuitoSelecionado || loading}
-                    required
-                  >
-                    <option value="">Selecione um módulo</option>
-                    {modulosFiltrados.map(m => (
-                      <option key={m.id} value={m.id}>
-                        {m.nome} ({m.tipo})
-                      </option>
-                    ))}
-                  </select>
-                  {!!circuitoSelecionado && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Compatível com {circuitoSelecionado.tipo}: {(options.compat[circuitoSelecionado.tipo] || []).join(", ") || "—"}
-                    </p>
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+                <CardHeader className="pb-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                        <Link2 className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-2xl font-bold text-slate-900">Vinculações Cadastradas</CardTitle>
+                        <p className="text-slate-600 mt-1">Lista de todas as vinculações do projeto</p>
+                      </div>
+                    </div>
+                    <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-medium px-3 py-1">
+                      {vinculacoes.length} {vinculacoes.length === 1 ? "vinculação" : "vinculações"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex flex-col justify-center items-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
+                      <p className="text-slate-600 font-medium">Carregando vinculações...</p>
+                    </div>
+                  ) : vinculacoes.length === 0 ? (
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">
+                      <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Link2 className="h-10 w-10 text-slate-400" />
+                      </div>
+                      <h4 className="text-xl font-semibold text-slate-900 mb-2">
+                        {projetoSelecionado ? "Nenhuma vinculação cadastrada" : "Selecione um projeto"}
+                      </h4>
+                      <p className="text-slate-600 max-w-sm mx-auto">
+                        {projetoSelecionado
+                          ? "Comece adicionando a primeira vinculação usando o formulário ao lado."
+                          : "Selecione um projeto para visualizar e gerenciar as vinculações."}
+                      </p>
+                    </motion.div>
+                  ) : (
+                    <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                      <AnimatePresence>
+                        {vinculacoes.map((v, index) => {
+                          const badge = getTipoBadge(v.modulo_tipo);
+                          return (
+                            <motion.div
+                              key={v.id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -20 }}
+                              transition={{ delay: index * 0.05 }}
+                              className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1 mr-4">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <Badge className={`text-xs font-medium px-2 py-1 ${badge.color}`}>
+                                      {badge.label.toUpperCase()}
+                                    </Badge>
+                                    <span className="text-sm font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                      Canal {v.canal}
+                                    </span>
+                                  </div>
+                                  <h4 className="font-bold text-slate-900 text-lg mb-1">{v.circuito_nome}</h4>
+                                  <p className="text-sm text-slate-600 mb-1">
+                                    <span className="font-medium">Identificador:</span> {v.identificador}
+                                  </p>
+                                  <p className="text-sm text-slate-600 mb-1">
+                                    <span className="font-medium">Módulo:</span> {v.modulo_nome}
+                                  </p>
+                                  <p className="text-sm text-slate-500">
+                                    {v.area_nome} &gt; {v.ambiente_nome}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleDelete(v.id)}
+                                  disabled={loading}
+                                  className="opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </AnimatePresence>
+                    </div>
                   )}
-                </div>
-
-                <div>
-                  <Label htmlFor="canal">Canal</Label>
-                  <select
-                    id="canal"
-                    className="mt-1 w-full h-10 px-3 rounded-md border bg-background"
-                    value={canal as any}
-                    onChange={(e) => setCanal(Number(e.target.value))}
-                    disabled={!projetoSelecionado || !moduloId || loading}
-                    required
-                  >
-                    <option value="">Selecione</option>
-                    {canaisDisponiveis.map(ch => (
-                      <option key={ch} value={ch}>Canal {ch}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="md:col-span-5">
-                  <Button type="submit" className="w-full md:w-auto" disabled={!projetoSelecionado || loading}>
-                    <Link2 className="h-4 w-4 mr-2" />
-                    Vincular
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Lista */}
-          <Card className="border-0 shadow-sm rounded-3xl bg-card/50 backdrop-blur-sm">
-            <CardHeader className="border-0 pb-4">
-              <CardTitle className="flex items-center justify-between text-xl">
-                <span className="flex items-center gap-2">
-                  <Plug className="h-5 w-5 text-primary" />
-                  Vinculações Existentes
-                </span>
-                <Badge variant="secondary" className="text-xs">
-                  {vinculacoes.length} {vinculacoes.length === 1 ? "vinculação" : "vinculações"}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <p className="text-sm text-muted-foreground">Carregando…</p>
-              ) : vinculacoes.length === 0 ? (
-                <p className="text-muted-foreground text-center py-6">Nenhuma vinculação cadastrada ainda.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left border-b bg-muted/40">
-                        <th className="py-2 px-3">Circuito</th>
-                        <th className="py-2 px-3">Área</th>
-                        <th className="py-2 px-3">Ambiente</th>
-                        <th className="py-2 px-3">Módulo</th>
-                        <th className="py-2 px-3">Canal</th>
-                        <th className="py-2 px-3 text-right">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {vinculacoes.map(v => (
-                        <tr key={v.id} className="border-b">
-                          <td className="py-2 px-3"><strong>{v.identificador}</strong> — {v.circuito_nome}</td>
-                          <td className="py-2 px-3">{v.area_nome}</td>
-                          <td className="py-2 px-3">{v.ambiente_nome}</td>
-                          <td className="py-2 px-3">{v.modulo_nome} ({v.modulo_tipo})</td>
-                          <td className="py-2 px-3">{v.canal}</td>
-                          <td className="py-2 px-3 text-right">
-                            <Button variant="destructive" size="sm" onClick={() => handleDelete(v.id)}>
-                              <Trash2 className="h-4 w-4 mr-1" />
-                              Excluir
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
         </div>
       </div>
     </Layout>

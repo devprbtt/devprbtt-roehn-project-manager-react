@@ -176,7 +176,7 @@ def roehn_import():
     
     try:
         # Converter dados do projeto para Roehn
-        converter = RoehnProjectConverter()
+        converter = RoehnProjectConverter(projeto, db.session, current_user.id)
         converter.create_project(project_info)
         
         # Processar os dados do projeto atual - CORREÇÃO AQUI
