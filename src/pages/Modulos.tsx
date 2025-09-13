@@ -8,7 +8,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useProject } from "@/store/project";
-import { PlusCircle, Trash2, Boxes, Server } from "lucide-react";
+import { PlusCircle, Trash2, Boxes, Server, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 type MetaModulo = {
   nome_completo: string;
@@ -128,136 +129,194 @@ export default function Modulos() {
 
   return (
     <Layout projectSelected={projetoSelecionado}>
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
-          {/* Header no padrão */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <Boxes className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold text-foreground">Gerenciar Módulos do Projeto</h1>
-                <p className="text-muted-foreground mt-1">Cadastre módulos físicos e defina seus canais.</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
+            <div>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-violet-600 rounded-3xl flex items-center justify-center shadow-lg shadow-purple-500/25">
+                  <Boxes className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Módulos</h1>
+                  <p className="text-lg text-slate-600 max-w-2xl">
+                    Cadastre e gerencie os módulos físicos do seu projeto, definindo seus tipos e canais.
+                  </p>
+                </div>
               </div>
+              <div className="h-1 w-32 bg-gradient-to-r from-purple-600 to-violet-600 rounded-full shadow-sm" />
             </div>
-            <div className="h-1 w-24 bg-gradient-to-r from-primary to-primary-glow rounded-full" />
           </div>
 
           {!projetoSelecionado && (
-            <Alert className="mb-6">
-              <AlertDescription>Selecione um projeto na página inicial para cadastrar módulos.</AlertDescription>
-            </Alert>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+              <Alert className="bg-amber-50 border-amber-200 shadow-sm">
+                <Sparkles className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  Selecione um projeto na página inicial para cadastrar módulos.
+                </AlertDescription>
+              </Alert>
+            </motion.div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Form */}
-            <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Server className="h-5 w-5 text-primary" />
-                  Adicionar Novo Módulo
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loadingMeta ? (
-                  <p className="text-sm text-muted-foreground">Carregando metadados…</p>
-                ) : (
-                  <form className="space-y-4" onSubmit={handleCreate}>
-                    <div>
-                      <Label htmlFor="tipo">Tipo</Label>
-                      <select
-                        id="tipo"
-                        className="mt-1 w-full h-10 px-3 rounded-md border bg-background"
-                        value={tipo}
-                        onChange={(e) => setTipo(e.target.value)}
-                        required
-                        disabled={!projetoSelecionado}
-                      >
-                        <option value="">Selecione o tipo</option>
-                        {tipoOptions.map(t => (
-                          <option key={t} value={t}>
-                            {meta[t]?.nome_completo || t}
-                          </option>
-                        ))}
-                      </select>
-                      {!!tipo && meta[tipo] && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Canais: {meta[tipo].canais} • Tipos permitidos: {meta[tipo].tipos_permitidos.join(", ")}
-                        </p>
-                      )}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+                <CardHeader className="pb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <PlusCircle className="w-6 h-6 text-white" />
                     </div>
-
                     <div>
-                      <Label htmlFor="nome">Nome do Módulo</Label>
-                      <Input
-                        id="nome"
-                        value={nome}
-                        onChange={(e) => setNome(e.target.value)}
-                        placeholder={tipo && meta[tipo]?.nome_completo ? meta[tipo].nome_completo : ""}
-                        required
-                        disabled={!projetoSelecionado}
-                        className="mt-1"
-                      />
+                      <CardTitle className="text-2xl font-bold text-slate-900">Adicionar Novo Módulo</CardTitle>
+                      <p className="text-slate-600 mt-1">Preencha as informações do módulo físico</p>
                     </div>
-
-                    <Button type="submit" className="w-full" disabled={!projetoSelecionado}>
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      Adicionar Módulo
-                    </Button>
-                  </form>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Lista */}
-            <Card className="shadow-sm border-0 bg-card/50 backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center justify-between text-xl">
-                  <span className="flex items-center gap-2">
-                    <Boxes className="h-5 w-5 text-primary" />
-                    Módulos Cadastrados
-                  </span>
-                  <Badge variant="secondary" className="text-xs">
-                    {modulos.length} {modulos.length === 1 ? "módulo" : "módulos"}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <p className="text-sm text-muted-foreground">Carregando…</p>
-                ) : modulos.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Boxes className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-muted-foreground">Nenhum módulo cadastrado.</p>
                   </div>
-                ) : (
-                  <ul className="space-y-3">
-                    {modulos.map(m => (
-                      <li key={m.id} className="flex items-center justify-between rounded-lg border p-3 bg-card hover:bg-accent/50 transition-colors group">
-                        <div className="mr-4">
-                          <div className="font-semibold">{m.nome} ({m.tipo})</div>
-                          <div className="text-sm text-muted-foreground">Canais: {m.quantidade_canais}</div>
-                          {m.vinc_count && m.vinc_count > 0 ? (
-                            <div className="text-xs mt-1 px-2 py-1 rounded bg-yellow-100 text-yellow-800 w-fit">
-                              Em uso ({m.vinc_count})
-                            </div>
-                          ) : null}
-                        </div>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(m.id)}
-                          disabled={!!m.vinc_count && m.vinc_count > 0}
-                          title={m.vinc_count && m.vinc_count > 0 ? "Exclua as vinculações antes de remover este módulo." : undefined}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                </CardHeader>
+                <CardContent>
+                  {loadingMeta ? (
+                    <div className="flex items-center justify-center py-8 text-slate-600">
+                      <div className="animate-spin rounded-full h-8 w-8 border-4 border-purple-500 border-t-transparent mr-4"></div>
+                      Carregando metadados...
+                    </div>
+                  ) : (
+                    <form className="space-y-6" onSubmit={handleCreate}>
+                      <div>
+                        <Label htmlFor="tipo" className="text-sm font-semibold text-slate-700">Tipo *</Label>
+                        <select
+                          id="tipo"
+                          className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                          value={tipo}
+                          onChange={(e) => setTipo(e.target.value)}
+                          required
+                          disabled={!projetoSelecionado}
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
+                          <option value="">Selecione o tipo</option>
+                          {tipoOptions.map(t => (
+                            <option key={t} value={t}>
+                              {meta[t]?.nome_completo || t}
+                            </option>
+                          ))}
+                        </select>
+                        {!!tipo && meta[tipo] && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            Canais: {meta[tipo].canais} • Tipos permitidos: {meta[tipo].tipos_permitidos.join(", ")}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <Label htmlFor="nome" className="text-sm font-semibold text-slate-700">Nome do Módulo *</Label>
+                        <Input
+                          id="nome"
+                          value={nome}
+                          onChange={(e) => setNome(e.target.value)}
+                          placeholder={tipo && meta[tipo]?.nome_completo ? meta[tipo].nome_completo : ""}
+                          required
+                          disabled={!projetoSelecionado}
+                          className="mt-2 h-12 px-4 rounded-xl border-slate-200 focus:border-purple-500 focus:ring-purple-500/20"
+                        />
+                      </div>
+
+                      <Button type="submit" className="w-full h-12 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2" disabled={!projetoSelecionado}>
+                        <PlusCircle className="h-5 w-5" />
+                        Adicionar Módulo
+                      </Button>
+                    </form>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+                <CardHeader className="pb-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                        <Boxes className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-2xl font-bold text-slate-900">Módulos Cadastrados</CardTitle>
+                        <p className="text-slate-600 mt-1">Lista de todos os módulos do projeto</p>
+                      </div>
+                    </div>
+                    <Badge className="bg-gradient-to-r from-purple-500 to-violet-500 text-white text-sm font-medium px-3 py-1">
+                      {modulos.length} {modulos.length === 1 ? "módulo" : "módulos"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex flex-col justify-center items-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-4"></div>
+                      <p className="text-slate-600 font-medium">Carregando módulos...</p>
+                    </div>
+                  ) : modulos.length === 0 ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-center py-12"
+                    >
+                      <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Boxes className="h-10 w-10 text-slate-400" />
+                      </div>
+                      <h4 className="text-xl font-semibold text-slate-900 mb-2">
+                        {projetoSelecionado ? "Nenhum módulo cadastrado" : "Selecione um projeto"}
+                      </h4>
+                      <p className="text-slate-600 max-w-sm mx-auto">
+                        {projetoSelecionado
+                          ? "Comece adicionando seu primeiro módulo usando o formulário ao lado."
+                          : "Selecione um projeto para visualizar e gerenciar os módulos."}
+                      </p>
+                    </motion.div>
+                  ) : (
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                      <AnimatePresence>
+                        {modulos.map((m, index) => (
+                          <motion.li
+                            key={m.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300 flex items-center justify-between"
+                          >
+                            <div className="flex-1 mr-4">
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className="text-sm font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                  {m.tipo}
+                                </span>
+                              </div>
+                              <h4 className="font-bold text-slate-900 text-lg mb-1">{m.nome}</h4>
+                              <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
+                                <Server className="h-4 w-4 text-slate-400" />
+                                <span className="font-medium">Canais: {m.quantidade_canais}</span>
+                              </div>
+                              {m.vinc_count && m.vinc_count > 0 && (
+                                <Badge className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 mt-1 w-fit">
+                                  Em uso ({m.vinc_count} vinculações)
+                                </Badge>
+                              )}
+                            </div>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDelete(m.id)}
+                              disabled={!!m.vinc_count && m.vinc_count > 0}
+                              title={m.vinc_count && m.vinc_count > 0 ? "Exclua as vinculações antes de remover este módulo." : undefined}
+                              className="opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </motion.li>
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
           </div>
         </div>
       </div>
