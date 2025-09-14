@@ -14,6 +14,7 @@ import {
   Building2,
   Sparkles,
   FolderPlus,
+  MapPin, 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -25,7 +26,31 @@ type Area = {
 export default function Areas() {
   const { toast } = useToast();
   const { projeto } = useProject();
-  const projetoSelecionado = !!projeto?.id;
+  const [projetoSelecionado, setProjetoSelecionado] = useState<boolean | null>(projeto ? true : null);
+  const isLocked = projetoSelecionado !== true;
+
+  // Se o store já tem projeto, marcamos como selecionado
+  useEffect(() => {
+    try {
+      if (projeto) setProjetoSelecionado(true);
+    } catch {}
+  }, [projeto]);
+
+  // Checa a sessão quando ainda não sabemos se há projeto
+  useEffect(() => {
+    const checkProject = async () => {
+      try {
+        if (projetoSelecionado !== null) return;
+        const res = await fetch("/api/projeto_atual", { credentials: "same-origin" });
+        const data = await res.json();
+        setProjetoSelecionado(!!(data?.ok && data?.projeto_atual));
+      } catch {
+        setProjetoSelecionado(false);
+      }
+    };
+    checkProject();
+  }, [projetoSelecionado]);
+
 
   const [areas, setAreas] = useState<Area[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +81,7 @@ export default function Areas() {
   };
 
   useEffect(() => {
-    if (projetoSelecionado) {
+    if (projetoSelecionado === true) {
       fetchAreas();
     } else {
       setLoading(false);
@@ -136,13 +161,13 @@ export default function Areas() {
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
             <div>
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-violet-600 rounded-3xl flex items-center justify-center shadow-lg shadow-purple-500/25">
-                  <Building2 className="w-8 h-8 text-white" />
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl flex items-center justify-center shadow-lg shadow-purple-500/25">
+                  <MapPin className="w-8 h-8 text-white" />
                 </div>
                 <div>
                   <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Áreas</h1>
                   <p className="text-lg text-slate-600 max-w-2xl">
-                    Crie e organize as áreas de sua empresa ou residência para gerenciar melhor seus dispositivos.
+                    Adicione áreas ao seu projeto.
                   </p>
                 </div>
               </div>
@@ -150,7 +175,7 @@ export default function Areas() {
             </div>
           </div>
 
-          {!projetoSelecionado && (
+          {projetoSelecionado === false && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
               <Alert className="bg-amber-50 border-amber-200 shadow-sm">
                 <Sparkles className="h-4 w-4 text-amber-600" />
@@ -189,13 +214,13 @@ export default function Areas() {
                         placeholder="Ex: Térreo, Cobertura..."
                         required
                         className="mt-2 h-12 px-4 rounded-xl border-slate-200 focus:border-purple-500 focus:ring-purple-500/20"
-                        disabled={!projetoSelecionado}
+                        disabled={isLocked}
                       />
                     </div>
                     <Button
                       type="submit"
-                      className="w-full h-12 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
-                      disabled={!projetoSelecionado}
+                      className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                      disabled={isLocked}
                     >
                       <PlusCircle className="h-5 w-5" />
                       Adicionar Área
@@ -210,8 +235,8 @@ export default function Areas() {
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <Building2 className="w-6 h-6 text-white" />
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                        <MapPin className="w-6 h-6 text-white" />
                       </div>
                       <div>
                         <CardTitle className="text-2xl font-bold text-slate-900">Áreas Cadastradas</CardTitle>

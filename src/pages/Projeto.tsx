@@ -18,7 +18,28 @@ type ProjetoTree = { projeto: { id: number; nome: string } | null; areas: Area[]
 
 export default function Projeto() {
   const { projeto } = useProject();
-  const projetoSelecionado = !!projeto?.id;
+  const [projetoSelecionado, setProjetoSelecionado] = useState<boolean | null>(projeto ? true : null);
+  const isLocked = projetoSelecionado !== true;
+  // Sincroniza com o store quando hidratar
+  useEffect(() => {
+    try { if (projeto) setProjetoSelecionado(true); } catch {}
+  }, [projeto]);
+
+  // Confirma via sessão quando ainda não sabemos (estado null)
+  useEffect(() => {
+    const checkProject = async () => {
+      try {
+        if (projetoSelecionado !== null) return;
+        const res = await fetch("/api/projeto_atual", { credentials: "same-origin" });
+        const data = await res.json();
+        setProjetoSelecionado(!!(data?.ok && data?.projeto_atual));
+      } catch {
+        setProjetoSelecionado(false);
+      }
+    };
+    checkProject();
+  }, [projetoSelecionado]);
+
   const { toast } = useToast();
 
   const [data, setData] = useState<ProjetoTree>({ projeto: null, areas: [] });
@@ -43,7 +64,7 @@ export default function Projeto() {
   const softwareVersion = "1.0.8.67";
 
   const fetchProjectData = async () => {
-    if (!projetoSelecionado) {
+    if (projetoSelecionado !== true) {
       setLoading(false);
       return;
     }
@@ -113,13 +134,13 @@ export default function Projeto() {
   const handlePrint = () => { window.print(); };
 
   return (
-    <Layout projectSelected={projetoSelecionado}>
+    <Layout projectSelected={projetoSelecionado === true}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
             <div>
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <div className="w-16 h-16 bg-gradient-to-br from-gray-500 to-gray-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
                   <LayoutList className="w-8 h-8 text-white" />
                 </div>
                 <div>
@@ -135,7 +156,7 @@ export default function Projeto() {
               <Button
                 onClick={openPdf}
                 className="group flex items-center gap-2 h-12 px-6 rounded-full border border-blue-600 bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300 shadow-lg hover:shadow-xl"
-                disabled={!projetoSelecionado || loading}
+                disabled={isLocked || loading}
               >
                 <FileOutput className="h-4 w-4" />
                 Gerar AS BUILT
@@ -143,7 +164,7 @@ export default function Projeto() {
               <Button
                 onClick={() => setShowRwp(true)}
                 className="group flex items-center gap-2 h-12 px-6 rounded-full border border-blue-600 bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300 shadow-lg hover:shadow-xl"
-                disabled={!projetoSelecionado || loading}
+                disabled={isLocked || loading}
               >
                 <FileDown className="h-4 w-4" />
                 Gerar RWP
@@ -159,7 +180,7 @@ export default function Projeto() {
             </div>
           </div>
 
-          {!projetoSelecionado && (
+          {projetoSelecionado === false && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
               <Alert className="bg-amber-50 border-amber-200 shadow-sm">
                 <Sparkles className="h-4 w-4 text-amber-600" />

@@ -52,7 +52,28 @@ type Vinculacao = {
 export default function Vinculacao() {
   const { toast } = useToast();
   const { projeto } = useProject();
-  const projetoSelecionado = !!projeto?.id;
+  const [projetoSelecionado, setProjetoSelecionado] = useState<boolean | null>(projeto ? true : null);
+  const isLocked = projetoSelecionado !== true;
+  // Mantém em sincronia com o store quando hidratar
+  useEffect(() => {
+    try { if (projeto) setProjetoSelecionado(true); } catch {}
+  }, [projeto]);
+
+  // Confirma na sessão quando ainda não sabemos
+  useEffect(() => {
+    const checkProject = async () => {
+      try {
+        if (projetoSelecionado !== null) return;
+        const res = await fetch("/api/projeto_atual", { credentials: "same-origin" });
+        const data = await res.json();
+        setProjetoSelecionado(!!(data?.ok && data?.projeto_atual));
+      } catch {
+        setProjetoSelecionado(false);
+      }
+    };
+    checkProject();
+  }, [projetoSelecionado]);
+
 
   const [circuitos, setCircuitos] = useState<Circuito[]>([]);
   const [modulos, setModulos] = useState<Modulo[]>([]);
@@ -92,7 +113,7 @@ export default function Vinculacao() {
   }, [circuitos, vinculacoes]);
 
   const fetchAllData = async () => {
-    if (!projetoSelecionado) {
+    if (projetoSelecionado !== true) {
       setLoading(false);
       return;
     }
@@ -226,13 +247,13 @@ export default function Vinculacao() {
   };
 
   return (
-    <Layout projectSelected={projetoSelecionado}>
+    <Layout projectSelected={projetoSelecionado === true}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
             <div>
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
                   <Link2 className="w-8 h-8 text-white" />
                 </div>
                 <div>
@@ -254,7 +275,7 @@ export default function Vinculacao() {
             </Button>
           </div>
 
-          {!projetoSelecionado && (
+          {projetoSelecionado === false && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
               <Alert className="bg-amber-50 border-amber-200 shadow-sm">
                 <Sparkles className="h-4 w-4 text-amber-600" />
@@ -295,16 +316,16 @@ export default function Vinculacao() {
                         }}
                         required
                         className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                        disabled={!projetoSelecionado || circuitosNaoVinculados.length === 0}
+                        disabled={isLocked || loading || circuitosNaoVinculados.length === 0}
                       >
-                        <option value="">Selecione um circuito</option>
-                        {circuitosNaoVinculados.map((c) => (
+                        <option value="">{loading ? "Carregando circuitos..." : "Selecione um circuito"}</option>
+                        {!loading && circuitosNaoVinculados.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.identificador} — {c.nome} ({c.ambiente_nome})
                           </option>
                         ))}
                       </select>
-                      {circuitosNaoVinculados.length === 0 && projetoSelecionado && (
+                      {!loading && projetoSelecionado && circuitosNaoVinculados.length === 0 && (
                         <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
                           <Sparkles className="w-3 h-3" />
                           Nenhum circuito disponível para vincular.
@@ -324,16 +345,16 @@ export default function Vinculacao() {
                         }}
                         required
                         className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
-                        disabled={!projetoSelecionado || modulosFiltrados.length === 0}
+                        disabled={isLocked || loading || modulosFiltrados.length === 0}
                       >
-                        <option value="">Selecione um módulo</option>
-                        {modulosFiltrados.map((m) => (
+                        <option value="">{loading ? "Carregando módulos..." : "Selecione um módulo"}</option>
+                        {!loading && modulosFiltrados.map((m) => (
                           <option key={m.id} value={m.id}>
                             {m.nome} ({m.tipo} - {m.quantidade_canais} canais)
                           </option>
                         ))}
                       </select>
-                      {modulosFiltrados.length === 0 && projetoSelecionado && (
+                      {!loading && projetoSelecionado && modulosFiltrados.length === 0 && (
                         <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
                           <Sparkles className="w-3 h-3" />
                           Nenhum módulo disponível para vincular.
@@ -353,7 +374,7 @@ export default function Vinculacao() {
                         disabled={!selectedModulo || canaisDisponiveis.length === 0}
                       >
                         <option value="">Selecione um canal</option>
-                        {canaisDisponiveis.map((c) => (
+                        {!loading && canaisDisponiveis.map((c) => (
                           <option key={c} value={c}>
                             Canal {c}
                           </option>
@@ -366,7 +387,7 @@ export default function Vinculacao() {
                     <Button
                       type="submit"
                       className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
-                      disabled={!projetoSelecionado || !selectedCircuito || !selectedModulo || canaisDisponiveis.length === 0}
+                      disabled={isLocked || loading || !selectedCircuito || !selectedModulo || canaisDisponiveis.length === 0}
                     >
                       <Plug className="h-5 w-5" />
                       Vincular Circuito
@@ -381,7 +402,7 @@ export default function Vinculacao() {
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
                         <Link2 className="w-6 h-6 text-white" />
                       </div>
                       <div>
@@ -406,7 +427,7 @@ export default function Vinculacao() {
                         <Link2 className="h-10 w-10 text-slate-400" />
                       </div>
                       <h4 className="text-xl font-semibold text-slate-900 mb-2">
-                        {projetoSelecionado ? "Nenhuma vinculação cadastrada" : "Selecione um projeto"}
+                        {projetoSelecionado === true ? "Nenhuma vinculação cadastrada" : "Selecione um projeto"}
                       </h4>
                       <p className="text-slate-600 max-w-sm mx-auto">
                         {projetoSelecionado

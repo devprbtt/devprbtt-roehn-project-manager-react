@@ -195,8 +195,7 @@ const Dashboard: React.FC = () => {
               Gerenciador de Projetos
             </h1>
             <p className="text-lg text-slate-600 max-w-2xl">
-              Gerencie seus projetos com elegância e eficiência. 
-              Crie, organize e acompanhe o progresso de todos os seus projetos em um só lugar.
+              Gerencie seus projetos com automação ROEHN. Cadastre ambientes, areas, circuitos e módulos e gere um relatório completo.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">

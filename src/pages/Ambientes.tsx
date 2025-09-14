@@ -15,6 +15,7 @@ import {
   Sparkles,
   Building2,
   FolderPlus,
+  Grid3X3,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -24,7 +25,31 @@ type Ambiente = { id: number; nome: string; area?: Area; area_id?: number };
 export default function Ambientes() {
   const { toast } = useToast();
   const { projeto } = useProject();
-  const projetoSelecionado = !!projeto?.id;
+  const [projetoSelecionado, setProjetoSelecionado] = useState<boolean | null>(projeto ? true : null);
+  const isLocked = projetoSelecionado !== true;
+
+  // Se o store já tem projeto, marcamos como selecionado
+  useEffect(() => {
+    try {
+      if (projeto) setProjetoSelecionado(true);
+    } catch {}
+  }, [projeto]);
+
+  // Checa a sessão quando ainda não sabemos se há projeto
+  useEffect(() => {
+    const checkProject = async () => {
+      try {
+        if (projetoSelecionado !== null) return;
+        const res = await fetch("/api/projeto_atual", { credentials: "same-origin" });
+        const data = await res.json();
+        setProjetoSelecionado(!!(data?.ok && data?.projeto_atual));
+      } catch {
+        setProjetoSelecionado(false);
+      }
+    };
+    checkProject();
+  }, [projetoSelecionado]);
+
 
   const [areas, setAreas] = useState<Area[]>([]);
   const [ambientes, setAmbientes] = useState<Ambiente[]>([]);
@@ -73,7 +98,7 @@ export default function Ambientes() {
   };
 
   const fetchAll = async () => {
-    if (!projetoSelecionado) {
+    if (projetoSelecionado !== true) {
       setLoading(false);
       return;
     }
@@ -168,13 +193,13 @@ export default function Ambientes() {
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
             <div>
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-                  <DoorOpen className="w-8 h-8 text-white" />
+                <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                  <Grid3X3 className="w-8 h-8 text-white" />
                 </div>
                 <div>
                   <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Ambientes</h1>
                   <p className="text-lg text-slate-600 max-w-2xl">
-                    Organize seu projeto criando áreas e ambientes, a base para todos os circuitos.
+                    Adicione ambientes dentro de áreas.
                   </p>
                 </div>
               </div>
@@ -182,7 +207,7 @@ export default function Ambientes() {
             </div>
           </div>
 
-          {!projetoSelecionado && (
+          {projetoSelecionado === false && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
               <Alert className="bg-amber-50 border-amber-200 shadow-sm">
                 <Sparkles className="h-4 w-4 text-amber-600" />
@@ -219,7 +244,7 @@ export default function Ambientes() {
                         value={nome}
                         onChange={(e) => setNome(e.target.value)}
                         required
-                        disabled={!projetoSelecionado}
+                        disabled={isLocked || loading || areas.length === 0}
                         className="h-12 px-4 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
                       />
                     </div>
@@ -242,7 +267,7 @@ export default function Ambientes() {
                           </option>
                         ))}
                       </select>
-                      {areas.length === 0 && projetoSelecionado && (
+                      {!loading && projetoSelecionado === true && areas.length === 0 && (
                         <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
                           <Sparkles className="w-3 h-3" />
                           Nenhuma área disponível. Crie áreas primeiro.
@@ -268,8 +293,8 @@ export default function Ambientes() {
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <Building2 className="w-6 h-6 text-white" />
+                      <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
+                        <Grid3X3 className="w-6 h-6 text-white" />
                       </div>
                       <div>
                         <CardTitle className="text-2xl font-bold text-slate-900">Ambientes Cadastrados</CardTitle>
