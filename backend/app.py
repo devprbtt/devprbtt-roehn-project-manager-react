@@ -11,7 +11,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from roehn_converter import RoehnProjectConverter
 from datetime import datetime
-from sqlalchemy import event, or_
+from sqlalchemy import select, event, or_
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import joinedload
 from sqlalchemy.exc import IntegrityError
@@ -243,12 +243,23 @@ def api_users_list():
 @admin_required
 def api_users_delete(user_id):
     u = db.get_or_404(User, user_id)
+
     if u.id == current_user.id:
         return jsonify({"ok": False, "error": "Você não pode excluir o usuário atualmente logado."}), 400
+
+    # opcional: impedir apagar o único admin do sistema
+    admins = User.query.filter_by(role="admin").all()
+    if u.role == "admin" and len(admins) == 1:
+        return jsonify({"ok": False, "error": "Não é possível excluir o único administrador."}), 400
+
+    # 1) Reatribuir projetos do usuário-alvo para o admin atual (ou outro dono)
+    projetos_do_usuario = Projeto.query.filter_by(user_id=u.id).all()
+    for p in projetos_do_usuario:
+        p.user_id = current_user.id   # ou um ID de "admin" padrão
+
     db.session.delete(u)
     db.session.commit()
     return jsonify({"ok": True})
-
 
 @app.post("/api/users")
 @login_required
