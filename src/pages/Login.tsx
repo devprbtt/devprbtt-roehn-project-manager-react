@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Lock, User as UserIcon, Eye, EyeOff, LogIn } from "lucide-react";
+import { Lock, Eye, EyeOff, LogIn, Sparkles } from "lucide-react";
 import { useAuth } from "@/store/auth";
+import { motion } from "framer-motion";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -32,26 +33,20 @@ export default function Login() {
     try {
       const res = await fetch("/api/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
         credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username.trim(), password }),
       });
-
-      let data: any = null;
-      try { data = await res.json(); } catch {}
-
-      if (res.ok && (data?.ok || data?.success)) {
-        // atualiza o store para a Navbar refletir imediatamente
-        if (data?.user) setUser(data.user);
-        else await fetchSession(); // fallback, se o backend não devolver user
-
+      const data = await res.json();
+      if (res.ok && data?.ok) {
         toast({ title: "Bem-vindo!", description: "Login realizado com sucesso." });
-        navigate(from);
+        await fetchSession();
+        navigate(from, { replace: true });
       } else {
-        setError(data?.error || data?.message || (res.status === 401 ? "Usuário ou senha inválidos." : "Falha ao autenticar."));
+        setError(data?.error || "Credenciais inválidas.");
       }
     } catch {
-      setError("Falha ao conectar ao servidor. Verifique sua conexão.");
+      setError("Falha ao se conectar ao servidor.");
     } finally {
       setLoading(false);
     }
@@ -59,96 +54,107 @@ export default function Login() {
 
   return (
     <Layout>
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
-        <Card className="w-full max-w-md border-0 shadow-lg rounded-3xl bg-card/70 backdrop-blur">
-          <CardHeader className="px-6 pt-6 pb-2">
-            <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Lock className="h-5 w-5 text-primary" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
+            <div>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-violet-600 rounded-3xl flex items-center justify-center shadow-lg shadow-purple-500/25">
+                  <LogIn className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Login</h1>
+                  <p className="text-lg text-slate-600 max-w-2xl">
+                    Entre para acessar seu painel e gerenciar seus projetos.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-2xl font-bold leading-tight">Login</h2>
-                <p className="text-sm text-muted-foreground">Acesse o Gerenciador de Projetos Roehn</p>
-              </div>
+              <div className="h-1 w-32 bg-gradient-to-r from-purple-600 to-violet-600 rounded-full shadow-sm" />
             </div>
-            <div className="mt-4 h-1 w-24 bg-gradient-to-r from-primary to-primary/40 rounded-full" />
-          </CardHeader>
+          </div>
 
-          <CardContent className="px-6 pb-6">
-            {error && (
-              <Alert className="mb-4 border-destructive/30 bg-destructive/10">
-                <AlertDescription className="text-destructive-foreground">
-                  {error}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">Usuário</Label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="username"
-                    autoFocus
-                    placeholder="Seu usuário"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="pl-9"
-                    required
-                    autoComplete="username"
-                  />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="max-w-md mx-auto"
+          >
+            <Card className="border-0 shadow-lg rounded-3xl bg-card/50 backdrop-blur-sm">
+              <CardHeader className="text-center">
+                <div className="flex flex-col items-center mb-4">
+                  <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-2">
+                    <Lock className="h-6 w-6 text-gray-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold">Acesso ao Sistema</h2>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pr-10"
-                    required
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md hover:bg-muted"
-                    onClick={() => setShowPassword((s) => !s)}
-                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full h-11"
-                disabled={loading || !username || !password}
-              >
-                {loading ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-transparent border-b-current" />
-                    Entrando...
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-2">
-                    <LogIn className="h-4 w-4" />
-                    Entrar
-                  </span>
+              </CardHeader>
+              <CardContent>
+                {error && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
                 )}
-              </Button>
+                <form className="space-y-4" onSubmit={handleSubmit}>
+                  <div>
+                    <Label htmlFor="username">Nome de Usuário</Label>
+                    <Input
+                      id="username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      required
+                      autoComplete="username"
+                      className="h-11"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="password">Senha</Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        autoComplete="current-password"
+                        className="h-11 pr-10"
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-md hover:bg-muted"
+                        onClick={() => setShowPassword((s) => !s)}
+                        aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
 
-              <p className="text-center text-xs text-muted-foreground">
-                Dica: usuário <span className="font-medium">admin</span> / senha <span className="font-medium">admin123</span> (alterar após primeiro login)
-              </p>
-            </form>
-          </CardContent>
-        </Card>
+                  <Button
+                    type="submit"
+                    className="w-full h-11 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                    disabled={loading || !username || !password}
+                  >
+                    {loading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-transparent border-b-current" />
+                        Entrando...
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <LogIn className="h-4 w-4" />
+                        Entrar
+                      </span>
+                    )}
+                  </Button>
+
+                  <p className="text-center text-xs text-muted-foreground">
+                    Dica: usuário <span className="font-medium">admin</span> / senha <span className="font-medium">admin123</span> (alterar após primeiro login)
+                  </p>
+                </form>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
       </div>
     </Layout>
   );

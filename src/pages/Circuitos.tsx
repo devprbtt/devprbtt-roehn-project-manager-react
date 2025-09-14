@@ -194,13 +194,13 @@ export default function Circuitos() {
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
             <div>
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
                   <Zap className="w-8 h-8 text-white" />
                 </div>
                 <div>
                   <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Circuitos</h1>
                   <p className="text-lg text-slate-600 max-w-2xl">
-                    Cadastre e organize os circuitos elétricos do seu projeto com elegância e eficiência.
+                    Cadastre os circuitos elétricos do seu projeto.
                   </p>
                 </div>
               </div>
@@ -295,16 +295,16 @@ export default function Circuitos() {
                           value={ambienteId as any}
                           onChange={(e) => setAmbienteId(Number(e.target.value))}
                           required
-                          disabled={!projetoSelecionado || ambientes.length === 0}
+                          disabled={!projetoSelecionado || loading || ambientes.length === 0}
                         >
-                          <option value="">Selecione um ambiente</option>
-                          {ambienteOptions.map((opt) => (
+                          <option value="">{loading ? "Carregando ambientes..." : "Selecione um ambiente"}</option>
+                          {!loading && ambienteOptions.map((opt) => (
                             <option key={opt.id} value={opt.id}>
                               {opt.label}
                             </option>
                           ))}
                         </select>
-                        {ambientes.length === 0 && projetoSelecionado && (
+                        {!loading && projetoSelecionado && ambientes.length === 0 && (
                           <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
                             <Sparkles className="w-3 h-3" />
                             Nenhum ambiente disponível. Crie ambientes primeiro.
@@ -316,7 +316,7 @@ export default function Circuitos() {
                     <Button
                       type="submit"
                       className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
-                      disabled={!projetoSelecionado || ambientes.length === 0}
+                      disabled={!projetoSelecionado || loading || ambientes.length === 0}
                     >
                       <PlusCircle className="h-5 w-5" />
                       Adicionar Circuito
@@ -331,7 +331,7 @@ export default function Circuitos() {
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg">
                         <Zap className="w-6 h-6 text-white" />
                       </div>
                       <div>
