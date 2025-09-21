@@ -24,8 +24,7 @@ import json
 import re
 import os
 from datetime import datetime
-from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao
-from database import User
+from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao, Keypad, KeypadButton
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///projetos.db'
@@ -50,6 +49,31 @@ MODULO_INFO = {
     'DIM8': {'nome_completo': 'ADP-DIM8', 'canais': 8, 'tipos_permitidos': ['luz']}
 }
 
+# Keypad metadata (RQR-K)
+KEYPAD_ALLOWED_COLORS = {
+    "WHITE",
+    "BRASS",
+    "BRUSHED BLACK",
+    "BLACK",
+    "BRONZE",
+    "NICKEL",
+    "SILVER",
+    "TITANIUM",
+}
+
+KEYPAD_ALLOWED_BUTTON_COLORS = {"WHITE", "BLACK"}
+
+KEYPAD_ALLOWED_BUTTON_COUNTS = {1, 2, 4}
+
+LAYOUT_TO_COUNT = {
+    "1": 1, "ONE": 1,
+    "2": 2, "TWO": 2,
+    "4": 4, "FOUR": 4,
+}
+
+
+ZERO_GUID = "00000000-0000-0000-0000-000000000000"
+
 # --- serialize_user helper (ADD) ---
 def serialize_user(user):
     return {
@@ -57,6 +81,96 @@ def serialize_user(user):
         "username": getattr(user, "username", ""),
         "role": getattr(user, "role", "user"),
     }
+
+
+def serialize_keypad_button(button):
+    circuito = button.circuito
+    return {
+        "id": button.id,
+        "ordem": button.ordem,
+        "guid": button.guid,
+        "modo": button.modo,
+        "command_on": button.command_on,
+        "command_off": button.command_off,
+        "can_hold": button.can_hold,
+        "modo_double_press": button.modo_double_press,
+        "command_double_press": button.command_double_press,
+        "target_object_guid": button.target_object_guid,
+        "circuito_id": circuito.id if circuito else None,
+        "circuito": {
+            "id": circuito.id,
+            "identificador": circuito.identificador,
+            "nome": circuito.nome,
+            "tipo": circuito.tipo,
+        } if circuito else None,
+    }
+
+
+def serialize_keypad(keypad):
+    ambiente = keypad.ambiente
+    area = ambiente.area if ambiente else None
+    return {
+        "id": keypad.id,
+        "nome": keypad.nome,
+        "modelo": keypad.modelo,
+        "color": keypad.color,
+        "button_color": keypad.button_color,
+        "button_count": keypad.button_count,
+        "hsnet": keypad.hsnet,
+        "dev_id": keypad.dev_id,
+        "notes": keypad.notes,
+        "ambiente": {
+            "id": ambiente.id,
+            "nome": ambiente.nome,
+            "area": {
+                "id": area.id,
+                "nome": area.nome,
+            } if area else None,
+        } if ambiente else None,
+        "buttons": [serialize_keypad_button(btn) for btn in sorted(keypad.buttons, key=lambda b: b.ordem)],
+    }
+
+
+def ensure_keypad_button_slots(keypad, count: int):
+    """Garante que keypad.buttons tenha exatamente `count` itens (1..count)."""
+    # cria os que faltam
+    existing_by_ordem = {b.ordem: b for b in keypad.buttons}
+    for i in range(1, count + 1):
+        if i not in existing_by_ordem:
+            btn = KeypadButton(
+                ordem=i,
+                guid=str(uuid.uuid4()),
+                modo=3,  # default neutro
+                command_on=0,
+                command_off=0,
+                modo_double_press=3,
+                command_double_press=0,
+                can_hold=False,
+                circuito=None,
+                circuito_id=None,
+                target_object_guid=ZERO_GUID,
+            )
+            keypad.buttons.append(btn)
+
+    # remove sobras
+    for b in sorted(keypad.buttons, key=lambda x: x.ordem, reverse=True):
+        if b.ordem > count:
+            db.session.delete(b)
+
+    keypad.button_count = count
+
+
+def is_hsnet_in_use(hsnet, exclude_keypad_id=None, exclude_modulo_id=None):
+    keypad_query = Keypad.query.filter(Keypad.hsnet == hsnet)
+    if exclude_keypad_id is not None:
+        keypad_query = keypad_query.filter(Keypad.id != exclude_keypad_id)
+    if keypad_query.first() is not None:
+        return True
+
+    modulo_query = Modulo.query.filter(Modulo.hsnet == hsnet)
+    if exclude_modulo_id is not None:
+        modulo_query = modulo_query.filter(Modulo.id != exclude_modulo_id)
+    return modulo_query.first() is not None
 
 
 @event.listens_for(Engine, "connect")
@@ -138,6 +252,14 @@ with app.app_context():
         admin_user.set_password('admin123')  # Senha padrão - deve ser alterada após o primeiro login
         db.session.add(admin_user)
         db.session.commit()
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def spa_catch_all(path):
+    # Não intercepta APIs ou arquivos estáticos
+    if path.startswith("api/") or path.startswith("static/"):
+        abort(404)
+    return send_from_directory(app.static_folder, "index.html")
 
 @app.route('/roehn/import', methods=['POST'])
 @login_required
@@ -317,6 +439,7 @@ def gate_apis_and_project():
         exempt_paths = {
             "/api/projetos",          # GET/POST
             "/api/projeto_atual",     # GET/PUT (consultar/selecionar)
+            "/api/keypads/meta",     # metadados de keypad
         }
         if request.path in exempt_paths:
             return
@@ -330,6 +453,7 @@ def gate_apis_and_project():
                 or path.startswith("/api/modulos")
                 or path.startswith("/api/vinculacoes")
                 or path.startswith("/api/vinculacao")    # options da tela
+                or path.startswith("/api/keypads")
                 or path.startswith("/api/projeto_tree")
             )
 
@@ -890,11 +1014,37 @@ def api_modulos_create():
     if exists:
         return jsonify({"ok": False, "error": "Já existe um módulo com esse nome no projeto."}), 409
 
+    hsnet_val = data.get("hsnet")
+    if hsnet_val not in (None, ""):
+        try:
+            hsnet = int(hsnet_val)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "hsnet invalido."}), 400
+        if hsnet <= 0:
+            return jsonify({"ok": False, "error": "hsnet deve ser positivo."}), 400
+        if is_hsnet_in_use(hsnet):
+            return jsonify({"ok": False, "error": "HSNET ja esta em uso."}), 409
+    else:
+        hsnet = None
+
+    dev_id_val = data.get("dev_id")
+    if dev_id_val not in (None, ""):
+        try:
+            dev_id = int(dev_id_val)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "dev_id invalido."}), 400
+        if dev_id <= 0:
+            return jsonify({"ok": False, "error": "dev_id deve ser positivo."}), 400
+    else:
+        dev_id = hsnet
+
     m = Modulo(
         nome=nome,
         tipo=tipo,
         quantidade_canais=info["canais"],
         projeto_id=projeto_id,
+        hsnet=hsnet,
+        dev_id=dev_id,
     )
     db.session.add(m)
     db.session.commit()
@@ -1100,7 +1250,11 @@ def api_projeto_tree():
             joinedload(Area.ambientes)
             .joinedload(Ambiente.circuitos)
             .joinedload(Circuito.vinculacao)
-            .joinedload(Vinculacao.modulo)
+            .joinedload(Vinculacao.modulo),
+            joinedload(Area.ambientes)
+            .joinedload(Ambiente.keypads)
+            .joinedload(Keypad.buttons)
+            .joinedload(KeypadButton.circuito),
         )
         .filter(Area.projeto_id == projeto_id)
         .all()
@@ -1123,7 +1277,16 @@ def api_projeto_tree():
                         "canal": getattr(vinc, "canal", None),
                     } if vinc else None,
                 })
-            ambs.append({"id": amb.id, "nome": amb.nome, "circuitos": circs})
+            keypads_out = [
+                serialize_keypad(k)
+                for k in sorted(amb.keypads, key=lambda kp: (kp.nome or "").lower())
+            ]
+            ambs.append({
+                "id": amb.id,
+                "nome": amb.nome,
+                "circuitos": circs,
+                "keypads": keypads_out,
+            })
         out_areas.append({"id": a.id, "nome": a.nome, "ambientes": ambs})
 
     return jsonify({
@@ -1208,7 +1371,9 @@ def exportar_projeto(projeto_id):
         'ambientes': [],
         'circuitos': [],
         'modulos': [],
-        'vinculacoes': []
+        'vinculacoes': [],
+        'keypads': [],
+        'keypad_buttons': []
     }
     
     for area in projeto.areas:
@@ -1237,6 +1402,38 @@ def exportar_projeto(projeto_id):
                     'sak': circuito.sak
                 }
                 projeto_data['circuitos'].append(circuito_data)
+
+            for keypad in ambiente.keypads:
+                keypad_data = {
+                    'id': keypad.id,
+                    'nome': keypad.nome,
+                    'modelo': keypad.modelo,
+                    'color': keypad.color,
+                    'button_color': keypad.button_color,
+                    'button_count': keypad.button_count,
+                    'hsnet': keypad.hsnet,
+                    'dev_id': keypad.dev_id,
+                    'ambiente_id': keypad.ambiente_id,
+                    'notes': keypad.notes,
+                }
+                projeto_data['keypads'].append(keypad_data)
+
+                for button in keypad.buttons:
+                    projeto_data['keypad_buttons'].append({
+                        'id': button.id,
+                        'keypad_id': keypad.id,
+                        'ordem': button.ordem,
+                        'guid': button.guid,
+                        'circuito_id': button.circuito_id,
+                        'modo': button.modo,
+                        'command_on': button.command_on,
+                        'command_off': button.command_off,
+                        'can_hold': button.can_hold,
+                        'modo_double_press': button.modo_double_press,
+                        'command_double_press': button.command_double_press,
+                        'target_object_guid': button.target_object_guid,
+                        'notes': button.notes,
+                    })
     
     # Adicionar apenas módulos do projeto
     for modulo in Modulo.query.filter_by(projeto_id=projeto_id).all():
@@ -1244,21 +1441,29 @@ def exportar_projeto(projeto_id):
             'id': modulo.id,
             'nome': modulo.nome,
             'tipo': modulo.tipo,
-            'quantidade_canais': modulo.quantidade_canais
+            'quantidade_canais': modulo.quantidade_canais,
+            'hsnet': modulo.hsnet,
+            'dev_id': modulo.dev_id,
         }
         projeto_data['modulos'].append(modulo_data)
     
-    for vinculacao in Vinculacao.query.all():
-        # Verificar se o circuito pertence ao projeto
-        circuito = Circuito.query.get(vinculacao.circuito_id)
-        if circuito and circuito.ambiente.area.projeto_id == projeto_id:
-            vinculacao_data = {
-                'id': vinculacao.id,
-                'circuito_id': vinculacao.circuito_id,
-                'modulo_id': vinculacao.modulo_id,
-                'canal': vinculacao.canal
-            }
-            projeto_data['vinculacoes'].append(vinculacao_data)
+    vincs = (
+        Vinculacao.query
+        .join(Circuito, Vinculacao.circuito_id == Circuito.id)
+        .join(Ambiente, Circuito.ambiente_id == Ambiente.id)
+        .join(Area, Ambiente.area_id == Area.id)
+        .join(Modulo, Vinculacao.modulo_id == Modulo.id)
+        .filter(Area.projeto_id == projeto_id, Modulo.projeto_id == projeto_id)
+        .all()
+    )
+    for vinculacao in vincs:
+        vinculacao_data = {
+            'id': vinculacao.id,
+            'circuito_id': vinculacao.circuito_id,
+            'modulo_id': vinculacao.modulo_id,
+            'canal': vinculacao.canal
+        }
+        projeto_data['vinculacoes'].append(vinculacao_data)
     
     # Converter para JSON
     output = io.BytesIO()
@@ -1631,6 +1836,412 @@ def exportar_pdf(projeto_id):
         download_name=nome_arquivo,
         mimetype='application/pdf'
     )
+# -------------------- Keypads (RQR-K) --------------------
+
+@app.get("/api/keypads/meta")
+@login_required
+def api_keypads_meta():
+    return jsonify({
+        "ok": True,
+        "colors": sorted(KEYPAD_ALLOWED_COLORS),
+        "button_colors": sorted(KEYPAD_ALLOWED_BUTTON_COLORS),
+        "button_counts": sorted(KEYPAD_ALLOWED_BUTTON_COUNTS),
+        "model": "RQR-K",
+    })
+
+
+@app.get("/api/keypads/next-hsnet")
+@login_required
+def api_keypads_next_hsnet():
+    projeto_id = session.get("projeto_atual_id")
+    if not projeto_id:
+        return jsonify({"ok": False, "error": "Projeto não selecionado."}), 400
+
+    usados = {k.hsnet for k in Keypad.query
+              .join(Ambiente, Keypad.ambiente_id == Ambiente.id)
+              .join(Area, Ambiente.area_id == Area.id)
+              .filter(Area.projeto_id == projeto_id).all()}
+
+    hs = 110
+    while hs in usados:
+        hs += 1
+    return jsonify({"ok": True, "hsnet": hs})
+
+
+
+@app.get("/api/keypads")
+@login_required
+def api_keypads_list():
+    projeto_id = session.get("projeto_atual_id")
+    if not projeto_id:
+        return jsonify({"ok": True, "keypads": []})
+
+    keypads = (
+        Keypad.query
+        .join(Ambiente, Keypad.ambiente_id == Ambiente.id)
+        .join(Area, Ambiente.area_id == Area.id)
+        .filter(Area.projeto_id == projeto_id)
+        .options(
+            joinedload(Keypad.ambiente).joinedload(Ambiente.area),
+            joinedload(Keypad.buttons).joinedload(KeypadButton.circuito),
+        )
+        .order_by(Ambiente.nome.asc(), Keypad.nome.asc(), Keypad.id.asc())
+        .all()
+    )
+    return jsonify({"ok": True, "keypads": [serialize_keypad(k) for k in keypads]})
+
+
+@app.get("/api/keypads/<int:keypad_id>")
+@login_required
+def api_keypads_get(keypad_id):
+    projeto_id = session.get("projeto_atual_id")
+    keypad = db.get_or_404(Keypad, keypad_id)
+    if not projeto_id or not keypad.ambiente or keypad.ambiente.area.projeto_id != projeto_id:
+        return jsonify({"ok": False, "error": "Keypad não encontrado."}), 404
+    return jsonify({"ok": True, "keypad": serialize_keypad(keypad)})
+
+
+@app.post("/api/keypads")
+@login_required
+def api_keypads_create():
+    projeto_id = session.get("projeto_atual_id")
+    if not projeto_id:
+        return jsonify({"ok": False, "error": "Projeto não selecionado."}), 400
+
+    data = request.get_json(silent=True) or request.form or {}
+
+    nome = (data.get("nome") or "").strip()
+    if not nome:
+        return jsonify({"ok": False, "error": "Nome do keypad é obrigatório."}), 400
+
+    # ids
+    try:
+        ambiente_id = int(data.get("ambiente_id"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "ambiente_id inválido."}), 400
+
+    try:
+        hsnet = int(data.get("hsnet"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "hsnet inválido."}), 400
+    if hsnet <= 0:
+        return jsonify({"ok": False, "error": "hsnet deve ser positivo."}), 400
+
+    # aceita PT ou EN
+    color = (data.get("color") or data.get("cor") or "WHITE").strip().upper()
+    if color not in KEYPAD_ALLOWED_COLORS:
+        return jsonify({"ok": False, "error": "Cor inválida para o keypad."}), 400
+
+    button_color = (data.get("button_color") or data.get("cor_teclas") or "WHITE").strip().upper()
+    if button_color not in KEYPAD_ALLOWED_BUTTON_COLORS:
+        return jsonify({"ok": False, "error": "Cor das teclas inválida."}), 400
+
+    # button_count pode vir direto ou podemos derivar de layout
+    button_count = None
+    if "button_count" in data and data.get("button_count") not in (None, ""):
+        try:
+            button_count = int(data.get("button_count"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "button_count inválido."}), 400
+    else:
+        layout_raw = (data.get("layout") or "").strip().upper()
+        if layout_raw:
+            button_count = LAYOUT_TO_COUNT.get(layout_raw)
+            if button_count is None:
+                return jsonify({"ok": False, "error": "layout inválido."}), 400
+        else:
+            button_count = 4  # default
+
+    if button_count not in KEYPAD_ALLOWED_BUTTON_COUNTS:
+        return jsonify({"ok": False, "error": "Quantidade de teclas não suportada."}), 400
+
+    modelo = (data.get("modelo") or "RQR-K").strip().upper()
+    if modelo != "RQR-K":
+        return jsonify({"ok": False, "error": "Modelo de keypad não suportado."}), 400
+
+    dev_id_raw = data.get("dev_id")
+    if dev_id_raw not in (None, ""):
+        try:
+            dev_id = int(dev_id_raw)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "dev_id inválido."}), 400
+        if dev_id <= 0:
+            return jsonify({"ok": False, "error": "dev_id deve ser positivo."}), 400
+    else:
+        dev_id = hsnet  # default prático
+
+    notes = (data.get("notes") or "").strip() or None
+
+    ambiente = db.get_or_404(Ambiente, ambiente_id)
+    area = ambiente.area if ambiente else None
+    if not area or area.projeto_id != projeto_id:
+        return jsonify({"ok": False, "error": "Ambiente não pertence ao projeto selecionado."}), 400
+
+    if is_hsnet_in_use(hsnet):
+        return jsonify({"ok": False, "error": "HSNET já está em uso."}), 409
+
+    keypad = Keypad(
+        nome=nome,
+        modelo="RQR-K",
+        color=color,
+        button_color=button_color,
+        button_count=button_count,
+        hsnet=hsnet,
+        dev_id=dev_id,
+        ambiente_id=ambiente.id,
+        notes=notes,
+    )
+    db.session.add(keypad)
+    db.session.flush()  # garante id
+
+    # >>> ESSENCIAL: cria exatamente N slots de tecla
+    ensure_keypad_button_slots(keypad, button_count)
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"ok": False, "error": "Não foi possível criar o keypad."}), 400
+
+    return jsonify({"ok": True, "keypad": serialize_keypad(keypad)})
+
+
+
+@app.put("/api/keypads/<int:keypad_id>")
+@login_required
+def api_keypads_update(keypad_id):
+    projeto_id = session.get("projeto_atual_id")
+    keypad = db.get_or_404(Keypad, keypad_id)
+    ambiente = keypad.ambiente
+    area = ambiente.area if ambiente else None
+    if not projeto_id or not area or area.projeto_id != projeto_id:
+        return jsonify({"ok": False, "error": "Keypad não encontrado no projeto."}), 404
+
+    data = request.get_json(silent=True) or {}
+
+    if "nome" in data:
+        novo_nome = (data.get("nome") or "").strip()
+        if not novo_nome:
+            return jsonify({"ok": False, "error": "Nome do keypad é obrigatório."}), 400
+        keypad.nome = novo_nome
+
+    if "color" in data:
+        color = (data.get("color") or "").strip().upper()
+        if color not in KEYPAD_ALLOWED_COLORS:
+            return jsonify({"ok": False, "error": "Cor inválida para o keypad."}), 400
+        keypad.color = color
+
+    if "button_color" in data:
+        b_color = (data.get("button_color") or "").strip().upper()
+        if b_color not in KEYPAD_ALLOWED_BUTTON_COLORS:
+            return jsonify({"ok": False, "error": "Cor das teclas inválida."}), 400
+        keypad.button_color = b_color
+
+    if "button_count" in data:
+        try:
+            new_count = int(data.get("button_count"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "Quantidade de teclas inválida."}), 400
+        if new_count not in KEYPAD_ALLOWED_BUTTON_COUNTS:
+            return jsonify({"ok": False, "error": "Quantidade de teclas não suportada."}), 400
+        keypad.button_count = new_count
+        ensure_keypad_button_slots(keypad, new_count)
+
+    if "hsnet" in data:
+        try:
+            new_hsnet = int(data.get("hsnet"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "hsnet inválido."}), 400
+        if new_hsnet <= 0:
+            return jsonify({"ok": False, "error": "hsnet deve ser positivo."}), 400
+        if new_hsnet != keypad.hsnet and is_hsnet_in_use(new_hsnet, exclude_keypad_id=keypad.id):
+            return jsonify({"ok": False, "error": "HSNET já está em uso."}), 409
+        keypad.hsnet = new_hsnet
+
+    if "dev_id" in data:
+        dev_val = data.get("dev_id")
+        if dev_val in (None, ""):
+            keypad.dev_id = None
+        else:
+            try:
+                dev_int = int(dev_val)
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "error": "dev_id inválido."}), 400
+            if dev_int <= 0:
+                return jsonify({"ok": False, "error": "dev_id deve ser positivo."}), 400
+            keypad.dev_id = dev_int
+
+    if "notes" in data:
+        txt = (data.get("notes") or "").strip()
+        keypad.notes = txt or None
+
+    if "modelo" in data:
+        modelo = (data.get("modelo") or "").strip().upper()
+        if modelo != "RQR-K":
+            return jsonify({"ok": False, "error": "Modelo de keypad não suportado."}), 400
+        keypad.modelo = "RQR-K"
+
+    if "ambiente_id" in data:
+        try:
+            novo_ambiente_id = int(data.get("ambiente_id"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "ambiente_id inválido."}), 400
+        novo_ambiente = db.get_or_404(Ambiente, novo_ambiente_id)
+        nova_area = novo_ambiente.area if novo_ambiente else None
+        if not nova_area or nova_area.projeto_id != projeto_id:
+            return jsonify({"ok": False, "error": "Ambiente não pertence ao projeto selecionado."}), 400
+        keypad.ambiente_id = novo_ambiente.id
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"ok": False, "error": "Não foi possível atualizar o keypad."}), 400
+
+    return jsonify({"ok": True, "keypad": serialize_keypad(keypad)})
+
+
+@app.delete("/api/keypads/<int:keypad_id>")
+@login_required
+def api_keypads_delete(keypad_id):
+    projeto_id = session.get("projeto_atual_id")
+    keypad = db.get_or_404(Keypad, keypad_id)
+    ambiente = keypad.ambiente
+    area = ambiente.area if ambiente else None
+    if not projeto_id or not area or area.projeto_id != projeto_id:
+        return jsonify({"ok": False, "error": "Keypad não encontrado no projeto."}), 404
+
+    db.session.delete(keypad)
+    db.session.commit()
+    return jsonify({"ok": True})
+
+@app.route('/api/keypads/<int:keypad_id>/buttons', methods=['GET'])
+@login_required
+def get_keypad_buttons(keypad_id):
+    keypad = Keypad.query.get(keypad_id)
+    if not keypad:
+        return jsonify({'error': 'Keypad not found'}), 404
+        
+    if keypad.ambiente.area.projeto_id != session.get('projeto_atual_id'):
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    # Define o número de botões com base no layout
+    button_limit = 4  # Padrão para "FOUR"
+    if keypad.layout == "ONE":
+        button_limit = 1
+    elif keypad.layout == "TWO":
+        button_limit = 2
+
+    # Busca os botões e limita a quantidade com base no layout
+    buttons = keypad.buttons.order_by(KeypadButton.ordem).limit(button_limit).all()
+
+    # Formata os dados para o frontend
+    buttons_data = []
+    for button in buttons:
+        buttons_data.append({
+            'id': button.id,
+            'circuito_id': button.circuito_id,
+            'modo': button.modo,
+            'command_on': button.command_on,
+            'command_off': button.command_off,
+            'can_hold': button.can_hold,
+            'modo_double_press': button.modo_double_press,
+            'command_double_press': button.command_double_press,
+            'ordem': button.ordem
+        })
+    
+    return jsonify(buttons_data)
+
+
+@app.put("/api/keypads/<int:keypad_id>/buttons/<int:ordem>")
+@login_required
+def api_keypad_button_update(keypad_id, ordem):
+    projeto_id = session.get("projeto_atual_id")
+    keypad = db.get_or_404(Keypad, keypad_id)
+    ambiente = keypad.ambiente
+    area = ambiente.area if ambiente else None
+    if not projeto_id or not area or area.projeto_id != projeto_id:
+        return jsonify({"ok": False, "error": "Keypad não encontrado no projeto."}), 404
+
+    if ordem <= 0 or ordem > keypad.button_count:
+        return jsonify({"ok": False, "error": "Ordem de tecla inválida."}), 400
+
+    ensure_keypad_button_slots(keypad, keypad.button_count)
+    button = next((btn for btn in keypad.buttons if btn.ordem == ordem), None)
+    if button is None:
+        return jsonify({"ok": False, "error": "Tecla não encontrada."}), 404
+
+    data = request.get_json(silent=True) or {}
+
+    if "circuito_id" in data:
+        raw_circuit = data.get("circuito_id")
+        if raw_circuit in (None, "", 0, "0"):
+            button.circuito = None
+            button.target_object_guid = ZERO_GUID
+            button.modo = 3
+            button.command_on = 0
+            button.command_off = 0
+        else:
+            try:
+                circuito_id = int(raw_circuit)
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "error": "circuito_id inválido."}), 400
+            circuito = db.get_or_404(Circuito, circuito_id)
+            ambiente_circ = circuito.ambiente
+            area_circ = ambiente_circ.area if ambiente_circ else None
+            if not area_circ or area_circ.projeto_id != projeto_id:
+                return jsonify({"ok": False, "error": "Circuito não pertence ao projeto."}), 400
+            if circuito.tipo != 'luz':
+                return jsonify({"ok": False, "error": "Apenas circuitos de luz podem ser vinculados."}), 400
+            button.circuito = circuito
+            button.target_object_guid = ZERO_GUID
+            button.modo = 2
+            button.command_on = 1
+            button.command_off = 0
+
+    if "modo" in data:
+        try:
+            button.modo = int(data.get("modo"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "Valor de modo inválido."}), 400
+
+    if "command_on" in data:
+        try:
+            button.command_on = int(data.get("command_on"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "command_on inválido."}), 400
+
+    if "command_off" in data:
+        try:
+            button.command_off = int(data.get("command_off"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "command_off inválido."}), 400
+
+    if "can_hold" in data:
+        button.can_hold = bool(data.get("can_hold"))
+
+    if "modo_double_press" in data:
+        try:
+            button.modo_double_press = int(data.get("modo_double_press"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "modo_double_press inválido."}), 400
+
+    if "command_double_press" in data:
+        try:
+            button.command_double_press = int(data.get("command_double_press"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "command_double_press inválido."}), 400
+
+    if "target_object_guid" in data:
+        guid_val = (data.get("target_object_guid") or ZERO_GUID).strip()
+        button.target_object_guid = guid_val or ZERO_GUID
+
+    if "notes" in data:
+        txt = (data.get("notes") or "").strip()
+        button.notes = txt or None
+
+    db.session.commit()
+    return jsonify({"ok": True, "keypad": serialize_keypad(keypad)})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

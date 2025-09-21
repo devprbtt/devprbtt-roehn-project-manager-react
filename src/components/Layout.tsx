@@ -10,6 +10,7 @@ import {
   Zap,
   Boxes,
   GitBranch,
+  KeySquare,
   Eye,
   Users as UsersIcon,
   LogOut,
@@ -54,6 +55,7 @@ const baseItems: NavItem[] = [
   { title: "Circuitos", url: createPageUrl("circuitos"), icon: Zap, requiresProject: true },
   { title: "Módulos", url: createPageUrl("modulos"), icon: Boxes, requiresProject: true },
   { title: "Vinculação", url: createPageUrl("vinculacao"), icon: GitBranch, requiresProject: true },
+  { title: "Keypads", url: createPageUrl("keypads"), icon: KeySquare, requiresProject: true },
   { title: "Visualizar Projeto", url: createPageUrl("projeto"), icon: Eye, requiresProject: true },
 ];
 

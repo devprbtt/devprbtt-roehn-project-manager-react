@@ -7,6 +7,7 @@ import {
   Grid3X3,
   Zap,
   Boxes,
+  KeySquare,
   GitBranch,
   Eye,
   ArrowRight
@@ -37,6 +38,12 @@ const navigationSteps = [
     description: "Gerencie os módulos disponíveis no sistema",
     icon: Boxes,
     color: "from-purple-500 to-purple-600"
+  },
+  {
+    title: "Keypads",
+    description: "Cadastre keypads RQR-K e vincule circuitos de luz às teclas",
+    icon: KeySquare,
+    color: "from-rose-500 to-pink-500"
   },
   {
     title: "Vinculação",

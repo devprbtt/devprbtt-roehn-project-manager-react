@@ -14,6 +14,7 @@ import Circuitos from "./pages/Circuitos";
 import Modulos from "./pages/Modulos";
 import Vinculacao from "./pages/Vinculacao";
 import Projeto from "./pages/Projeto";
+import Keypads from "./pages/Keypads";
 import NotFound from "./pages/NotFound";
 
 import RequireAdmin from "@/components/RequireAdmin";
@@ -81,6 +82,15 @@ function AppInner() {
         element={
           <RequireAuth>
             <Vinculacao />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/keypads"
+        element={
+          <RequireAuth>
+            <Keypads />
           </RequireAuth>
         }
       />

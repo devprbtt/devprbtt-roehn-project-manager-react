@@ -4,7 +4,7 @@ import csv
 import uuid
 import io
 from datetime import datetime
-from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao
+from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao, Keypad, KeypadButton
 
 class RoehnProjectConverter:
     # --- AQUI ESTÁ A CORREÇÃO ---
@@ -20,6 +20,11 @@ class RoehnProjectConverter:
             'SA1': {'driver_guid': '80000000-0000-0000-0000-000000000013', 'slots': {'IR': 1}},
             'DIM8': {'driver_guid': '80000000-0000-0000-0000-000000000001', 'slots': {'Load Dim': 8}}
         }
+        self.zero_guid = "00000000-0000-0000-0000-000000000000"
+        self.keypad_driver_guid = "90000000-0000-0000-0000-000000000004"
+        self.keypad_profile_guid = "40000000-0000-0000-0000-000000000001"
+        self.keypad_rocker_icon_guid = "11000000-0000-0000-0000-000000000001"
+        self.keypad_button_layouts = {1: 1, 2: 6, 4: 7}
 
     def process_json_project(self):
         try:
@@ -90,61 +95,61 @@ class RoehnProjectConverter:
     def process_db_project(self, projeto):
         """Processa os dados do projeto do banco de dados para o formato Roehn"""
         print(f"Processando projeto: {projeto.nome}")
-        print(f"Número de áreas: {len(projeto.areas)}")
-        
-        # Primeiro, criar todas as áreas e ambientes
+        print(f"Numero de areas: {len(projeto.areas)}")
+
+        self._circuit_guid_map = {}
+
         for area in projeto.areas:
-            print(f"Processando área: {area.nome}")
-            # Garantir que a área existe no projeto Roehn
+            print(f"Processando area: {area.nome}")
             self._ensure_area_exists(area.nome)
-            
+
             for ambiente in area.ambientes:
                 print(f"Processando ambiente: {ambiente.nome}")
-                # Garantir que o ambiente existe na área
                 self._ensure_room_exists(area.nome, ambiente.nome)
-        
-        # Depois, garantir que todos os módulos existam
+
         for modulo in projeto.modulos:
-            print(f"Processando módulo: {modulo.nome} ({modulo.tipo})")
-            # Garantir que o módulo existe no projeto Roehn - USAR O NOME REAL
-            self._ensure_module_exists(modulo.tipo, modulo.nome)  # Alteração aqui
-        
-        # Finalmente, processar os circuitos
+            print(f"Processando modulo: {modulo.nome} ({modulo.tipo})")
+            self._ensure_module_exists(modulo)
+
         for area in projeto.areas:
             for ambiente in area.ambientes:
                 for circuito in ambiente.circuitos:
                     print(f"Processando circuito: {circuito.identificador} ({circuito.tipo})")
-                    
-                    # Verificar se o circuito está vinculado
                     if circuito.vinculacao:
                         vinculacao = circuito.vinculacao
                         modulo = vinculacao.modulo
                         canal = vinculacao.canal
-                        # USAR O NOME REAL DO MÓDULO EM VEZ DE GERAR UM
-                        modulo_nome = modulo.nome  # Alteração aqui
-                        
-                        print(f"Circuito vinculado ao módulo: {modulo_nome}, canal: {canal}")
-                        
+                        modulo_nome = modulo.nome if modulo else None
+
+                        if not modulo_nome:
+                            print(f"Circuito {circuito.identificador} sem modulo associado, ignorando.")
+                            continue
+
                         try:
-                            # Adicionar o circuito ao projeto Roehn
                             if circuito.tipo == 'luz':
                                 guid = self._add_load(area.nome, ambiente.nome, circuito.nome or circuito.identificador)
+                                self._circuit_guid_map[circuito.id] = guid
                                 self._link_load_to_module(guid, modulo_nome, canal)
                                 print(f"Circuito de luz adicionado: {guid}")
                             elif circuito.tipo == 'persiana':
                                 guid = self._add_shade(area.nome, ambiente.nome, circuito.nome or circuito.identificador)
+                                self._circuit_guid_map[circuito.id] = guid
                                 self._link_shade_to_module(guid, modulo_nome, canal)
                                 print(f"Circuito de persiana adicionado: {guid}")
                             elif circuito.tipo == 'hvac':
                                 guid = self._add_hvac(area.nome, ambiente.nome, circuito.nome or circuito.identificador)
+                                self._circuit_guid_map[circuito.id] = guid
                                 self._link_hvac_to_module(guid, modulo_nome, canal)
-                                print(f"Circuito de HVAC adicionado: {guid}")
-                        except Exception as e:
-                            print(f"Erro ao processar circuito {circuito.id}: {e}")
-                            # Continuar processando outros circuitos mesmo se um falhar
+                                print(f"Circuito HVAC adicionado: {guid}")
+                            else:
+                                print(f"Tipo de circuito nao suportado: {circuito.tipo}")
+                        except Exception as exc:
+                            print(f"Erro ao processar circuito {circuito.id}: {exc}")
                             continue
                     else:
-                        print(f"Circuito {circuito.id} não vinculado, ignorando.")
+                        print(f"Circuito {circuito.id} nao vinculado, ignorando.")
+
+                self._add_keypads_for_room(area.nome, ambiente)
 
     def create_project(self, project_info):
         """Cria um projeto base compatível com o ROEHN Wizard"""
@@ -469,35 +474,63 @@ class RoehnProjectConverter:
         area["SubItems"].append(new_room)
         return new_room
 
-    def _ensure_module_exists(self, model, module_name):
-        """Garantir que um módulo existe no projeto usando o nome real"""
+    def _ensure_module_exists(self, model, module_name=None):
+        """Garantir que um modulo existe no projeto Roehn."""
         modules_list = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"]
-        
-        # Verificar se o módulo já existe pelo nome
+
+        modulo_obj = None
+        desired_hsnet = None
+        desired_dev_id = None
+
+        if hasattr(model, "nome") and hasattr(model, "tipo"):
+            modulo_obj = model
+            module_name = modulo_obj.nome
+            model_key = (modulo_obj.tipo or "").upper()
+            desired_hsnet = modulo_obj.hsnet
+            desired_dev_id = modulo_obj.dev_id
+        else:
+            model_key = (model or "").upper()
+            if module_name is None:
+                module_name = model_key
+
+        if not module_name:
+            module_name = "Modulo"
+
         for module in modules_list:
-            if module["Name"] == module_name:
+            if module.get("Name") == module_name:
+                if modulo_obj:
+                    if desired_hsnet is not None:
+                        module["HsnetAddress"] = desired_hsnet
+                    if desired_dev_id is not None:
+                        module["DevID"] = desired_dev_id
                 return module_name
-                
-        # Criar novo módulo se não existir
-        hsnet = self._find_max_hsnet() + 1
-        while self._is_hsnet_duplicate(hsnet):
-            hsnet += 1
-            
-        dev_id = self._find_max_dev_id() + 1
-        
-        # Determinar o tipo de módulo e criar
-        u = model.upper()
-        if "RL12" in u:
+
+        if desired_hsnet is not None and not self._is_hsnet_duplicate(desired_hsnet):
+            hsnet = desired_hsnet
+        else:
+            hsnet = self._find_max_hsnet() + 1
+            while self._is_hsnet_duplicate(hsnet):
+                hsnet += 1
+
+        if desired_dev_id is not None:
+            dev_id = desired_dev_id
+        else:
+            dev_id = self._find_max_dev_id() + 1
+
+        key = (model_key or module_name).upper()
+        if "RL12" in key:
             self._create_rl12_module(module_name, hsnet, dev_id)
-        elif "RL4" in u:
+        elif "RL4" in key:
             self._create_rl4_module(module_name, hsnet, dev_id)
-        elif "LX4" in u:
+        elif "LX4" in key:
             self._create_lx4_module(module_name, hsnet, dev_id)
-        elif "SA1" in u:
+        elif "SA1" in key:
             self._create_sa1_module(module_name, hsnet, dev_id)
-        elif "DIM8" in u or "ADP-DIM8" in u:
+        elif "DIM8" in key or "ADP-DIM8" in key:
             self._create_dim8_module(module_name, hsnet, dev_id)
-            
+        else:
+            self._create_rl12_module(module_name, hsnet, dev_id)
+
         return module_name
 
     def _create_rl4_module(self, name, hsnet_address, dev_id):
@@ -813,6 +846,202 @@ class RoehnProjectConverter:
                     
                     break
 
+    def _add_keypads_for_room(self, area_name, ambiente):
+        keypads = getattr(ambiente, "keypads", None)
+        if not keypads:
+            return
+
+        try:
+            area_idx = next(i for i, area in enumerate(self.project_data["Areas"]) if area.get("Name") == area_name)
+        except StopIteration:
+            return
+
+        subitems = self.project_data["Areas"][area_idx].get("SubItems", [])
+        try:
+            room_idx = next(i for i, room in enumerate(subitems) if room.get("Name") == ambiente.nome)
+        except StopIteration:
+            return
+
+        room = subitems[room_idx]
+        user_interfaces = room.setdefault("UserInterfaces", [])
+        for keypad in keypads:
+            payload = self._build_keypad_payload(area_idx, room_idx, keypad)
+            user_interfaces.append(payload)
+            self._register_user_interface_guid(payload["Guid"])
+
+    def _build_keypad_payload(self, area_idx, room_idx, keypad):
+        zero_guid = self.zero_guid
+        keypad_guid = str(uuid.uuid4())
+
+        base_unit_id = self._find_max_unit_id() + 1
+
+        def next_unit_id():
+            nonlocal base_unit_id
+            unit_id = base_unit_id
+            base_unit_id += 1
+            return unit_id
+
+        def make_unit(unit_id):
+            return {
+                "$type": "Unit",
+                "Id": unit_id,
+                "Event": 0,
+                "Scene": 0,
+                "Disabled": False,
+                "Logged": False,
+                "Memo": False,
+                "Increment": False,
+            }
+
+        def make_composer(name, port_number, port_type, kind, io):
+            return {
+                "$type": "UnitComposer",
+                "Name": name,
+                "Unit": make_unit(next_unit_id()),
+                "PortNumber": port_number,
+                "PortType": port_type,
+                "NotProgrammable": False,
+                "Kind": kind,
+                "IO": io,
+                "Value": 0,
+            }
+
+        color_value = (keypad.color or "WHITE").upper()
+        button_color_value = (keypad.button_color or "WHITE").upper()
+        button_count = int(keypad.button_count or len(keypad.buttons) or 1)
+        button_layout = self.keypad_button_layouts.get(button_count, button_count)
+        hsnet_address = keypad.hsnet if keypad.hsnet is not None else 0
+        dev_id = keypad.dev_id if keypad.dev_id is not None else hsnet_address
+
+        payload = {
+            "$type": "Keypad",
+            "DriverGuid": self.keypad_driver_guid,
+            "ModuleInterface": False,
+            "Keypad4x4": False,
+            "HsnetAddress": hsnet_address,
+            "TipoEntrada1ChaveLD": 0,
+            "TipoEntrada2ChaveLD": 0,
+            "UnitEntradaDigital1": make_composer("UnitEntradaDigital1", 1, 0, 0, 0),
+            "UnitEntradaDigital2": make_composer("UnitEntradaDigital2", 2, 0, 0, 0),
+            "UnitAnyKey": make_composer("UnitAnyKey", 3, 0, 0, 0),
+            "BrightUnit": 0,
+            "UnitBrightnessColor1": make_composer("UnitBrightnessColor1", 1, 600, 1, 1),
+            "UnitBrightnessColor2": make_composer("UnitBrightnessColor2", 2, 600, 1, 1),
+            "UnitBeepProfile": make_composer("UnitBeepProfile", 3, 600, 1, 1),
+            "UnitVolumeProfile": make_composer("UnitVolumeProfile", 4, 600, 1, 1),
+            "UnitVolumeKey": make_composer("UnitVolumeKey", 5, 0, 0, 0),
+            "UnitBlockedKeypad": make_composer("UnitBlockedKeypad", 1, 100, 0, 1),
+            "UnitPIN32": make_composer("UnitPIN32", 1, 1100, 1, 0),
+            "NightModeGroup": 0,
+            "LightSensorMode": 0,
+            "LightSensorMasterID": 0,
+            "DevID": dev_id,
+            "ListKeypadButtons": [],
+            "ListKeypadButtonsLayout2": [],
+            "ProfileGuid": self.keypad_profile_guid,
+            "ButtonCountLayout2": 0,
+            "ButtonLayout2": 0,
+            "Slots": [],
+            "hold": 0,
+            "ButtonLayout1": button_layout,
+            "ModelName": keypad.modelo or "RQR-K",
+            "Color": color_value,
+            "ButtonColor": button_color_value,
+            "Name": keypad.nome or "RQR-K",
+            "Notes": keypad.notes,
+            "Guid": keypad_guid,
+            "ButtonCount": button_count,
+        }
+
+        primary_ports = [1, 2, 3, 4]
+        secondary_ports = [5, 6, 7, 8]
+
+        for button in sorted(keypad.buttons, key=lambda b: b.ordem or 0):
+            if button.ordem and button.ordem > button_count:
+                continue
+            index = (button.ordem - 1) if button.ordem else 0
+            primary_port = primary_ports[index % len(primary_ports)]
+            secondary_port = secondary_ports[index % len(secondary_ports)]
+
+            unit_key = make_composer("UnitKey", primary_port, 300, 0, 0)
+            unit_led = make_composer("UnitLed", primary_port, 200, 1, 1)
+            unit_secondary_key = make_composer("UnitSecondaryKey", secondary_port, 300, 0, 0)
+            unit_secondary_led = make_composer("UnitSecondaryLed", secondary_port, 200, 1, 1)
+
+            target_guid = zero_guid
+            circuito = button.circuito
+            if circuito and circuito.id in self._circuit_guid_map:
+                target_guid = self._circuit_guid_map[circuito.id]
+
+            style_properties = None
+            if target_guid != zero_guid:
+                style_properties = {
+                    "$type": "Dictionary`2",
+                    "STYLE_PROP_ICON": None,
+                    "STYLE_PROP_ROCKER_ICON": self.keypad_rocker_icon_guid,
+                }
+
+            button_payload = {
+                "$type": "RockerKeypadButton",
+                "StylePropertiesSerializable": style_properties,
+                "DoublePressDelay": False,
+                "TargetDoubleObjectGuid": zero_guid,
+                "ModoDoublePress": button.modo_double_press or 3,
+                "CommandDoublePress": button.command_double_press or 0,
+                "PortNumberDoublePress": 0,
+                "CanHold": bool(button.can_hold),
+                "Guid": button.guid or str(uuid.uuid4()),
+                "TargetObjectGuid": target_guid,
+                "Modo": button.modo or (2 if target_guid != zero_guid else 3),
+                "CommandOn": button.command_on if button.command_on is not None else (1 if target_guid != zero_guid else 0),
+                "CommandOff": button.command_off if button.command_off is not None else 0,
+                "PortNumber": 0,
+                "UnitControleLed": 0,
+                "LedColor": 0,
+                "Vincled": False,
+                "TimeFeedBack": 0,
+                "UnitKey": unit_key,
+                "UnitLed": unit_led,
+                "UnitSecondaryKey": unit_secondary_key,
+                "UnitSecondaryLed": unit_secondary_led,
+                "ButtonStyleGuid": zero_guid,
+                "EngraverText": button.notes,
+                "Automode": True,
+            }
+            payload["ListKeypadButtons"].append(button_payload)
+
+        return payload
+
+    def _register_user_interface_guid(self, ui_guid):
+        try:
+            modules_list = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"]
+        except (KeyError, IndexError):
+            return
+        if not modules_list:
+            return
+
+        acnet_slot = None
+        for slot in modules_list[0].get("Slots", []):
+            if slot.get("Name") == "ACNET":
+                acnet_slot = slot
+                break
+        if acnet_slot is None:
+            return
+
+        subitems = acnet_slot.setdefault("SubItemsGuid", [])
+        if ui_guid in subitems:
+            return
+
+        for index, guid in enumerate(subitems):
+            if guid == self.zero_guid:
+                subitems[index] = ui_guid
+                break
+        else:
+            subitems.append(ui_guid)
+
+        if subitems and subitems[-1] != self.zero_guid:
+            subitems.append(self.zero_guid)
+
     def _find_max_dev_id(self):
         """Encontra o maior DevID atual"""
         max_id = 0
@@ -842,7 +1071,15 @@ class RoehnProjectConverter:
                     max_addr = module['HsnetAddress']
         except (KeyError, IndexError):
             pass
-            
+
+        try:
+            user_interfaces = self.project_data['Areas'][0]['SubItems'][0].get('UserInterfaces', [])
+            for ui in user_interfaces:
+                if 'HsnetAddress' in ui and ui['HsnetAddress'] > max_addr:
+                    max_addr = ui['HsnetAddress']
+        except (KeyError, IndexError):
+            pass
+
         return max_addr
 
     def _is_hsnet_duplicate(self, hsnet_address):
@@ -857,7 +1094,15 @@ class RoehnProjectConverter:
                     return True
         except (KeyError, IndexError):
             pass
-            
+
+        try:
+            user_interfaces = self.project_data['Areas'][0]['SubItems'][0].get('UserInterfaces', [])
+            for ui in user_interfaces:
+                if 'HsnetAddress' in ui and ui['HsnetAddress'] == hsnet_address:
+                    return True
+        except (KeyError, IndexError):
+            pass
+
         return False
 
     def _add_shade(self, area, ambiente, name, description="Persiana"):
