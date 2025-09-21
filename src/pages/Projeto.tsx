@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useProject } from "@/store/project";
-import { FileDown, FileOutput, Lightbulb, Blinds, Snowflake, LayoutList, RefreshCcw, Sparkles, Printer } from "lucide-react";
+import { FileDown, FileOutput, Lightbulb, Blinds, Snowflake, LayoutList, RefreshCcw, Sparkles, KeySquare, Link2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type VincInfo = { modulo_nome: string; canal: number };
@@ -15,9 +16,19 @@ type Circuito = { id: number; tipo: "luz" | "persiana" | "hvac"; identificador: 
 type Ambiente = { id: number; nome: string; circuitos: Circuito[] };
 type Area = { id: number; nome: string; ambientes: Ambiente[] };
 type ProjetoTree = { projeto: { id: number; nome: string } | null; areas: Area[] };
+type KeypadButton = { id: number; ordem: number; circuito_id: number | null };
+type Keypad = {
+  id: number;
+  nome: string;
+  hsnet: number;
+  button_count: number;
+  buttons: KeypadButton[];
+  ambiente?: { id: number; nome: string; area?: { id: number; nome: string } };
+};
 
 export default function Projeto() {
   const { projeto } = useProject();
+  const [keypads, setKeypads] = useState<Keypad[]>([]);
   const [projetoSelecionado, setProjetoSelecionado] = useState<boolean | null>(projeto ? true : null);
   const isLocked = projetoSelecionado !== true;
   // Sincroniza com o store quando hidratar
@@ -62,6 +73,27 @@ export default function Projeto() {
   const m4hsnet = "245";
   const m4devid = "1";
   const softwareVersion = "1.0.8.67";
+
+  const countKeypads = (all: Keypad[]) => all.length;
+  const keypadCount = countKeypads(keypads);
+
+
+  const fetchKeypads = async () => {
+    if (projetoSelecionado !== true) return;
+    try {
+      const res = await fetch("/api/keypads", { credentials: "same-origin" });
+      const json = await res.json();
+      setKeypads(json?.keypads || []);
+    } catch {
+      // silencioso para não poluir o toast do projeto
+    }
+  };
+
+  useEffect(() => {
+    fetchProjectData();
+    fetchKeypads();
+  }, [projetoSelecionado]);
+
 
   const fetchProjectData = async () => {
     if (projetoSelecionado !== true) {
@@ -170,7 +202,7 @@ export default function Projeto() {
                 Gerar RWP
               </Button>
               <Button
-                onClick={fetchProjectData}
+                onClick={() => { fetchProjectData(); fetchKeypads(); }}
                 variant="outline"
                 className="group flex items-center gap-2 h-12 px-6 rounded-full border-slate-200 text-slate-600 hover:text-slate-900 transition-all duration-300"
               >
@@ -211,7 +243,7 @@ export default function Projeto() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="flex flex-col items-center justify-center rounded-xl p-6 bg-slate-50/50">
                       <Lightbulb className="h-8 w-8 text-yellow-500 mb-2" />
                       <div className="text-2xl font-bold text-slate-900">{counts.luz}</div>
@@ -227,6 +259,12 @@ export default function Projeto() {
                       <div className="text-2xl font-bold text-slate-900">{counts.hvac}</div>
                       <div className="text-sm text-slate-600">Circuitos de HVAC</div>
                     </div>
+                    <div className="flex flex-col items-center justify-center rounded-xl p-6 bg-slate-50/50">
+                      <KeySquare className="h-8 w-8 text-violet-600 mb-2" />
+                      <div className="text-2xl font-bold text-slate-900">{keypadCount}</div>
+                      <div className="text-sm text-slate-600">Keypads</div>
+                    </div>
+
                   </CardContent>
                 </Card>
               </motion.div>
@@ -290,6 +328,57 @@ export default function Projeto() {
                                         ))}
                                       </ul>
                                     )}
+                                    {/* Keypads do ambiente */}
+                                    {(() => {
+                                      const kps = keypads.filter(k => k.ambiente?.id === ambiente.id);
+                                      if (kps.length === 0) {
+                                        return (
+                                          <p className="text-sm text-slate-500 mt-3">
+                                            Nenhum keypad neste ambiente.
+                                          </p>
+                                        );
+                                      }
+                                      return (
+                                        <div className="mt-4">
+                                          <h5 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                            <KeySquare className="h-4 w-4 text-violet-600" />
+                                            Keypads
+                                          </h5>
+                                          <ul className="space-y-2">
+                                            {kps.map((k) => {
+                                              const linked = k.buttons.filter(b => b.circuito_id != null).length;
+                                              const total = k.button_count || k.buttons.length || 0;
+                                              let statusLabel = "Vazio";
+                                              let statusClass = "bg-red-100 text-red-700";
+                                              if (linked > 0 && linked < total) {
+                                                statusLabel = "Parcial";
+                                                statusClass = "bg-yellow-100 text-yellow-800";
+                                              } else if (total > 0 && linked === total) {
+                                                statusLabel = "Completo";
+                                                statusClass = "bg-green-100 text-green-700";
+                                              }
+                                              return (
+                                                <li key={k.id} className="text-sm text-slate-600 flex items-center justify-between gap-2">
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="h-2 w-2 rounded-full bg-violet-400"></span>
+                                                    <span className="font-medium text-slate-800">{k.nome}</span>
+                                                    <span className="text-xs text-slate-500">HSNET {k.hsnet}</span>
+                                                    <span className="text-xs text-slate-500">• {total} tecla(s)</span>
+                                                    <span className="text-xs text-slate-500 flex items-center gap-1">
+                                                      <Link2 className="h-3 w-3" /> {linked}/{total} vinculadas
+                                                    </span>
+                                                  </div>
+                                                  <Badge className={`text-xs px-2 py-0.5 ${statusClass}`}>
+                                                    {statusLabel}
+                                                  </Badge>
+                                                </li>
+                                              );
+                                            })}
+                                          </ul>
+                                        </div>
+                                      );
+                                    })()}
+
                                   </div>
                                 </div>
                               ))}
