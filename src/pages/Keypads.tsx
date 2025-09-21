@@ -489,20 +489,31 @@ export default function Keypads() {
     if (!bindingKeypad) return;
     try {
       setBindingLoading(true);
-      
-      // Fazer uma requisição para cada botão
-      const promises = buttonBindings.map((b) => {
-        return fetch(`/api/keypads/${bindingKeypad.id}/buttons/${b.index + 1}`, {
-          method: "PUT",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({
-            circuito_id: b.circuito_id
-          }),
-        });
-      });
 
-      await Promise.all(promises);
+      // 1) Atualiza cada tecla
+      await Promise.all(
+        buttonBindings.map((b) =>
+          fetch(`/api/keypads/${bindingKeypad.id}/buttons/${b.index + 1}`, {
+            method: "PUT",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ circuito_id: b.circuito_id }),
+          })
+        )
+      );
+
+      // 2) Busca esse keypad atualizado
+      const res = await fetch(`/api/keypads/${bindingKeypad.id}`, { credentials: "same-origin" });
+      const json = await res.json().catch(() => ({} as any));
+
+      if (res.ok && json?.ok && json.keypad) {
+        // 3) Atualiza só ele na lista
+        setKeypads((prev) => prev.map((k) => (k.id === bindingKeypad.id ? json.keypad : k)));
+      } else {
+        // fallback: recarrega tudo
+        await checkAndFetch();
+      }
+
       toast({ title: "Vinculações salvas!", description: "As teclas foram atualizadas." });
       closeBindings();
     } catch (err: any) {
@@ -511,6 +522,7 @@ export default function Keypads() {
       setBindingLoading(false);
     }
   }
+
 
   // ---------- Render ----------
   return (
