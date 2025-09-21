@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, PlusCircle, Zap, DoorOpen, Sparkles } from "lucide-react";
+import { Trash2, PlusCircle, Zap, DoorOpen, Sparkles, Lightbulb, Blinds, Snowflake } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProject } from "@/store/project";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -271,20 +272,39 @@ export default function Circuitos() {
                         <Label htmlFor="tipo" className="text-sm font-semibold text-slate-700">
                           Tipo *
                         </Label>
-                        <select
-                          id="tipo"
-                          className="h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                          value={tipo}
-                          onChange={(e) => setTipo(e.target.value as any)}
-                          required
+
+                        <Select
+                          value={tipo || undefined}
+                          onValueChange={(v) => setTipo(v as "luz" | "persiana" | "hvac")}
                           disabled={!projetoSelecionado}
                         >
-                          <option value="">Selecione o tipo</option>
-                          <option value="luz">💡 Luz</option>
-                          <option value="persiana">🪟 Persiana</option>
-                          <option value="hvac">❄️ HVAC</option>
-                        </select>
+                          <SelectTrigger id="tipo" className="h-12 w-full rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all">
+                            <SelectValue placeholder="Selecione o tipo" />
+                          </SelectTrigger>
+
+                          <SelectContent className="rounded-xl">
+                            <SelectItem value="luz">
+                              <div className="flex items-center gap-2">
+                                <Lightbulb className="h-4 w-4 text-yellow-500" />
+                                <span>Luz</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="persiana">
+                              <div className="flex items-center gap-2">
+                                <Blinds className="h-4 w-4 text-blue-500" />
+                                <span>Persiana</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="hvac">
+                              <div className="flex items-center gap-2">
+                                <Snowflake className="h-4 w-4 text-green-500" />
+                                <span>HVAC</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
+
                       <div className="space-y-2">
                         <Label htmlFor="ambiente_id" className="text-sm font-semibold text-slate-700">
                           Ambiente *
@@ -384,7 +404,7 @@ export default function Circuitos() {
                               <div className="flex-1 mr-4">
                                 <div className="flex items-center gap-3 mb-2">
                                   <Badge
-                                    className={`text-xs font-medium px-2 py-1 ${
+                                    className={`text-xs font-medium px-2 py-1 flex items-center gap-1 ${
                                       c.tipo === "luz"
                                         ? "bg-yellow-100 text-yellow-800"
                                         : c.tipo === "persiana"
@@ -392,9 +412,16 @@ export default function Circuitos() {
                                           : "bg-green-100 text-green-800"
                                     }`}
                                   >
-                                    {c.tipo === "luz" ? "💡" : c.tipo === "persiana" ? "🪟" : "❄️"}{" "}
+                                    {c.tipo === "luz" ? (
+                                      <Lightbulb className="h-3 w-3" />
+                                    ) : c.tipo === "persiana" ? (
+                                      <Blinds className="h-3 w-3" />
+                                    ) : (
+                                      <Snowflake className="h-3 w-3" />
+                                    )}
                                     {c.tipo.toUpperCase()}
                                   </Badge>
+
                                   <span className="text-sm font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
                                     {c.identificador}
                                   </span>
