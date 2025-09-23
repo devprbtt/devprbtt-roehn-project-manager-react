@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
@@ -15,7 +15,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { setUser, fetchSession } = useAuth();
+  const { user, fetchSession } = useAuth();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -24,6 +24,9 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
 
   const from = (location.state as any)?.from || "/";
+
+  useEffect(() => { fetchSession(); }, [fetchSession]);
+  useEffect(() => { if (user) navigate(from, { replace: true }); }, [user, from, navigate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

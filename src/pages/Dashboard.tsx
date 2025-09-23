@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/store/auth"; // <-- garante que temos user/loading/fetchSession
 import Layout from "../components/Layout";
 import CreateProjectForm from "@/components/dashboard/CreateProjectForm";
 import ProjectGrid from "@/components/dashboard/ProjectGrid";
@@ -15,6 +17,9 @@ export type Project = {
 };
 
 const Dashboard: React.FC = () => {
+
+  const location = useLocation();
+  const { user, loading: authLoading, fetchSession } = useAuth();  
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | undefined>();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -46,8 +51,13 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    loadProjects();
-  }, []);
+    // garante que a sessão foi checada quando entrar na página
+    fetchSession();
+  }, [fetchSession]);
+  
+  useEffect(() => {
+    if (user) loadProjects();   // <— só carrega dados se já estiver logado
+  }, [user]);
 
 
   // Função para exportar projeto em JSON
@@ -184,7 +194,22 @@ const Dashboard: React.FC = () => {
       setCurrentProject(prev => prev ? { ...prev, nome: data.nome || prev.nome } : prev);
     }
   };
-
+  if (authLoading) {
+    return (
+      <Layout>
+        <div className="min-h-[60vh] grid place-items-center">
+          <div className="flex items-center gap-3 text-slate-600">
+            <span className="animate-spin inline-block h-5 w-5 rounded-full border-2 border-slate-300 border-t-slate-600" />
+            Verificando sessão...
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+  // Se não logado, redireciona para login e guarda a rota atual
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }  
   return (
     <Layout projectSelected={!!currentProject} projectId={currentProject?.id}>
       <div className="max-w-7xl mx-auto px-6 py-8">
