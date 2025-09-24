@@ -7,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, PlusCircle, Zap, DoorOpen, Sparkles, Lightbulb, Blinds, Snowflake } from "lucide-react";
+import { Trash2, PlusCircle, Zap, DoorOpen, Sparkles, Lightbulb, Blinds, Snowflake, Search, Filter, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProject } from "@/store/project";
 import { motion, AnimatePresence } from "framer-motion";
+
 
 type Ambiente = { id: number; nome: string; area?: { id: number; nome: string } };
 type Circuito = {
@@ -30,11 +31,35 @@ export default function Circuitos() {
   const [loading, setLoading] = useState(true);
   const [projetoSelecionado, setProjetoSelecionado] = useState(false);
 
+  // Estados para filtros
+  const [searchTerm, setSearchTerm] = useState("");
+  const [tipoFilter, setTipoFilter] = useState<"luz" | "persiana" | "hvac" | "todos">("todos");
+  const [ambienteFilter, setAmbienteFilter] = useState<number | "todos">("todos");
+
   // form
   const [identificador, setIdentificador] = useState("");
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<"luz" | "persiana" | "hvac">("luz");
   const [ambienteId, setAmbienteId] = useState<number | "">("");
+
+  // Circuitos filtrados
+  const circuitosFiltrados = useMemo(() => {
+    return circuitos.filter(circuito => {
+      // Filtro por texto (nome ou identificador)
+      const matchesSearch = searchTerm === "" || 
+        circuito.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        circuito.identificador.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Filtro por tipo
+      const matchesTipo = tipoFilter === "todos" || circuito.tipo === tipoFilter;
+      
+      // Filtro por ambiente
+      const matchesAmbiente = ambienteFilter === "todos" || circuito.ambiente.id === ambienteFilter;
+      
+      return matchesSearch && matchesTipo && matchesAmbiente;
+    });
+  }, [circuitos, searchTerm, tipoFilter, ambienteFilter]);
+
 
   const checkAndFetchData = async () => {
     setLoading(true);
@@ -221,6 +246,7 @@ export default function Circuitos() {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Card de Adicionar Circuito */}
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
                 <CardHeader className="pb-6">
@@ -346,6 +372,7 @@ export default function Circuitos() {
               </Card>
             </motion.div>
 
+            {/* Card de Circuitos Cadastrados com Filtros */}
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
                 <CardHeader className="pb-6">
@@ -360,10 +387,97 @@ export default function Circuitos() {
                       </div>
                     </div>
                     <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-medium px-3 py-1">
-                      {circuitos.length} {circuitos.length === 1 ? "circuito" : "circuitos"}
+                      {circuitosFiltrados.length} de {circuitos.length} {circuitos.length === 1 ? "circuito" : "circuitos"}
                     </Badge>
                   </div>
+                  
+                  {/* Barra de Filtros */}
+                  <div className="mt-6 space-y-4">
+                    {/* Filtro de Busca por Texto */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <Input
+                        placeholder="Buscar por nome ou identificador..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 pr-10 h-10 rounded-xl border-slate-200 focus:border-blue-500"
+                      />
+                      {searchTerm && (
+                        <button
+                          onClick={() => setSearchTerm("")}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Filtros de Tipo e Ambiente */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Filtro por Tipo */}
+                      <div className="space-y-1">
+                        <Label htmlFor="filtro-tipo" className="text-xs font-medium text-slate-600">
+                          Tipo
+                        </Label>
+                        <Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}>
+                          <SelectTrigger id="filtro-tipo" className="h-9 text-sm rounded-xl">
+                            <SelectValue placeholder="Todos os tipos" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            <SelectItem value="todos">Todos os tipos</SelectItem>
+                            <SelectItem value="luz">Luz</SelectItem>
+                            <SelectItem value="persiana">Persiana</SelectItem>
+                            <SelectItem value="hvac">HVAC</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {/* Filtro por Ambiente */}
+                      <div className="space-y-1">
+                        <Label htmlFor="filtro-ambiente" className="text-xs font-medium text-slate-600">
+                          Ambiente
+                        </Label>
+                        <Select 
+                          value={ambienteFilter === "todos" ? "todos" : ambienteFilter.toString()} 
+                          onValueChange={(v) => setAmbienteFilter(v === "todos" ? "todos" : parseInt(v))}
+                        >
+                          <SelectTrigger id="filtro-ambiente" className="h-9 text-sm rounded-xl">
+                            <SelectValue placeholder="Todos os ambientes" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            <SelectItem value="todos">Todos os ambientes</SelectItem>
+                            {ambientes.map(ambiente => (
+                              <SelectItem key={ambiente.id} value={ambiente.id.toString()}>
+                                {ambiente.nome}
+                                {ambiente.area && ` (${ambiente.area.nome})`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    {/* Botão para limpar todos os filtros */}
+                    {(searchTerm || tipoFilter !== "todos" || ambienteFilter !== "todos") && (
+                      <div className="flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSearchTerm("");
+                            setTipoFilter("todos");
+                            setAmbienteFilter("todos");
+                          }}
+                          className="h-8 text-xs rounded-lg gap-1"
+                        >
+                          <X className="w-3 h-3" />
+                          Limpar filtros
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </CardHeader>
+                
                 <CardContent>
                   {loading ? (
                     <div className="flex flex-col justify-center items-center py-12">
@@ -388,10 +502,26 @@ export default function Circuitos() {
                           : "Selecione um projeto para visualizar e gerenciar os circuitos."}
                       </p>
                     </motion.div>
+                  ) : circuitosFiltrados.length === 0 ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-center py-12"
+                    >
+                      <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Search className="h-10 w-10 text-slate-400" />
+                      </div>
+                      <h4 className="text-xl font-semibold text-slate-900 mb-2">
+                        Nenhum circuito encontrado
+                      </h4>
+                      <p className="text-slate-600 max-w-sm mx-auto">
+                        Tente ajustar os filtros de busca para encontrar o que procura.
+                      </p>
+                    </motion.div>
                   ) : (
                     <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                       <AnimatePresence>
-                        {circuitos.map((c, index) => (
+                        {circuitosFiltrados.map((c, index) => (
                           <motion.div
                             key={c.id}
                             initial={{ opacity: 0, y: 20 }}
