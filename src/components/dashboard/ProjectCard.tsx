@@ -21,12 +21,23 @@ type Props = {
   onUpdate: (data: Partial<Project>) => void;
 };
 
-const borderByStatus: Record<ProjectStatus, string> = {
-  ATIVO: 'border-green-400',
-  INATIVO: 'border-slate-300',
-  CONCLUIDO: 'border-amber-400',
+const statusBorderClass: Record<ProjectStatus, string> = {
+  ATIVO: "border-emerald-500",
+  INATIVO: "border-slate-300",
+  CONCLUIDO: "border-amber-500",
 };
 
+const statusBadgeClass: Record<ProjectStatus, string> = {
+  ATIVO: "bg-emerald-100 text-emerald-800",
+  INATIVO: "bg-slate-100 text-slate-700",
+  CONCLUIDO: "bg-amber-100 text-amber-800",
+};
+
+const statusTriangleClass: Record<ProjectStatus, string> = {
+  ATIVO: "border-t-emerald-500",
+  INATIVO: "border-t-slate-400",
+  CONCLUIDO: "border-t-amber-500",
+};
 
 //const statusColors: Record<ProjectStatus, string> = {
 //  ATIVO: 'border-green-500',
@@ -59,21 +70,21 @@ const ProjectCard: React.FC<Props> = ({
     }
   };
 
-  // escolhe estilo pela situação; se não vier status, trate como "Inativo"
-  const st = borderByStatus[project.status ?? "Inativo"];
+  const borderClass = statusBorderClass[project.status ?? "INATIVO"];
+  const badgeClass = statusBadgeClass[project.status ?? "INATIVO"];
 
   return (
     <>
       <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ duration: 0.2 }}>
         <Card
-          className={`relative overflow-hidden transition-all duration-300 border-2 ${st.border} ${
+          className={`relative overflow-hidden transition-all duration-300 border-2 ${borderClass} ${
             isCurrentProject
               ? "bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg shadow-blue-500/10"
               : "bg-white hover:shadow-lg shadow-slate-900/5"
           }`}
         >
           {isCurrentProject && (
-            <div className="absolute top-0 right-0 w-0 h-0 border-l-[40px] border-l-transparent border-t-[40px] border-t-blue-500">
+            <div className={`absolute top-0 right-0 w-0 h-0 border-l-[40px] border-l-transparent border-t-[40px] ${statusTriangleClass[project.status ?? "INATIVO"]}`}>
               <Crown className="absolute -top-8 -right-8 w-4 h-4 text-white transform rotate-45" />
             </div>
           )}
@@ -91,8 +102,8 @@ const ProjectCard: React.FC<Props> = ({
                   Atual
                 </Badge>
               )}
-              <Badge className={`${st.badge} text-xs font-medium`}>
-                {project.status ?? "Inativo"}
+              <Badge className={`${badgeClass} text-xs font-medium`}>
+                {project.status ?? "INATIVO"}
               </Badge>
             </div>
           </CardHeader>
