@@ -19,6 +19,7 @@ type Circuito = {
   identificador: string;
   nome: string;
   tipo: "luz" | "persiana" | "hvac";
+  dimerizavel?: boolean; // Novo campo opcional
   ambiente: { id: number; nome: string; area?: { id: number; nome: string } };
   sak?: string | null;
 };
@@ -30,6 +31,8 @@ export default function Circuitos() {
   const [circuitos, setCircuitos] = useState<Circuito[]>([]);
   const [loading, setLoading] = useState(true);
   const [projetoSelecionado, setProjetoSelecionado] = useState(false);
+  const [dimerizavel, setDimerizavel] = useState(false);
+
 
   // Estados para filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -41,6 +44,12 @@ export default function Circuitos() {
   const [nome, setNome] = useState("");
   const [tipo, setTipo] = useState<"luz" | "persiana" | "hvac">("luz");
   const [ambienteId, setAmbienteId] = useState<number | "">("");
+
+  useEffect(() => {
+    if (tipo !== 'luz') {
+      setDimerizavel(false);
+    }
+  }, [tipo]); 
 
   // Circuitos filtrados
   const circuitosFiltrados = useMemo(() => {
@@ -142,6 +151,7 @@ export default function Circuitos() {
           identificador: identificador.trim(),
           nome: nome.trim(),
           tipo,
+          dimerizavel: tipo === 'luz' ? dimerizavel : false, // Só envia se for luz
           ambiente_id: ambienteId,
         }),
       });
@@ -156,6 +166,8 @@ export default function Circuitos() {
         // Mantemos o tipo selecionado, apenas resetamos os outros campos
         setIdentificador("");
         setNome("");
+        setDimerizavel(false);
+       
         //setAmbienteId("");
         checkAndFetchData().catch((error) => {
           console.error("Erro ao recarregar dados:", error);
@@ -330,6 +342,22 @@ export default function Circuitos() {
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {tipo === 'luz' && (
+                        <div className="flex items-center space-x-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                          <input
+                            type="checkbox"
+                            id="dimerizavel"
+                            checked={dimerizavel}
+                            onChange={(e) => setDimerizavel(e.target.checked)}
+                            className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                          />
+                          <label htmlFor="dimerizavel" className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-blue-500" />
+                            Circuito dimerizável
+                          </label>
+                        </div>
+                      )}
 
                       <div className="space-y-2">
                         <Label htmlFor="ambiente_id" className="text-sm font-semibold text-slate-700">
@@ -536,7 +564,9 @@ export default function Circuitos() {
                                   <Badge
                                     className={`text-xs font-medium px-2 py-1 flex items-center gap-1 ${
                                       c.tipo === "luz"
-                                        ? "bg-yellow-100 text-yellow-800"
+                                        ? dimerizavel 
+                                          ? "bg-purple-100 text-purple-800" // Cor diferente para dimerizável
+                                          : "bg-yellow-100 text-yellow-800"
                                         : c.tipo === "persiana"
                                           ? "bg-blue-100 text-blue-800"
                                           : "bg-green-100 text-green-800"
@@ -550,6 +580,9 @@ export default function Circuitos() {
                                       <Snowflake className="h-3 w-3" />
                                     )}
                                     {c.tipo.toUpperCase()}
+                                    {c.tipo === "luz" && c.dimerizavel && (
+                                      <Sparkles className="h-3 w-3 ml-1" />
+                                    )}
                                   </Badge>
 
                                   <span className="text-sm font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
@@ -573,6 +606,13 @@ export default function Circuitos() {
                                     (c.sak ?? <span className="italic opacity-60">Não definido</span>)
                                   ) : (
                                     <span className="opacity-60">Não aplicável</span>
+                                  )}
+                                  {c.tipo === "luz" && (
+                                    <>
+                                      <span className="mx-2">•</span>
+                                      <span className="font-medium">Tipo: </span>
+                                      {c.dimerizavel ? "Dimmer" : "ON/OFF"}
+                                    </>
                                   )}
                                 </div>
                               </div>

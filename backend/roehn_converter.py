@@ -127,10 +127,17 @@ class RoehnProjectConverter:
 
                         try:
                             if circuito.tipo == 'luz':
-                                guid = self._add_load(area.nome, ambiente.nome, circuito.nome or circuito.identificador)
+                                # ⭐⭐⭐ NOVO: Obter informação de dimerizável do circuito
+                                dimerizavel = getattr(circuito, 'dimerizavel', False)
+                                guid = self._add_load(
+                                    area.nome, 
+                                    ambiente.nome, 
+                                    circuito.nome or circuito.identificador,
+                                    dimerizavel=dimerizavel  # ⭐⭐⭐ NOVO PARÂMETRO
+                                )
                                 self._circuit_guid_map[circuito.id] = guid
                                 self._link_load_to_module(guid, modulo_nome, canal)
-                                print(f"Circuito de luz adicionado: {guid}")
+                                print(f"Circuito de luz adicionado: {guid} (Dimerizável: {dimerizavel})")  # ⭐⭐⭐ LOG ATUALIZADO
                             elif circuito.tipo == 'persiana':
                                 guid = self._add_shade(area.nome, ambiente.nome, circuito.nome or circuito.identificador)
                                 self._circuit_guid_map[circuito.id] = guid
@@ -400,8 +407,12 @@ class RoehnProjectConverter:
             modulo_nome = self._ensure_module_exists(modulo, f"{modulo}_{id_modulo}")
 
             if tipo == "luz":
-                guid = self._add_load(area, ambiente, nome or circuito or "Load")
-                self._link_load_to_module(guid, modulo_nome, canal)
+                # ⭐⭐⭐ NOVO: Tentar obter informação de dimerizável do CSV (se existir)
+                dimerizavel_csv = row.get("Dimerizavel", "").strip().lower()
+                dimerizavel = dimerizavel_csv in ["sim", "true", "1", "yes"]
+                
+                guid = self._add_load(area, ambiente, nome or circuito or "Load", dimerizavel=dimerizavel)
+                self._link_load_to_module(guid, modulo_nome, canal, dimerizavel=dimerizavel)
             elif tipo == "persiana":
                 key = f"{area}|{ambiente}|{nome or circuito or 'Persiana'}"
                 if key not in shades_seen:
@@ -1204,19 +1215,29 @@ class RoehnProjectConverter:
             print("Erro ao linkar HVAC:", e)
         return False
 
-    def _add_load(self, area, ambiente, name, power=0.0, description="ON/OFF"):
+    def _add_load(self, area, ambiente, name, power=0.0, description="ON/OFF", dimerizavel=False):
         """Adiciona um circuito de iluminação"""
         area_idx = next(i for i, a in enumerate(self.project_data["Areas"]) if a["Name"] == area)
         room_idx = next(i for i, r in enumerate(self.project_data["Areas"][area_idx]["SubItems"]) if r["Name"] == ambiente)
 
         next_unit_id = self._find_max_unit_id() + 1
 
+        # ⭐⭐⭐ NOVO: Determinar LoadType e ProfileGuid baseado em dimerizavel
+        if dimerizavel:
+            load_type = 2  # Reverse Phase Dimmer
+            profile_guid = "10000000-0000-0000-0000-000000000002"  # GUID para dimer
+            description = "Dimmer"
+        else:
+            load_type = 0  # ON/OFF
+            profile_guid = "10000000-0000-0000-0000-000000000001"  # GUID para ON/OFF
+            description = "ON/OFF"
+
         new_load = {
             "$type": "Circuit",
-            "LoadType": 0,
+            "LoadType": load_type,  # ⭐⭐⭐ MODIFICADO
             "IconPath": 0,
             "Power": power,
-            "ProfileGuid": "10000000-0000-0000-0000-000000000001",
+            "ProfileGuid": profile_guid,  # ⭐⭐⭐ MODIFICADO
             "Unit": {
                 "$type": "Unit",
                 "Id": next_unit_id,
@@ -1259,19 +1280,27 @@ class RoehnProjectConverter:
         find_ids(self.project_data)
         return max_id
 
-    def _link_load_to_module(self, load_guid, module_name, canal):
+    def _link_load_to_module(self, load_guid, module_name, canal, dimerizavel=False):
         """Vincula um circuito de iluminação a um módulo"""
         try:
             modules_list = self.project_data['Areas'][0]['SubItems'][0]['AutomationBoards'][0]['ModulesList']
             for module in modules_list:
                 if module['Name'] == module_name:
-                    # tentar ON/OFF e depois DIM
-                    for wanted in ('Load ON/OFF', 'Load Dim'):
+                    # ⭐⭐⭐ NOVO: Priorizar slots baseado no tipo de carga
+                    if dimerizavel:
+                        # Para dimerizável, tentar primeiro Load Dim, depois Load ON/OFF
+                        slot_priority = ['Load Dim', 'Load ON/OFF']
+                    else:
+                        # Para ON/OFF, tentar primeiro Load ON/OFF, depois Load Dim
+                        slot_priority = ['Load ON/OFF', 'Load Dim']
+                    
+                    for wanted_slot in slot_priority:
                         for slot in module.get('Slots', []):
-                            if slot.get('Name') == wanted:
+                            if slot.get('Name') == wanted_slot:
                                 while len(slot['SubItemsGuid']) < slot.get('SlotCapacity', 0):
                                     slot['SubItemsGuid'].append("00000000-0000-0000-0000-000000000000")
                                 slot['SubItemsGuid'][canal-1] = load_guid
+                                print(f"Circuito vinculado ao slot: {wanted_slot}, canal: {canal}")
                                 return True
                     break
         except Exception as e:
