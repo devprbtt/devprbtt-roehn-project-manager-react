@@ -300,10 +300,10 @@ export default function Keypads() {
 
   function statusLabel(status: KeypadStatus) {
     return status === "completo"
-      ? "Todas teclas vinculadas"
+      ? "Completo"
       : status === "parcial"
-      ? "Parcialmente vinculado"
-      : "Sem vinculações";
+      ? "Parcial"
+      : "Vazio";
   }
 
 

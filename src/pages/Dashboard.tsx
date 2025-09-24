@@ -7,14 +7,11 @@ import ProjectGrid from "@/components/dashboard/ProjectGrid";
 import CurrentProjectAlert from "@/components/dashboard/CurrentProjectAlert";
 import ImportProjectSection from "@/components/dashboard/ImportProjectSection";
 import NavigationGuide from "@/components/dashboard/NavigationGuide";
+import type { Project, ProjectStatus } from '@/types/project';
+
 import { Download, Plus } from "lucide-react";
 
-// Tipagem do projeto conforme backend Flask
-export type Project = {
-  id: number;
-  nome: string;
-  selected?: boolean;
-};
+
 
 const Dashboard: React.FC = () => {
 
@@ -33,14 +30,27 @@ const Dashboard: React.FC = () => {
       const projRes = await fetch("/api/projetos", { credentials: "include" });
       const projData = await projRes.json();
       if (projData.ok && Array.isArray(projData.projetos)) {
-        setProjects(projData.projetos);
+        setProjects(
+          projData.projetos.map((p: any) => ({
+            id: p.id,
+            nome: p.nome,
+            status: (p.status ?? 'ATIVO') as ProjectStatus,
+            selected: !!p.selected,
+          }))
+        );
       }
 
       // Buscar o projeto atual
       const currentRes = await fetch("/api/projeto_atual", { credentials: "include" });
       const currentData = await currentRes.json();
       if (currentData.ok && currentData.projeto_atual) {
-        setCurrentProject(currentData.projeto_atual);
+        const p = currentData.projeto_atual;
+        setCurrentProject({
+          id: p.id,
+          nome: p.nome,
+          status: (p.status ?? 'ATIVO') as ProjectStatus,
+          selected: !!p.selected,
+        });
       } else {
         setCurrentProject(undefined);
       }
@@ -58,7 +68,6 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (user) loadProjects();   // <— só carrega dados se já estiver logado
   }, [user]);
-
 
   // Função para exportar projeto em JSON
   const handleExportProject = async () => {
@@ -126,7 +135,12 @@ const Dashboard: React.FC = () => {
         });
         
         // Atualiza localmente sem recarregar tudo
-        const newProject = { id: data.id, nome: formData.name, selected: true };
+        const newProject: Project = {
+          id: data.id,
+          nome: formData.name,
+          status: 'ATIVO',
+          selected: true,
+        };
         setProjects(prev => [...prev, newProject]);
         setCurrentProject(newProject);
       }
@@ -147,11 +161,21 @@ const Dashboard: React.FC = () => {
       });
       
       // Atualiza localmente sem recarregar tudo
-      setProjects(prev => prev.map(p => ({
-        ...p,
-        selected: p.id === project.id
-      })));
-      setCurrentProject(project);
+      // depois do fetch PUT, ao atualizar localmente
+      setProjects(prev =>
+        prev.map(p => ({
+          ...p,
+          selected: p.id === project.id,
+        }))
+      );
+      // e garantir currentProject com status:
+      setCurrentProject(prev => ({
+        id: project.id,
+        nome: project.nome,
+        status: (project as any).status ?? 'ATIVO',
+        selected: true,
+      }));
+
     } catch (error) {}
     setIsLoading(false);
   };
@@ -176,24 +200,47 @@ const Dashboard: React.FC = () => {
     setIsLoading(false);
   };
 
+  // Atualizar projeto (nome e/ou status)
   const handleUpdateProject = async (projectId: number, data: Partial<Project>) => {
     await fetch(`/api/projetos/${projectId}`, {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nome: data.nome }),
+      body: JSON.stringify({
+        nome: data.nome,
+        status: data.status, // <— enviar status também
+      }),
     });
 
-    // Atualiza localmente sem recarregar tudo
-    setProjects(prev => prev.map(p => 
-      p.id === projectId ? { ...p, nome: data.nome || p.nome } : p
-    ));
+    // Atualiza a lista
+    setProjects(prev =>
+      prev.map(p =>
+        p.id === projectId
+          ? {
+              ...p,
+              nome: data.nome ?? p.nome,
+              status: (data.status as ProjectStatus | undefined) ?? p.status,
+            }
+          : p
+      )
+    );
 
-    // Se era o projeto atual, atualiza também
+    // Atualiza o projeto atual se for ele
     if (currentProject?.id === projectId) {
-      setCurrentProject(prev => prev ? { ...prev, nome: data.nome || prev.nome } : prev);
+      setCurrentProject(prev =>
+        prev
+          ? {
+              ...prev,
+              nome: data.nome ?? prev.nome,
+              status: (data.status as ProjectStatus | undefined) ?? prev.status,
+            }
+          : prev
+      );
     }
-  };
+  }; // <— ESSA CHAVE FALTAVA
+
+
+
   if (authLoading) {
     return (
       <Layout>
@@ -256,14 +303,17 @@ const Dashboard: React.FC = () => {
         )}
 
         {/* Projects Grid */}
-        <ProjectGrid 
+        <ProjectGrid
           projects={projects}
           currentProject={currentProject}
           isLoading={isLoading}
           onSelectProject={handleSelectProject}
           onDeleteProject={handleDeleteProject}
-          onUpdateProject={(projectId, data) => handleUpdateProject(projectId, { nome: data.nome })}
+          onUpdateProject={(projectId, data: Partial<Project>) =>
+            handleUpdateProject(projectId, data)
+          }
         />
+
 
         {/* Import Section */}
         <ImportProjectSection onProjectImported={loadProjects} />

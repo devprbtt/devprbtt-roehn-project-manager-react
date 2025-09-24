@@ -21,12 +21,15 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
 
+# database.py
 class Projeto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False, unique=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='ATIVO')  # <--- NOVO
     areas = db.relationship('Area', backref='projeto', lazy=True, cascade='all, delete-orphan')
     modulos = db.relationship('Modulo', backref='projeto', lazy=True, cascade='all, delete-orphan')
+
 
 
 class Area(db.Model):

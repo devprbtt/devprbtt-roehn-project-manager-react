@@ -7,30 +7,49 @@ import {
   Edit3,
   Trash2,
   FolderOpen,
-  Crown
+  Crown,
 } from "lucide-react";
 import EditProjectModal from "./EditProjectModal";
 import { motion } from "framer-motion";
-
-type Project = {
-  id: number;
-  nome: string;
-};
+import type { Project, ProjectStatus } from '@/types/project';
 
 type Props = {
   project: Project;
-  isCurrentProject: boolean;
+  isCurrentProject?: boolean;
   onSelect: () => void;
   onDelete: () => void;
   onUpdate: (data: Partial<Project>) => void;
 };
+
+const borderByStatus: Record<ProjectStatus, string> = {
+  ATIVO: 'border-green-400',
+  INATIVO: 'border-slate-300',
+  CONCLUIDO: 'border-amber-400',
+};
+
+
+//const statusColors: Record<ProjectStatus, string> = {
+//  ATIVO: 'border-green-500',
+//  INATIVO: 'border-slate-300',
+//  CONCLUIDO: 'border-blue-500',
+//};
+
+
+//const statusStyles: Record<
+//  ProjectStatus,
+//  { border: string; badge: string }
+//> = {
+//  Ativo: { border: "border-green-300", badge: "bg-green-100 text-green-800" },
+//  Inativo: { border: "border-slate-300", badge: "bg-slate-100 text-slate-700" },
+//  "Concluído": { border: "border-amber-300", badge: "bg-amber-100 text-amber-800" },
+//};
 
 const ProjectCard: React.FC<Props> = ({
   project,
   isCurrentProject,
   onSelect,
   onDelete,
-  onUpdate
+  onUpdate,
 }) => {
   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -40,14 +59,19 @@ const ProjectCard: React.FC<Props> = ({
     }
   };
 
+  // escolhe estilo pela situação; se não vier status, trate como "Inativo"
+  const st = borderByStatus[project.status ?? "Inativo"];
+
   return (
     <>
       <motion.div whileHover={{ y: -4, scale: 1.02 }} transition={{ duration: 0.2 }}>
-        <Card className={`relative overflow-hidden transition-all duration-300 ${
-          isCurrentProject
-            ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-lg shadow-blue-500/10'
-            : 'bg-white hover:shadow-lg shadow-slate-900/5 border-slate-200/60'
-        }`}>
+        <Card
+          className={`relative overflow-hidden transition-all duration-300 border-2 ${st.border} ${
+            isCurrentProject
+              ? "bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg shadow-blue-500/10"
+              : "bg-white hover:shadow-lg shadow-slate-900/5"
+          }`}
+        >
           {isCurrentProject && (
             <div className="absolute top-0 right-0 w-0 h-0 border-l-[40px] border-l-transparent border-t-[40px] border-t-blue-500">
               <Crown className="absolute -top-8 -right-8 w-4 h-4 text-white transform rotate-45" />
@@ -59,12 +83,18 @@ const ProjectCard: React.FC<Props> = ({
               <FolderOpen className="w-5 h-5 text-slate-600" />
               <h4 className="text-lg font-bold text-slate-900 truncate">{project.nome}</h4>
             </div>
-            {isCurrentProject && (
-              <Badge className="bg-blue-500 text-white text-xs font-medium mt-2">
-                <Crown className="w-3 h-3 mr-1" />
-                Atual
+
+            <div className="flex items-center gap-2 mt-2">
+              {isCurrentProject && (
+                <Badge className="bg-blue-500 text-white text-xs font-medium">
+                  <Crown className="w-3 h-3 mr-1" />
+                  Atual
+                </Badge>
+              )}
+              <Badge className={`${st.badge} text-xs font-medium`}>
+                {project.status ?? "Inativo"}
               </Badge>
-            )}
+            </div>
           </CardHeader>
 
           <CardContent className="pt-0">
@@ -109,6 +139,7 @@ const ProjectCard: React.FC<Props> = ({
           </CardContent>
         </Card>
       </motion.div>
+
       <EditProjectModal
         project={project}
         isOpen={showEditModal}

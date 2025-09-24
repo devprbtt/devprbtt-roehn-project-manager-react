@@ -10,11 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Save, X } from "lucide-react";
-
-type Project = {
-  id: number;
-  nome: string;
-};
+import type { Project, ProjectStatus } from '@/types/project';
 
 type Props = {
   project?: Project;
@@ -30,15 +26,17 @@ const EditProjectModal: React.FC<Props> = ({
   onUpdate
 }) => {
   const [name, setName] = useState(project?.nome || "");
+  const [status, setStatus] = useState<ProjectStatus>(project?.status ?? "ATIVO");
 
   useEffect(() => {
     setName(project?.nome || "");
+    setStatus(project?.status ?? "ATIVO");
   }, [project]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onUpdate({ nome: name });
+    onUpdate({ nome: name.trim(), status }); // <-- envia status também
     onClose();
   };
 
@@ -74,6 +72,23 @@ const EditProjectModal: React.FC<Props> = ({
               required
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-status" className="text-sm font-semibold text-slate-700">
+              Status
+            </Label>
+            <select
+              id="edit-status"
+              className="h-11 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as ProjectStatus)}
+            >
+              <option value="ATIVO">Ativo</option>
+              <option value="INATIVO">Inativo</option>
+              <option value="CONCLUIDO">Concluído</option>
+            </select>
+          </div>
+
           <DialogFooter>
             <div className="flex gap-3 w-full">
               <Button

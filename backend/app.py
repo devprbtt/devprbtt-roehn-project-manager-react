@@ -561,7 +561,12 @@ def delete_projeto(projeto_id):
 def api_projetos_list():
     projetos = Projeto.query.order_by(Projeto.id.asc()).all()
     selected_id = session.get("projeto_atual_id")
-    out = [{"id": p.id, "nome": p.nome, "selected": (p.id == selected_id)} for p in projetos]
+    out = [{
+        "id": p.id,
+        "nome": p.nome,
+        "status": (p.status or "ATIVO"),
+        "selected": (p.id == selected_id)
+    } for p in projetos]
     return jsonify({"ok": True, "projetos": out})
 
 
@@ -605,25 +610,30 @@ def api_projetos_delete(projeto_id):
 
     return jsonify({"ok": True})
 
-
 @app.put("/api/projetos/<int:projeto_id>")
 @login_required
 def api_projetos_update(projeto_id):
     data = request.get_json(silent=True) or request.form or {}
-    nome = (data.get("nome") or "").strip()
-    if not nome:
-        return jsonify({"ok": False, "error": "Nome é obrigatório."}), 400
     p = db.get_or_404(Projeto, projeto_id)
-    p.nome = nome
+
+    if "nome" in data:
+        nome = (data.get("nome") or "").strip()
+        if not nome:
+            return jsonify({"ok": False, "error": "Nome é obrigatório."}), 400
+        p.nome = nome
+
+    if "status" in data:
+        status = (data.get("status") or "").strip().upper()
+        if status not in {"ATIVO", "INATIVO", "CONCLUIDO"}:
+            return jsonify({"ok": False, "error": "Status inválido (use ATIVO, INATIVO ou CONCLUIDO)."}), 400
+        p.status = status
+
     db.session.commit()
 
-    # se estava selecionado, atualiza nome na sessão
-    if session.get("projeto_atual_id") == p.id:
-      session["projeto_atual_nome"] = p.nome
+    if session.get("projeto_atual_id") == p.id and "nome" in data:
+        session["projeto_atual_nome"] = p.nome
 
-    return jsonify({"ok": True})
-
-
+    return jsonify({"ok": True, "projeto": {"id": p.id, "nome": p.nome, "status": p.status}})
 
 @app.post("/api/projetos")
 @login_required
@@ -633,9 +643,11 @@ def api_projetos_create():
     if not nome:
         return jsonify({"ok": False, "error": "Nome é obrigatório."}), 400
 
-    # preenche o criador para satisfazer o NOT NULL
-    p = Projeto(nome=nome, user_id=current_user.id)
+    status = (data.get("status") or "ATIVO").strip().upper()
+    if status not in {"ATIVO", "INATIVO", "CONCLUIDO"}:
+        return jsonify({"ok": False, "error": "Status inválido (use ATIVO, INATIVO ou CONCLUIDO)."}), 400
 
+    p = Projeto(nome=nome, user_id=current_user.id, status=status)
     db.session.add(p)
     try:
         db.session.commit()
@@ -643,11 +655,9 @@ def api_projetos_create():
         db.session.rollback()
         return jsonify({"ok": False, "error": "Não foi possível salvar o projeto."}), 400
 
-    # seleciona automaticamente o projeto criado
     session["projeto_atual_id"] = p.id
     session["projeto_atual_nome"] = p.nome
-
-    return jsonify({"ok": True, "id": p.id, "nome": p.nome})
+    return jsonify({"ok": True, "id": p.id, "nome": p.nome, "status": p.status})
 
 @app.get("/<path:prefix>/static/images/favicon-roehn.png")
 def favicon_nested(prefix):
