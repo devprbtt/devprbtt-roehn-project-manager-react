@@ -33,7 +33,7 @@ export default function Circuitos() {
   // form
   const [identificador, setIdentificador] = useState("");
   const [nome, setNome] = useState("");
-  const [tipo, setTipo] = useState<"luz" | "persiana" | "hvac" | "">("");
+  const [tipo, setTipo] = useState<"luz" | "persiana" | "hvac">("luz");
   const [ambienteId, setAmbienteId] = useState<number | "">("");
 
   const checkAndFetchData = async () => {
@@ -128,10 +128,10 @@ export default function Circuitos() {
       const data = await res.json();
 
       if (data?.ok || data?.success) {
+        // Mantemos o tipo selecionado, apenas resetamos os outros campos
         setIdentificador("");
         setNome("");
-        setTipo("");
-        setAmbienteId("");
+        //setAmbienteId("");
         checkAndFetchData().catch((error) => {
           console.error("Erro ao recarregar dados:", error);
         });
@@ -274,7 +274,7 @@ export default function Circuitos() {
                         </Label>
 
                         <Select
-                          value={tipo || undefined}
+                          value={tipo}
                           onValueChange={(v) => setTipo(v as "luz" | "persiana" | "hvac")}
                           disabled={!projetoSelecionado}
                         >

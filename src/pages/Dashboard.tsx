@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react"; // Adicione useMemo
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/store/auth"; // <-- garante que temos user/loading/fetchSession
+import { useAuth } from "@/store/auth";
 import Layout from "../components/Layout";
 import CreateProjectForm from "@/components/dashboard/CreateProjectForm";
 import ProjectGrid from "@/components/dashboard/ProjectGrid";
@@ -9,7 +9,7 @@ import ImportProjectSection from "@/components/dashboard/ImportProjectSection";
 import NavigationGuide from "@/components/dashboard/NavigationGuide";
 import type { Project, ProjectStatus } from '@/types/project';
 
-import { Download, Plus } from "lucide-react";
+import { Download, Plus, Search, Filter } from "lucide-react"; // Adicione Search e Filter
 
 
 
@@ -22,6 +22,19 @@ const Dashboard: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Novos estados para busca e filtro
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ProjectStatus | "TODOS">("TODOS");
+
+  // Filtrar projetos baseado na busca e filtro de status
+  const filteredProjects = useMemo(() => {
+    return projects.filter(project => {
+      const matchesSearch = project.nome.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === "TODOS" || project.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [projects, searchTerm, statusFilter]);
 
   // Carregar projetos e projeto atual
   const loadProjects = async () => {
@@ -302,18 +315,62 @@ const Dashboard: React.FC = () => {
           />
         )}
 
-        {/* Projects Grid */}
-        <ProjectGrid
-          projects={projects}
-          currentProject={currentProject}
-          isLoading={isLoading}
-          onSelectProject={handleSelectProject}
-          onDeleteProject={handleDeleteProject}
-          onUpdateProject={(projectId, data: Partial<Project>) =>
-            handleUpdateProject(projectId, data)
-          }
-        />
+        {/* Search and Filter Bar */}
+        <div className="mb-8 bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search Input */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Buscar projetos por nome..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            
+            {/* Status Filter */}
+            <div className="flex gap-2 items-center">
+              <Filter className="text-slate-400 w-5 h-5" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | "TODOS")}
+                className="px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="TODOS">Todos os status</option>
+                <option value="ATIVO">Ativo</option>
+                <option value="INATIVO">Inativo</option>
+                <option value="CONCLUIDO">Concluído</option>
+              </select>
+            </div>
+          </div>
+          
+          {/* Results Counter */}
+          <div className="mt-4 text-sm text-slate-600">
+            {filteredProjects.length} de {projects.length} projetos encontrados
+            {searchTerm && (
+              <span> para "{searchTerm}"</span>
+            )}
+            {statusFilter !== "TODOS" && (
+              <span> com status {statusFilter.toLowerCase()}</span>
+            )}
+          </div>
+        </div>
 
+        {/* Projects Grid - Agora com scroll quando necessário */}
+        <div className="mb-12 max-h-[70vh] overflow-y-auto pr-2">
+          <ProjectGrid
+            projects={filteredProjects}
+            currentProject={currentProject}
+            isLoading={isLoading}
+            onSelectProject={handleSelectProject}
+            onDeleteProject={handleDeleteProject}
+            onUpdateProject={(projectId, data: Partial<Project>) =>
+              handleUpdateProject(projectId, data)
+            }
+          />
+        </div>
 
         {/* Import Section */}
         <ImportProjectSection onProjectImported={loadProjects} />
