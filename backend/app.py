@@ -674,7 +674,7 @@ def api_projeto_atual():
         if not pid:
             return jsonify({"ok": True, "projeto_atual": None})
         p = db.get_or_404(Projeto, int(pid))
-        return jsonify({"ok": True, "projeto_atual": {"id": p.id, "nome": p.nome}})
+        return jsonify({"ok": True, "projeto_atual": {"id": p.id, "nome": p.nome, "status": p.status}})
 
     # PUT/POST: seleciona um projeto
     data = request.get_json(silent=True) or request.form or {}
@@ -817,8 +817,8 @@ def api_circuitos_list():
     circuitos = (
         Circuito.query
         .join(Ambiente, Circuito.ambiente_id == Ambiente.id)
-        .join(Area, Ambiente.area_id == Area.id)  # <-- join em Area
-        .filter(Area.projeto_id == projeto_id)    # <-- filtra pelo projeto na Area
+        .join(Area, Ambiente.area_id == Area.id)
+        .filter(Area.projeto_id == projeto_id)
         .all()
     )
 
@@ -829,6 +829,7 @@ def api_circuitos_list():
             "identificador": c.identificador,
             "nome": c.nome,
             "tipo": c.tipo,
+            "dimerizavel": getattr(c, "dimerizavel", False),  # ⭐⭐⭐ NOVO CAMPO
             "sak": getattr(c, "sak", None),
             "ambiente": {
                 "id": c.ambiente.id,
@@ -850,14 +851,18 @@ def api_circuitos_create():
     nome = (data.get("nome") or "").strip()
     tipo = (data.get("tipo") or "").strip()
     ambiente_id = data.get("ambiente_id")
+    dimerizavel = data.get("dimerizavel", False)  # ⭐⭐⭐ NOVO CAMPO
 
     if not identificador or not nome or not tipo or not ambiente_id:
         return jsonify({"ok": False, "error": "Campos obrigatórios ausentes."}), 400
 
+    # ⭐⭐⭐ VALIDAÇÃO: dimerizavel só é permitido para tipo "luz"
+    if tipo != "luz" and dimerizavel:
+        return jsonify({"ok": False, "error": "Campo 'dimerizavel' só é permitido para circuitos do tipo 'luz'."}), 400
+
     ambiente = db.get_or_404(Ambiente, int(ambiente_id))
 
     projeto_id = session.get("projeto_atual_id")
-    # o Ambiente precisa pertencer ao projeto atual (via Area)
     if not getattr(ambiente, "area", None) or getattr(ambiente.area, "projeto_id", None) != projeto_id:
         return jsonify({"ok": False, "error": "Ambiente não pertence ao projeto atual."}), 400
 
@@ -872,15 +877,13 @@ def api_circuitos_create():
     if exists:
         return jsonify({"ok": False, "error": "Identificador já existe neste projeto."}), 409
 
-    # ---------- GERAÇÃO DE SAK (mesma lógica do legado) ----------
+    # ---------- GERAÇÃO DE SAK ----------
     if tipo == "hvac":
         sak = None
         quantidade_saks = 0
     else:
-        # persiana ocupa 2 SAKs; luz ocupa 1
         quantidade_saks = 2 if tipo == "persiana" else 1
 
-        # último circuito não-HVAC do projeto, pela ordem de SAK
         ultimo = (
             Circuito.query
             .join(Ambiente, Circuito.ambiente_id == Ambiente.id)
@@ -893,7 +896,6 @@ def api_circuitos_create():
         if ultimo:
             proximo_base = (ultimo.sak or 0) + (ultimo.quantidade_saks or 1)
             if tipo == "persiana":
-                # garantir 2 SAKs consecutivos livres nesse projeto
                 existe_seguinte = (
                     Circuito.query
                     .join(Ambiente, Circuito.ambiente_id == Ambiente.id)
@@ -902,32 +904,75 @@ def api_circuitos_create():
                     .first()
                 )
                 if existe_seguinte:
-                    proximo_base += 2  # pula para próximo par livre
+                    proximo_base += 2
             sak = proximo_base
         else:
             sak = 1
-    # -------------------------------------------------------------
 
     c = Circuito(
         identificador=identificador,
         nome=nome,
         tipo=tipo,
+        dimerizavel=dimerizavel if tipo == "luz" else False,  # ⭐⭐⭐ NOVO CAMPO
         ambiente_id=ambiente.id,
         sak=sak,
         quantidade_saks=quantidade_saks,
     )
     db.session.add(c)
     db.session.commit()
-    return jsonify({"ok": True, "id": c.id, "sak": c.sak, "quantidade_saks": c.quantidade_saks})
+    
+    return jsonify({
+        "ok": True, 
+        "id": c.id, 
+        "sak": c.sak, 
+        "quantidade_saks": c.quantidade_saks,
+        "dimerizavel": c.dimerizavel  # ⭐⭐⭐ RETORNAR O VALOR SALVO
+    })
 
+# ATUALIZAR CIRCUITO (se você não tiver essa rota, precisa adicionar)
+@app.put("/api/circuitos/<int:circuito_id>")
+@login_required
+def api_circuitos_update(circuito_id):
+    c = db.get_or_404(Circuito, circuito_id)
+    
+    # valida que o circuito pertence ao projeto atual
+    projeto_id = session.get("projeto_atual_id")
+    if not getattr(c, "ambiente", None) or not getattr(c.ambiente, "area", None) or getattr(c.ambiente.area, "projeto_id", None) != projeto_id:
+        return jsonify({"ok": False, "error": "Circuito não pertence ao projeto atual."}), 400
 
-# EXCLUIR CIRCUITO
+    data = request.get_json(silent=True) or request.form or {}
+    
+    # Campos que podem ser atualizados
+    if "nome" in data:
+        c.nome = (data.get("nome") or "").strip()
+    
+    if "tipo" in data:
+        novo_tipo = (data.get("tipo") or "").strip()
+        c.tipo = novo_tipo
+        # ⭐⭐⭐ Se mudar o tipo para não ser "luz", resetar dimerizavel
+        if novo_tipo != "luz":
+            c.dimerizavel = False
+    
+    # ⭐⭐⭐ NOVO: Atualizar campo dimerizavel (apenas se for do tipo "luz")
+    if "dimerizavel" in data and c.tipo == "luz":
+        c.dimerizavel = bool(data.get("dimerizavel"))
+
+    db.session.commit()
+    
+    return jsonify({
+        "ok": True, 
+        "id": c.id,
+        "nome": c.nome,
+        "tipo": c.tipo,
+        "dimerizavel": c.dimerizavel
+    })
+
+# EXCLUIR CIRCUITO (permanece igual)
 @app.delete("/api/circuitos/<int:circuito_id>")
 @login_required
 def api_circuitos_delete(circuito_id):
     c = db.get_or_404(Circuito, circuito_id)
 
-    # valida que o circuito pertence ao projeto atual
     projeto_id = session.get("projeto_atual_id")
     if not getattr(c, "ambiente", None) or not getattr(c.ambiente, "area", None) or getattr(c.ambiente.area, "projeto_id", None) != projeto_id:
         return jsonify({"ok": False, "error": "Circuito não pertence ao projeto atual."}), 400
