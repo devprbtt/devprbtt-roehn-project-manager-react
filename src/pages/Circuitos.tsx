@@ -19,7 +19,8 @@ type Circuito = {
   identificador: string;
   nome: string;
   tipo: "luz" | "persiana" | "hvac";
-  dimerizavel?: boolean; // Novo campo opcional
+  dimerizavel?: boolean;
+  potencia?: number; // NOVO CAMPO
   ambiente: { id: number; nome: string; area?: { id: number; nome: string } };
   sak?: string | null;
 };
@@ -32,6 +33,7 @@ export default function Circuitos() {
   const [loading, setLoading] = useState(true);
   const [projetoSelecionado, setProjetoSelecionado] = useState(false);
   const [dimerizavel, setDimerizavel] = useState(false);
+  const [potencia, setPotencia] = useState(0);
 
 
   // Estados para filtros
@@ -152,6 +154,7 @@ export default function Circuitos() {
           nome: nome.trim(),
           tipo,
           dimerizavel: tipo === 'luz' ? dimerizavel : false, // Só envia se for luz
+          potencia: potencia, // NOVO CAMPO
           ambiente_id: ambienteId,
         }),
       });
@@ -167,6 +170,7 @@ export default function Circuitos() {
         setIdentificador("");
         setNome("");
         setDimerizavel(false);
+        setPotencia(0);
        
         //setAmbienteId("");
         checkAndFetchData().catch((error) => {
@@ -358,6 +362,26 @@ export default function Circuitos() {
                           </label>
                         </div>
                       )}
+
+
+                        {/* Campo de Potência */}
+                        <div className="space-y-2">
+                          <Label htmlFor="potencia" className="text-sm font-semibold text-slate-700">
+                            Potência (W) *
+                          </Label>
+                          <Input
+                            id="potencia"
+                            type="number"
+                            placeholder="Ex: 60, 100, 150..."
+                            value={potencia}
+                            onChange={(e) => setPotencia(Number(e.target.value))}
+                            required
+                            disabled={!projetoSelecionado}
+                            className="h-12 px-4 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                            min="0"
+                            step="0.1"
+                          />
+                        </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="ambiente_id" className="text-sm font-semibold text-slate-700">
@@ -612,6 +636,14 @@ export default function Circuitos() {
                                       <span className="mx-2">•</span>
                                       <span className="font-medium">Tipo: </span>
                                       {c.dimerizavel ? "Dimmer" : "ON/OFF"}
+                                    </>
+                                  )}
+                                  {/* NOVO: Exibir potência */}
+                                  {c.potencia > 0 && (
+                                    <>
+                                      <span className="mx-2">•</span>
+                                      <span className="font-medium">Potência: </span>
+                                      {c.potencia}W
                                     </>
                                   )}
                                 </div>

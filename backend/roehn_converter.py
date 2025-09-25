@@ -127,17 +127,19 @@ class RoehnProjectConverter:
 
                         try:
                             if circuito.tipo == 'luz':
-                                # ⭐⭐⭐ NOVO: Obter informação de dimerizável do circuito
                                 dimerizavel = getattr(circuito, 'dimerizavel', False)
+                                potencia = getattr(circuito, 'potencia', 0.0)  # ⭐⭐⭐ OBTER POTÊNCIA
                                 guid = self._add_load(
                                     area.nome, 
                                     ambiente.nome, 
                                     circuito.nome or circuito.identificador,
-                                    dimerizavel=dimerizavel  # ⭐⭐⭐ NOVO PARÂMETRO
+                                    power=potencia,  # ⭐⭐⭐ PASSAR POTÊNCIA
+                                    dimerizavel=dimerizavel
                                 )
                                 self._circuit_guid_map[circuito.id] = guid
-                                self._link_load_to_module(guid, modulo_nome, canal)
-                                print(f"Circuito de luz adicionado: {guid} (Dimerizável: {dimerizavel})")  # ⭐⭐⭐ LOG ATUALIZADO
+                                self._link_load_to_module(guid, modulo_nome, canal, dimerizavel)
+                                print(f"Circuito de luz adicionado: {guid} (Dimerizável: {dimerizavel}, Potência: {potencia}W)")
+
                             elif circuito.tipo == 'persiana':
                                 guid = self._add_shade(area.nome, ambiente.nome, circuito.nome or circuito.identificador)
                                 self._circuit_guid_map[circuito.id] = guid
@@ -1222,22 +1224,21 @@ class RoehnProjectConverter:
 
         next_unit_id = self._find_max_unit_id() + 1
 
-        # ⭐⭐⭐ NOVO: Determinar LoadType e ProfileGuid baseado em dimerizavel
         if dimerizavel:
-            load_type = 2  # Reverse Phase Dimmer
-            profile_guid = "10000000-0000-0000-0000-000000000002"  # GUID para dimer
+            load_type = 2
+            profile_guid = "10000000-0000-0000-0000-000000000002"
             description = "Dimmer"
         else:
-            load_type = 0  # ON/OFF
-            profile_guid = "10000000-0000-0000-0000-000000000001"  # GUID para ON/OFF
+            load_type = 0
+            profile_guid = "10000000-0000-0000-0000-000000000001"
             description = "ON/OFF"
 
         new_load = {
             "$type": "Circuit",
-            "LoadType": load_type,  # ⭐⭐⭐ MODIFICADO
+            "LoadType": load_type,
             "IconPath": 0,
-            "Power": power,
-            "ProfileGuid": profile_guid,  # ⭐⭐⭐ MODIFICADO
+            "Power": power,  # ⭐⭐⭐ AGORA USA A POTÊNCIA REAL
+            "ProfileGuid": profile_guid,
             "Unit": {
                 "$type": "Unit",
                 "Id": next_unit_id,
@@ -1254,6 +1255,7 @@ class RoehnProjectConverter:
         }
         self.project_data["Areas"][area_idx]["SubItems"][room_idx]["LoadOutputs"].append(new_load)
         return new_load["Guid"]
+
 
     def _find_max_unit_id(self):
         """Encontra o maior Unit ID atual, considerando UnitComposers"""

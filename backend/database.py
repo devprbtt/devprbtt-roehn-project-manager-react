@@ -56,6 +56,8 @@ class Circuito(db.Model):
     identificador = db.Column(db.String(50), nullable=False)
     nome = db.Column(db.String(100), nullable=False)
     tipo = db.Column(db.String(50), nullable=False)
+    dimerizavel = db.Column(db.Boolean, nullable=False, default=False)
+    potencia = db.Column(db.Float, nullable=False, default=0.0)  # NOVO CAMPO
     ambiente_id = db.Column(db.Integer, db.ForeignKey('ambiente.id'), nullable=False)
     sak = db.Column(db.Integer, nullable=True)
     quantidade_saks = db.Column(db.Integer, default=1)
@@ -63,8 +65,7 @@ class Circuito(db.Model):
     keypad_buttons = db.relationship('KeypadButton', backref='circuito', lazy=True)
 
     __table_args__ = (db.UniqueConstraint('identificador', 'ambiente_id', name='unique_circuito_por_ambiente'),)
-
-
+    
 class Modulo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)

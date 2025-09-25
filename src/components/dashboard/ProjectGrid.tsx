@@ -2,11 +2,8 @@ import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProjectCard from "./ProjectCard";
+import type { Project } from '@/types/project';
 
-type Project = {
-  id: number;
-  nome: string;
-};
 
 type Props = {
   projects: Project[];
@@ -16,6 +13,7 @@ type Props = {
   onDeleteProject: (projectId: number) => void;
   onUpdateProject: (projectId: number, data: Partial<Project>) => void;
 };
+
 
 const ProjectGrid: React.FC<Props> = ({
   projects,
