@@ -33,7 +33,8 @@ export default function Circuitos() {
   const [loading, setLoading] = useState(true);
   const [projetoSelecionado, setProjetoSelecionado] = useState(false);
   const [dimerizavel, setDimerizavel] = useState(false);
-  const [potencia, setPotencia] = useState(0);
+  const [potencia, setPotencia] = useState<string>("");
+  const onlyInts = (v: string) => v.replace(/[^\d]/g, "");
 
 
   // Estados para filtros
@@ -154,7 +155,7 @@ export default function Circuitos() {
           nome: nome.trim(),
           tipo,
           dimerizavel: tipo === 'luz' ? dimerizavel : false, // Só envia se for luz
-          potencia: potencia, // NOVO CAMPO
+          potencia: potencia === "" ? null : parseInt(potencia, 10),
           ambiente_id: ambienteId,
         }),
       });
@@ -170,7 +171,7 @@ export default function Circuitos() {
         setIdentificador("");
         setNome("");
         setDimerizavel(false);
-        setPotencia(0);
+        setPotencia(""); // em vez de 0
        
         //setAmbienteId("");
         checkAndFetchData().catch((error) => {
@@ -371,15 +372,22 @@ export default function Circuitos() {
                           </Label>
                           <Input
                             id="potencia"
-                            type="number"
+                            type="text"              // ← use text para ter controle total
+                            inputMode="numeric"      // ← teclado numérico no mobile
                             placeholder="Ex: 60, 100, 150..."
                             value={potencia}
-                            onChange={(e) => setPotencia(Number(e.target.value))}
+                            onChange={(e) => setPotencia(onlyInts(e.target.value))}
+                            onBlur={() => setPotencia((p) => p.replace(/^0+(?=\d)/, ""))} // remove zeros à esquerda
+                            onKeyDown={(e) => {
+                              // bloqueia teclas que viram não-inteiro em alguns browsers
+                              if (["e","E","+","-",".",",","="].includes(e.key)) e.preventDefault();
+                            }}
+                            minLength={1}
+                            pattern="^\d+$"
+                            title="Digite apenas números inteiros"
                             required
                             disabled={!projetoSelecionado}
                             className="h-12 px-4 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
-                            min="0"
-                            step="0.1"
                           />
                         </div>
 
