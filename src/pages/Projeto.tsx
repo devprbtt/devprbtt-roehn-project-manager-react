@@ -400,104 +400,108 @@ export default function Projeto() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
               >
                 <motion.div
                   initial={{ y: -50, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   exit={{ y: -50, opacity: 0 }}
-                  className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-2xl"
+                  className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
                 >
-                  <h3 className="text-2xl font-bold mb-4">Gerar Arquivo de Configuração (.rwp)</h3>
-                  <p className="text-sm text-muted-foreground mb-6">
-                    Preencha os dados técnicos para gerar o arquivo de configuração do projeto.
-                  </p>
-                  <form 
-                    method="POST" 
-                    action="/roehn/import" 
-                    encType="multipart/form-data" 
-                    target="_blank" 
-                    onSubmit={validateAndSubmitRwp}
-                    className="space-y-6"
-                  >
-                    <input type="hidden" name="m4_hsnet" value={m4hsnet} />
-                    <input type="hidden" name="m4_devid" value={m4devid} />
-                    <input type="hidden" name="software_version" value={softwareVersion} />
+                  <div className="p-6 md:p-8">
+                    <h3 className="text-2xl font-bold mb-4">Gerar Arquivo de Configuração (.rwp)</h3>
+                    <p className="text-sm text-muted-foreground mb-6">
+                      Preencha os dados técnicos para gerar o arquivo de configuração do projeto.
+                    </p>
+                    <form 
+                      method="POST" 
+                      action="/roehn/import" 
+                      encType="multipart/form-data" 
+                      target="_blank" 
+                      onSubmit={validateAndSubmitRwp}
+                      className="space-y-6"
+                    >
+                      <input type="hidden" name="m4_hsnet" value={m4hsnet} />
+                      <input type="hidden" name="m4_devid" value={m4devid} />
+                      <input type="hidden" name="software_version" value={softwareVersion} />
 
-                    <section>
-                      <h4 className="text-primary text-sm font-semibold mb-2 border-b pb-1">Informações do Projeto</h4>
-                      <div>
-                        <Label htmlFor="project_name">Nome do Projeto</Label>
-                        <Input id="project_name" name="project_name" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
-                        <p className="text-xs text-muted-foreground mt-1">Será baseado no projeto atual selecionado.</p>
-                      </div>
-                    </section>
+                      <section>
+                        <h4 className="text-primary text-sm font-semibold mb-2 border-b pb-1">Informações do Projeto</h4>
+                        <div>
+                          <Label htmlFor="project_name">Nome do Projeto</Label>
+                          <Input id="project_name" name="project_name" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
+                          <p className="text-xs text-muted-foreground mt-1">Será baseado no projeto atual selecionado.</p>
+                        </div>
+                      </section>
 
-                    <section>
-                      <h4 className="text-primary text-sm font-semibold mb-2 border-b pb-1">Informações do Cliente</h4>
-                      <div className="grid md:grid-cols-2 gap-3">
-                        <div>
-                          <Label htmlFor="client_name">Nome do Cliente</Label>
-                          <Input id="client_name" name="client_name" value={clientName} onChange={(e) => setClientName(e.target.value)} required />
+                      <section>
+                        <h4 className="text-primary text-sm font-semibold mb-2 border-b pb-1">Informações do Cliente</h4>
+                        <div className="grid md:grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="client_name">Nome do Cliente</Label>
+                            <Input id="client_name" name="client_name" value={clientName} onChange={(e) => setClientName(e.target.value)} required />
+                          </div>
+                          <div>
+                            <Label htmlFor="client_email">Email do Cliente</Label>
+                            <Input id="client_email" name="client_email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} />
+                          </div>
+                          <div>
+                            <Label htmlFor="client_phone">Telefone</Label>
+                            <Input id="client_phone" name="client_phone" placeholder="(00) 00000-0000" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} />
+                            <p className="text-xs text-muted-foreground mt-1">Digite com DDD; validaremos no envio.</p>
+                          </div>
                         </div>
-                        <div>
-                          <Label htmlFor="client_email">Email do Cliente</Label>
-                          <Input id="client_email" name="client_email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} />
-                        </div>
-                        <div>
-                          <Label htmlFor="client_phone">Telefone</Label>
-                          <Input id="client_phone" name="client_phone" placeholder="(00) 00000-0000" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} />
-                          <p className="text-xs text-muted-foreground mt-1">Digite com DDD; validaremos no envio.</p>
-                        </div>
-                      </div>
-                    </section>
+                      </section>
 
-                    <section>
-                      <h4 className="text-primary text-sm font-semibold mb-2 border-b pb-1">Configurações Técnicas</h4>
-                      <div className="grid md:grid-cols-3 gap-3">
-                        <div>
-                          <Label htmlFor="timezone_id">Timezone</Label>
-                          <Input id="timezone_id" name="timezone_id" value={timezoneId} onChange={(e) => setTimezoneId(e.target.value)} required />
+                      <section>
+                        <h4 className="text-primary text-sm font-semibold mb-2 border-b pb-1">Configurações Técnicas</h4>
+                        <div className="grid md:grid-cols-3 gap-3">
+                          <div>
+                            <Label htmlFor="timezone_id">Timezone</Label>
+                            <Input id="timezone_id" name="timezone_id" value={timezoneId} onChange={(e) => setTimezoneId(e.target.value)} required />
+                          </div>
+                          <div>
+                            <Label htmlFor="lat">Latitude</Label>
+                            <Input id="lat" name="lat" value={lat} onChange={(e) => setLat(e.target.value)} />
+                          </div>
+                          <div>
+                            <Label htmlFor="lon">Longitude</Label>
+                            <Input id="lon" name="lon" value={lon} onChange={(e) => setLon(e.target.value)} />
+                          </div>
                         </div>
-                        <div>
-                          <Label htmlFor="lat">Latitude</Label>
-                          <Input id="lat" name="lat" value={lat} onChange={(e) => setLat(e.target.value)} />
+                        <div className="grid md:grid-cols-3 gap-3 mt-3">
+                          <div>
+                            <Label htmlFor="tech_area">Área Técnica</Label>
+                            <Input id="tech_area" name="tech_area" value={techArea} onChange={(e) => setTechArea(e.target.value)} required />
+                          </div>
+                          <div>
+                            <Label htmlFor="tech_room">Sala Técnica</Label>
+                            <Input id="tech_room" name="tech_room" value={techRoom} onChange={(e) => setTechRoom(e.target.value)} required />
+                          </div>
+                          <div>
+                            <Label htmlFor="board_name">Nome do Quadro</Label>
+                            <Input id="board_name" name="board_name" value={boardName} onChange={(e) => setBoardName(e.target.value)} required />
+                          </div>
                         </div>
-                        <div>
-                          <Label htmlFor="lon">Longitude</Label>
-                          <Input id="lon" name="lon" value={lon} onChange={(e) => setLon(e.target.value)} />
+                        <div className="grid md:grid-cols-3 gap-3 mt-3">
+                          <div className="md:col-span-1">
+                            <Label htmlFor="m4_ip">IP do Módulo M4</Label>
+                            <Input id="m4_ip" name="m4_ip" value={m4ip} onChange={(e) => setM4ip(e.target.value)} required />
+                          </div>
                         </div>
-                      </div>
-                      <div className="grid md:grid-cols-3 gap-3 mt-3">
-                        <div>
-                          <Label htmlFor="tech_area">Área Técnica</Label>
-                          <Input id="tech_area" name="tech_area" value={techArea} onChange={(e) => setTechArea(e.target.value)} required />
-                        </div>
-                        <div>
-                          <Label htmlFor="tech_room">Sala Técnica</Label>
-                          <Input id="tech_room" name="tech_room" value={techRoom} onChange={(e) => setTechRoom(e.target.value)} required />
-                        </div>
-                        <div>
-                          <Label htmlFor="board_name">Nome do Quadro</Label>
-                          <Input id="board_name" name="board_name" value={boardName} onChange={(e) => setBoardName(e.target.value)} required />
-                        </div>
-                      </div>
-                      <div className="grid md:grid-cols-3 gap-3 mt-3">
-                        <div className="md:col-span-1">
-                          <Label htmlFor="m4_ip">IP do Módulo M4</Label>
-                          <Input id="m4_ip" name="m4_ip" value={m4ip} onChange={(e) => setM4ip(e.target.value)} required />
-                        </div>
-                      </div>
-                    </section>
+                      </section>
 
-                    <div className="flex justify-end gap-2 mt-6">
-                      <Button type="button" variant="ghost" onClick={() => setShowRwp(false)}>Fechar</Button>
-                      <Button type="submit">
-                        <FileDown className="h-4 w-4 mr-2" />
-                        Gerar e Baixar
-                      </Button>
-                    </div>
-                  </form>
+                      <div className="flex flex-col sm:flex-row justify-end gap-2 mt-6">
+                        <Button type="button" variant="ghost" onClick={() => setShowRwp(false)} className="w-full sm:w-auto">
+                          Fechar
+                        </Button>
+                        <Button type="submit" className="w-full sm:w-auto">
+                          <FileDown className="h-4 w-4 mr-2" />
+                          Gerar e Baixar
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
                 </motion.div>
               </motion.div>
             )}
