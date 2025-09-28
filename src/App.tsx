@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Areas from "./pages/Areas";
 import Ambientes from "./pages/Ambientes";
+import Quadros from "./pages/QuadrosEletricos";
 import Circuitos from "./pages/Circuitos";
 import Modulos from "./pages/Modulos";
 import Vinculacao from "./pages/Vinculacao";
@@ -55,6 +56,15 @@ function AppInner() {
         element={
           <RequireAuth>
             <Ambientes />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/quadros"
+        element={
+          <RequireAuth>
+            <Quadros />
           </RequireAuth>
         }
       />

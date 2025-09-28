@@ -247,17 +247,17 @@ export default function Projeto() {
                     <div className="flex flex-col items-center justify-center rounded-xl p-6 bg-slate-50/50">
                       <Lightbulb className="h-8 w-8 text-yellow-500 mb-2" />
                       <div className="text-2xl font-bold text-slate-900">{counts.luz}</div>
-                      <div className="text-sm text-slate-600">Circuitos de Luz</div>
+                      <div className="text-sm text-slate-600">Luz</div>
                     </div>
                     <div className="flex flex-col items-center justify-center rounded-xl p-6 bg-slate-50/50">
                       <Blinds className="h-8 w-8 text-blue-500 mb-2" />
                       <div className="text-2xl font-bold text-slate-900">{counts.persiana}</div>
-                      <div className="text-sm text-slate-600">Circuitos de Persiana</div>
+                      <div className="text-sm text-slate-600">Persiana</div>
                     </div>
                     <div className="flex flex-col items-center justify-center rounded-xl p-6 bg-slate-50/50">
                       <Snowflake className="h-8 w-8 text-green-500 mb-2" />
                       <div className="text-2xl font-bold text-slate-900">{counts.hvac}</div>
-                      <div className="text-sm text-slate-600">Circuitos de HVAC</div>
+                      <div className="text-sm text-slate-600">HVAC</div>
                     </div>
                     <div className="flex flex-col items-center justify-center rounded-xl p-6 bg-slate-50/50">
                       <KeySquare className="h-8 w-8 text-violet-600 mb-2" />

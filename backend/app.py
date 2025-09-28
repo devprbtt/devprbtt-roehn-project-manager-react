@@ -24,7 +24,7 @@ import json
 import re
 import os
 from datetime import datetime
-from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao, Keypad, KeypadButton
+from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao, Keypad, KeypadButton, QuadroEletrico
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///projetos.db'
@@ -246,10 +246,22 @@ def unauthorized():
 # Criar tabelas e usuário admin padrão
 with app.app_context():
     db.create_all()
+    # Verificar se as tabelas dos quadros elétricos foram criadas
+    try:
+        # Tentar uma consulta simples para verificar se a tabela existe
+        quadros_count = QuadroEletrico.query.count()
+        print(f"Tabela QuadroEletrico existe com {quadros_count} registros")
+    except Exception as e:
+        print(f"Erro ao acessar tabela QuadroEletrico: {e}")
+        # Recriar todas as tabelas se necessário
+        db.drop_all()
+        db.create_all()
+        print("Tabelas recriadas com sucesso")
+    
     # Criar usuário admin padrão se não existir
     if not User.query.filter_by(username='admin').first():
         admin_user = User(username='admin', email='admin@empresa.com', role='admin')
-        admin_user.set_password('admin123')  # Senha padrão - deve ser alterada após o primeiro login
+        admin_user.set_password('admin123')
         db.session.add(admin_user)
         db.session.commit()
 
@@ -936,6 +948,239 @@ def api_circuitos_create():
         "potencia": c.potencia  # NOVO CAMPO
     })
 
+# app.py (adições)
+
+# -------------------- Quadros Elétricos (AutomationBoards) --------------------
+
+@app.get("/api/quadros_eletricos")
+@login_required
+def api_quadros_eletricos_list():
+    projeto_id = session.get("projeto_atual_id")
+    if not projeto_id:
+        return jsonify({"ok": True, "quadros_eletricos": []})
+
+    quadros = (
+        QuadroEletrico.query
+        .join(Ambiente, QuadroEletrico.ambiente_id == Ambiente.id)
+        .join(Area, Ambiente.area_id == Area.id)
+        .filter(Area.projeto_id == projeto_id)
+        .options(joinedload(QuadroEletrico.modulos))
+        .all()
+    )
+
+    out = []
+    for q in quadros:
+        out.append({
+            "id": q.id,
+            "nome": q.nome,
+            "notes": q.notes,
+            "ambiente": {
+                "id": q.ambiente.id,
+                "nome": q.ambiente.nome,
+                "area": {
+                    "id": q.ambiente.area.id,
+                    "nome": q.ambiente.area.nome,
+                } if q.ambiente.area else None,
+            },
+            "quantidade_modulos": len(q.modulos),
+        })
+    return jsonify({"ok": True, "quadros_eletricos": out})
+
+@app.get("/api/quadros_eletricos/<int:quadro_id>")
+@login_required
+def api_quadros_eletricos_get(quadro_id):
+    projeto_id = session.get("projeto_atual_id")
+    quadro = db.get_or_404(QuadroEletrico, quadro_id)
+    
+    if not projeto_id or quadro.projeto_id != projeto_id:
+        return jsonify({"ok": False, "error": "Quadro elétrico não pertence ao projeto atual."}), 404
+
+    modulos_out = []
+    for modulo in quadro.modulos:
+        modulos_out.append({
+            "id": modulo.id,
+            "nome": modulo.nome,
+            "tipo": modulo.tipo,
+            "quantidade_canais": modulo.quantidade_canais,
+            "hsnet": modulo.hsnet,
+            "dev_id": modulo.dev_id,
+        })
+
+    return jsonify({
+        "ok": True,
+        "quadro_eletrico": {
+            "id": quadro.id,
+            "nome": quadro.nome,
+            "notes": quadro.notes,
+            "ambiente": {
+                "id": quadro.ambiente.id,
+                "nome": quadro.ambiente.nome,
+                "area": {
+                    "id": quadro.ambiente.area.id,
+                    "nome": quadro.ambiente.area.nome,
+                },
+            },
+            "modulos": modulos_out,
+        }
+    })
+
+@app.post("/api/quadros_eletricos")
+@login_required
+def api_quadros_eletricos_create():
+    projeto_id = session.get("projeto_atual_id")
+    if not projeto_id:
+        return jsonify({"ok": False, "error": "Projeto não selecionado."}), 400
+
+    data = request.get_json(silent=True) or request.form or {}
+    nome = (data.get("nome") or "").strip()
+    ambiente_id = data.get("ambiente_id")
+    notes = (data.get("notes") or "").strip() or None
+
+    if not nome or not ambiente_id:
+        return jsonify({"ok": False, "error": "Nome e ambiente são obrigatórios."}), 400
+
+    ambiente = db.get_or_404(Ambiente, int(ambiente_id))
+    
+    # Verificar se o ambiente pertence ao projeto atual
+    if ambiente.area.projeto_id != projeto_id:
+        return jsonify({"ok": False, "error": "Ambiente não pertence ao projeto atual."}), 400
+
+    # Verificar se já existe um quadro com o mesmo nome no ambiente
+    existing = QuadroEletrico.query.filter_by(ambiente_id=ambiente.id, nome=nome).first()
+    if existing:
+        return jsonify({"ok": False, "error": "Já existe um quadro elétrico com esse nome neste ambiente."}), 409
+
+    quadro = QuadroEletrico(
+        nome=nome,
+        notes=notes,
+        ambiente_id=ambiente.id,
+        projeto_id=projeto_id
+    )
+    
+    db.session.add(quadro)
+    db.session.commit()
+
+    return jsonify({"ok": True, "id": quadro.id})
+
+@app.put("/api/quadros_eletricos/<int:quadro_id>")
+@login_required
+def api_quadros_eletricos_update(quadro_id):
+    projeto_id = session.get("projeto_atual_id")
+    quadro = db.get_or_404(QuadroEletrico, quadro_id)
+    
+    if not projeto_id or quadro.projeto_id != projeto_id:
+        return jsonify({"ok": False, "error": "Quadro elétrico não pertence ao projeto atual."}), 404
+
+    data = request.get_json(silent=True) or request.form or {}
+    
+    if "nome" in data:
+        novo_nome = (data.get("nome") or "").strip()
+        if not novo_nome:
+            return jsonify({"ok": False, "error": "Nome é obrigatório."}), 400
+        
+        # Verificar se o novo nome já existe em outro quadro no mesmo ambiente
+        existing = QuadroEletrico.query.filter(
+            QuadroEletrico.ambiente_id == quadro.ambiente_id,
+            QuadroEletrico.nome == novo_nome,
+            QuadroEletrico.id != quadro_id
+        ).first()
+        if existing:
+            return jsonify({"ok": False, "error": "Já existe um quadro elétrico com esse nome neste ambiente."}), 409
+        
+        quadro.nome = novo_nome
+
+    if "notes" in data:
+        quadro.notes = (data.get("notes") or "").strip() or None
+
+    if "ambiente_id" in data:
+        novo_ambiente_id = data.get("ambiente_id")
+        novo_ambiente = db.get_or_404(Ambiente, int(novo_ambiente_id))
+        
+        if novo_ambiente.area.projeto_id != projeto_id:
+            return jsonify({"ok": False, "error": "Novo ambiente não pertence ao projeto atual."}), 400
+        
+        quadro.ambiente_id = novo_ambiente.id
+
+    db.session.commit()
+    return jsonify({"ok": True})
+
+@app.delete("/api/quadros_eletricos/<int:quadro_id>")
+@login_required
+def api_quadros_eletricos_delete(quadro_id):
+    projeto_id = session.get("projeto_atual_id")
+    quadro = db.get_or_404(QuadroEletrico, quadro_id)
+    
+    if not projeto_id or quadro.projeto_id != projeto_id:
+        return jsonify({"ok": False, "error": "Quadro elétrico não pertence ao projeto atual."}), 404
+
+    # Verificar se o quadro tem módulos antes de excluir
+    if quadro.modulos:
+        return jsonify({
+            "ok": False,
+            "error": "Não é possível excluir um quadro elétrico que contém módulos. Remova os módulos primeiro."
+        }), 409
+
+    db.session.delete(quadro)
+    db.session.commit()
+    return jsonify({"ok": True})
+
+# Rota para associar módulos a um quadro elétrico
+@app.put("/api/modulos/<int:modulo_id>/quadro")
+@login_required
+def api_modulos_associate_quadro(modulo_id):
+    projeto_id = session.get("projeto_atual_id")
+    modulo = db.get_or_404(Modulo, modulo_id)
+    
+    if not projeto_id or modulo.projeto_id != projeto_id:
+        return jsonify({"ok": False, "error": "Módulo não pertence ao projeto atual."}), 404
+
+    data = request.get_json(silent=True) or request.form or {}
+    quadro_id = data.get("quadro_eletrico_id")
+
+    if quadro_id in (None, ""):
+        # Remover associação
+        modulo.quadro_eletrico_id = None
+    else:
+        quadro = db.get_or_404(QuadroEletrico, int(quadro_id))
+        if quadro.projeto_id != projeto_id:
+            return jsonify({"ok": False, "error": "Quadro elétrico não pertence ao projeto atual."}), 400
+        modulo.quadro_eletrico_id = quadro.id
+
+    db.session.commit()
+    return jsonify({"ok": True})
+
+# Rota para obter módulos disponíveis para associação com quadros
+@app.get("/api/quadros_eletricos/<int:quadro_id>/modulos_disponiveis")
+@login_required
+def api_quadros_eletricos_modulos_disponiveis(quadro_id):
+    projeto_id = session.get("projeto_atual_id")
+    quadro = db.get_or_404(QuadroEletrico, quadro_id)
+    
+    if not projeto_id or quadro.projeto_id != projeto_id:
+        return jsonify({"ok": False, "error": "Quadro elétrico não pertence ao projeto atual."}), 404
+
+    # Módulos do projeto que não estão associados a nenhum quadro ou estão associados a este quadro
+    modulos = Modulo.query.filter_by(projeto_id=projeto_id).filter(
+        (Modulo.quadro_eletrico_id == None) | (Modulo.quadro_eletrico_id == quadro_id)
+    ).all()
+
+    modulos_out = []
+    for modulo in modulos:
+        modulos_out.append({
+            "id": modulo.id,
+            "nome": modulo.nome,
+            "tipo": modulo.tipo,
+            "quantidade_canais": modulo.quantidade_canais,
+            "associado": modulo.quadro_eletrico_id == quadro_id,
+        })
+
+    return jsonify({"ok": True, "modulos": modulos_out})
+
+# Rota SPA para a página de quadros elétricos
+@app.get("/quadros_eletricos")
+def quadros_eletricos_spa():
+    return current_app.send_static_file("index.html")
+
 # ATUALIZAR CIRCUITO (se você não tiver essa rota, precisa adicionar)
 @app.put("/api/circuitos/<int:circuito_id>")
 @login_required
@@ -1004,7 +1249,9 @@ def api_modulos_list():
     if not projeto_id:
         return jsonify({"ok": True, "modulos": []})
 
-    modulos = Modulo.query.filter_by(projeto_id=projeto_id).all()
+    modulos = Modulo.query.filter_by(projeto_id=projeto_id).options(
+        joinedload(Modulo.quadro_eletrico)  # CARREGAR QUADRO ELÉTRICO
+    ).all()
 
     # conta vinculações por módulo do projeto atual
     vincs = (
@@ -1023,11 +1270,16 @@ def api_modulos_list():
             "nome": m.nome,
             "tipo": m.tipo,
             "quantidade_canais": m.quantidade_canais,
-            "vinc_count": vinc_count_by_mod.get(m.id, 0),  # <<--- novo
+            "vinc_count": vinc_count_by_mod.get(m.id, 0),
+            "quadro_eletrico": {
+                "id": m.quadro_eletrico.id,
+                "nome": m.quadro_eletrico.nome,
+            } if m.quadro_eletrico else None,  # NOVO
         }
         for m in modulos
     ]
     return jsonify({"ok": True, "modulos": out})
+
 @app.delete("/api/modulos/<int:modulo_id>")
 @login_required
 def api_modulos_delete(modulo_id):
@@ -1062,6 +1314,7 @@ def api_modulos_create():
     data = request.get_json(silent=True) or request.form or {}
     tipo = (data.get("tipo") or "").strip().upper()
     nome = (data.get("nome") or "").strip()
+    quadro_eletrico_id = data.get("quadro_eletrico_id")  # NOVO CAMPO
     projeto_id = session.get("projeto_atual_id")
 
     if not projeto_id:
@@ -1075,6 +1328,16 @@ def api_modulos_create():
 
     if not nome:
         nome = info["nome_completo"]
+
+    # Verificar se o quadro elétrico pertence ao projeto
+    quadro_eletrico = None
+    if quadro_eletrico_id:
+        quadro_eletrico = QuadroEletrico.query.filter_by(
+            id=quadro_eletrico_id, 
+            projeto_id=projeto_id
+        ).first()
+        if not quadro_eletrico:
+            return jsonify({"ok": False, "error": "Quadro elétrico não encontrado no projeto."}), 400
 
     # (opcional) evitar nome duplicado dentro do projeto
     exists = Modulo.query.filter_by(projeto_id=projeto_id, nome=nome).first()
@@ -1112,6 +1375,7 @@ def api_modulos_create():
         projeto_id=projeto_id,
         hsnet=hsnet,
         dev_id=dev_id,
+        quadro_eletrico_id=quadro_eletrico.id if quadro_eletrico else None,  # NOVO
     )
     db.session.add(m)
     db.session.commit()
@@ -1303,6 +1567,8 @@ def excluir_modulo(id):
 def projeto_spa():
     return current_app.send_static_file("index.html")
     
+# app.py (atualização da rota api_projeto_tree)
+
 @app.get("/api/projeto_tree")
 @login_required
 def api_projeto_tree():
@@ -1310,7 +1576,7 @@ def api_projeto_tree():
     if not projeto_id:
         return jsonify({"ok": True, "projeto": None, "areas": []})
 
-    # Carrega Áreas -> Ambientes -> Circuitos -> Vinculação -> Módulo
+    # Carrega Áreas -> Ambientes -> Circuitos, Quadros Elétricos -> Módulos
     areas = (
         Area.query
         .options(
@@ -1322,6 +1588,9 @@ def api_projeto_tree():
             .joinedload(Ambiente.keypads)
             .joinedload(Keypad.buttons)
             .joinedload(KeypadButton.circuito),
+            joinedload(Area.ambientes)
+            .joinedload(Ambiente.quadros_eletricos)
+            .joinedload(QuadroEletrico.modulos),
         )
         .filter(Area.projeto_id == projeto_id)
         .all()
@@ -1344,15 +1613,34 @@ def api_projeto_tree():
                         "canal": getattr(vinc, "canal", None),
                     } if vinc else None,
                 })
+            
             keypads_out = [
                 serialize_keypad(k)
                 for k in sorted(amb.keypads, key=lambda kp: (kp.nome or "").lower())
             ]
+            
+            quadros_out = []
+            for q in amb.quadros_eletricos:
+                quadros_out.append({
+                    "id": q.id,
+                    "nome": q.nome,
+                    "modulos": [
+                        {
+                            "id": m.id,
+                            "nome": m.nome,
+                            "tipo": m.tipo,
+                            "quantidade_canais": m.quantidade_canais,
+                        }
+                        for m in q.modulos
+                    ]
+                })
+            
             ambs.append({
                 "id": amb.id,
                 "nome": amb.nome,
                 "circuitos": circs,
                 "keypads": keypads_out,
+                "quadros_eletricos": quadros_out,  # Novo
             })
         out_areas.append({"id": a.id, "nome": a.nome, "ambientes": ambs})
 
@@ -1361,6 +1649,8 @@ def api_projeto_tree():
         "projeto": {"id": projeto_id, "nome": session.get("projeto_atual_nome")},
         "areas": out_areas,
     })
+
+# app.py (atualização da rota exportar_csv)
 
 @app.route('/exportar-csv')
 @login_required
@@ -1373,7 +1663,8 @@ def exportar_csv():
     output = io.StringIO()
     writer = csv.writer(output)
     
-    writer.writerow(['Circuito', 'Tipo', 'Nome', 'Area', 'Ambiente', 'SAKs', 'Canal', 'Modulo', 'id Modulo'])
+    # Adicionar coluna do quadro elétrico
+    writer.writerow(['Circuito', 'Tipo', 'Nome', 'Area', 'Ambiente', 'SAKs', 'Canal', 'Modulo', 'Quadro Elétrico', 'id Modulo'])
     
     for circuito in circuitos:
         vinculacao = Vinculacao.query.filter_by(circuito_id=circuito.id).first()
@@ -1381,6 +1672,9 @@ def exportar_csv():
             modulo = Modulo.query.get(vinculacao.modulo_id)
             ambiente = Ambiente.query.get(circuito.ambiente_id)
             area = Area.query.get(ambiente.area_id)
+            
+            # Obter nome do quadro elétrico (se existir)
+            quadro_nome = modulo.quadro_eletrico.nome if modulo and modulo.quadro_eletrico else "-"
             
             # Para circuitos HVAC, mostrar vazio no campo SAK
             if circuito.tipo == 'hvac':
@@ -1398,8 +1692,9 @@ def exportar_csv():
                 ambiente.nome,
                 sak_value,
                 vinculacao.canal,
-                modulo.nome,
-                modulo.id
+                modulo.nome if modulo else "-",
+                quadro_nome,  # Nova coluna
+                modulo.id if modulo else ""
             ])
     
     output.seek(0)

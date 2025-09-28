@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useProject } from "@/store/project";
-import { PlusCircle, Trash2, Boxes, Server, Sparkles } from "lucide-react";
+import { PlusCircle, Trash2, Boxes, Server, Sparkles, CircuitBoard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type MetaModulo = {
@@ -18,29 +18,46 @@ type MetaModulo = {
 };
 type ModulosMeta = Record<string, MetaModulo>;
 
+type QuadroEletrico = {
+  id: number;
+  nome: string;
+  ambiente: {
+    nome: string;
+    area: {
+      nome: string;
+    };
+  };
+};
+
 type Modulo = {
   id: number;
   nome: string;
   tipo: string;
   quantidade_canais: number;
   vinc_count?: number;
+  quadro_eletrico?: {
+    id: number;
+    nome: string;
+  };
 };
 
 export default function Modulos() {
   const { projeto } = useProject();
-  // const projetoSelecionado = !!projeto?.id;
   const [projetoSelecionado, setProjetoSelecionado] = useState<boolean | null>(projeto ? true : null);
   const isLocked = projetoSelecionado !== true;
   const { toast } = useToast();
 
   const [modulos, setModulos] = useState<Modulo[]>([]);
+  const [quadros, setQuadros] = useState<QuadroEletrico[]>([]);
   const [meta, setMeta] = useState<ModulosMeta>({});
   const [loading, setLoading] = useState(true);
   const [loadingMeta, setLoadingMeta] = useState(true);
+  const [loadingQuadros, setLoadingQuadros] = useState(true);
 
   // form
   const [tipo, setTipo] = useState<string>("");
   const [nome, setNome] = useState("");
+  const [quadroEletricoId, setQuadroEletricoId] = useState<number | "">("");
 
   const tipoOptions = useMemo(() => Object.keys(meta), [meta]);
 
@@ -77,6 +94,20 @@ export default function Modulos() {
     }
   };
 
+  const fetchQuadros = async () => {
+    if (projetoSelecionado !== true) { setLoadingQuadros(false); return; }
+    setLoadingQuadros(true);
+    try {
+      const res = await fetch("/api/quadros_eletricos", { credentials: "same-origin" });
+      const data = await res.json();
+      setQuadros(data?.quadros_eletricos || []);
+    } catch {
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao carregar quadros elétricos." });
+    } finally {
+      setLoadingQuadros(false);
+    }
+  };
+
   const fetchModulos = async () => {
     if (projetoSelecionado !== true) { setLoading(false); return; }
     setLoading(true);
@@ -92,7 +123,15 @@ export default function Modulos() {
   };
 
   useEffect(() => { fetchMeta(); }, []);
-  useEffect(() => { if (projetoSelecionado === true) fetchModulos(); else if (projetoSelecionado === false) setLoading(false); }, [projetoSelecionado]);
+  useEffect(() => { 
+    if (projetoSelecionado === true) {
+      fetchModulos();
+      fetchQuadros();
+    } else if (projetoSelecionado === false) {
+      setLoading(false);
+      setLoadingQuadros(false);
+    }
+  }, [projetoSelecionado]);
 
   useEffect(() => {
     if (tipo && meta[tipo]) setNome(meta[tipo].nome_completo);
@@ -110,12 +149,17 @@ export default function Modulos() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ tipo, nome: nome.trim() }),
+        body: JSON.stringify({ 
+          tipo, 
+          nome: nome.trim(),
+          quadro_eletrico_id: quadroEletricoId || undefined 
+        }),
       });
       let data: any = null; try { data = await res.json(); } catch {}
       if (res.ok && (data?.ok || data?.success)) {
         setTipo("");
         setNome("");
+        setQuadroEletricoId("");
         await fetchModulos();
         toast({ title: "Sucesso!", description: "Módulo adicionado." });
       } else {
@@ -163,7 +207,7 @@ export default function Modulos() {
                 <div>
                   <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Módulos</h1>
                   <p className="text-lg text-slate-600 max-w-2xl">
-                    Cadastre os módulos de automação.
+                    Cadastre os módulos de automação e associe a quadros elétricos.
                   </p>
                 </div>
               </div>
@@ -241,6 +285,27 @@ export default function Modulos() {
                         />
                       </div>
 
+                      <div>
+                        <Label htmlFor="quadroEletrico" className="text-sm font-semibold text-slate-700">Quadro Elétrico (Opcional)</Label>
+                        <select
+                          id="quadroEletrico"
+                          className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                          value={quadroEletricoId}
+                          onChange={(e) => setQuadroEletricoId(Number(e.target.value))}
+                          disabled={isLocked || loadingQuadros}
+                        >
+                          <option value="">Selecione um quadro elétrico (opcional)</option>
+                          {quadros.map(quadro => (
+                            <option key={quadro.id} value={quadro.id}>
+                              {quadro.nome} ({quadro.ambiente.nome} - {quadro.ambiente.area.nome})
+                            </option>
+                          ))}
+                        </select>
+                        {loadingQuadros && (
+                          <p className="text-xs text-slate-500 mt-1">Carregando quadros...</p>
+                        )}
+                      </div>
+
                       <Button type="submit" className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2" disabled={isLocked}>
                         <PlusCircle className="h-5 w-5" />
                         Adicionar Módulo
@@ -310,6 +375,12 @@ export default function Modulos() {
                                 <span className="text-sm font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
                                   {m.tipo}
                                 </span>
+                                {m.quadro_eletrico && (
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-700 flex items-center gap-1">
+                                    <CircuitBoard className="h-3 w-3" />
+                                    {m.quadro_eletrico.nome}
+                                  </Badge>
+                                )}
                               </div>
                               <h4 className="font-bold text-slate-900 text-lg mb-1">{m.nome}</h4>
                               <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">

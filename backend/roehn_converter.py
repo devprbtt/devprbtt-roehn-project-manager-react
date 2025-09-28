@@ -25,6 +25,8 @@ class RoehnProjectConverter:
         self.keypad_profile_guid = "40000000-0000-0000-0000-000000000001"
         self.keypad_rocker_icon_guid = "11000000-0000-0000-0000-000000000001"
         self.keypad_button_layouts = {1: 1, 2: 6, 4: 7}
+        self._quadro_guid_map = {}
+
 
     def process_json_project(self):
         try:
@@ -91,6 +93,91 @@ class RoehnProjectConverter:
             self.db_session.rollback()
             raise Exception(f"Erro ao processar dados do JSON: {e}")
 
+    def _add_module_to_specific_board(self, module_name, automation_board_guid):
+        """Adiciona um módulo existente a um quadro elétrico específico e atualiza o ACNET"""
+        try:
+            # Encontrar o módulo pelo nome em todo o projeto
+            target_module = None
+            current_board = None
+            
+            # Procurar em todos os quadros
+            for area in self.project_data["Areas"]:
+                for room in area.get("SubItems", []):
+                    for board in room.get("AutomationBoards", []):
+                        for module in board.get("ModulesList", []):
+                            if module.get("Name") == module_name:
+                                target_module = module
+                                current_board = board
+                                break
+                        if target_module:
+                            break
+                    if target_module:
+                        break
+                if target_module:
+                    break
+            
+            if not target_module:
+                print(f"Módulo {module_name} não encontrado para mover para o quadro específico")
+                return False
+            
+            # Encontrar o quadro de destino
+            target_board = self._find_automation_board_by_guid(automation_board_guid)
+            if not target_board:
+                print(f"Quadro {automation_board_guid} não encontrado")
+                return False
+            
+            # Se o módulo já está no quadro de destino, não faz nada
+            if current_board == target_board:
+                print(f"Módulo {module_name} já está no quadro de destino")
+                return True
+            
+            # Remover o módulo do quadro atual (se não estiver no quadro de destino)
+            if current_board:
+                current_board["ModulesList"] = [m for m in current_board.get("ModulesList", []) if m.get("Name") != module_name]
+                print(f"Módulo {module_name} removido do quadro {current_board.get('Name')}")
+            
+            # Adicionar ao quadro de destino (se ainda não estiver lá)
+            if target_module not in target_board.get("ModulesList", []):
+                target_board.setdefault("ModulesList", []).append(target_module)
+                print(f"Módulo {module_name} movido para o quadro {target_board.get('Name')}")
+            
+            # ⭐⭐⭐ CORREÇÃO: Garantir que o módulo está no ACNET do M4
+            default_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
+            if default_board and default_board.get("ModulesList"):
+                m4_module = default_board["ModulesList"][0]
+                for slot in m4_module.get("Slots", []):
+                    if slot.get("Name") == "ACNET":
+                        # Encontrar o GUID do módulo
+                        module_guid = target_module.get("Guid")
+                        if module_guid and module_guid not in slot["SubItemsGuid"]:
+                            # Adicionar ao ACNET se não estiver presente
+                            for i, guid in enumerate(slot["SubItemsGuid"]):
+                                if guid == "00000000-0000-0000-0000-000000000000":
+                                    slot["SubItemsGuid"][i] = module_guid
+                                    print(f"Módulo {module_name} ({module_guid}) adicionado ao ACNET na posição {i}")
+                                    break
+                            else:
+                                # Se não encontrou posição vazia, adiciona ao final
+                                slot["SubItemsGuid"].append(module_guid)
+                                print(f"Módulo {module_name} ({module_guid}) adicionado ao final do ACNET")
+                            
+                            # Garantir que há pelo menos um item vazio no final
+                            if slot["SubItemsGuid"] and slot["SubItemsGuid"][-1] != "00000000-0000-0000-0000-000000000000":
+                                slot["SubItemsGuid"].append("00000000-0000-0000-0000-000000000000")
+                        
+                        # Verificar se o módulo já está no ACNET mas em posição diferente
+                        elif module_guid and module_guid in slot["SubItemsGuid"]:
+                            print(f"Módulo {module_name} já está no ACNET")
+                        
+                        break
+            
+            return True
+            
+        except Exception as e:
+            print(f"Erro ao mover módulo para quadro específico: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
     def process_db_project(self, projeto):
         """Processa os dados do projeto do banco de dados para o formato Roehn"""
@@ -98,7 +185,9 @@ class RoehnProjectConverter:
         print(f"Numero de areas: {len(projeto.areas)}")
 
         self._circuit_guid_map = {}
+        self._quadro_guid_map = {}
 
+        # Primeiro, processar quadros elétricos e seus módulos
         for area in projeto.areas:
             print(f"Processando area: {area.nome}")
             self._ensure_area_exists(area.nome)
@@ -106,11 +195,45 @@ class RoehnProjectConverter:
             for ambiente in area.ambientes:
                 print(f"Processando ambiente: {ambiente.nome}")
                 self._ensure_room_exists(area.nome, ambiente.nome)
+                
+                # Processar quadros elétricos do ambiente
+                for quadro in ambiente.quadros_eletricos:
+                    print(f"Processando quadro elétrico: {quadro.nome}")
+                    quadro_guid = self._ensure_automation_board_exists(area.nome, ambiente.nome, quadro.nome)
+                    self._quadro_guid_map[quadro.id] = quadro_guid
+                    
+                    # Processar módulos do quadro elétrico
+                    for modulo in quadro.modulos:
+                        print(f"Processando modulo no quadro: {modulo.nome} ({modulo.tipo})")
+                        # ⭐⭐⭐ CORREÇÃO: Passar o quadro_guid para garantir que o módulo seja criado no quadro correto
+                        modulo_nome = self._ensure_module_exists(modulo, automation_board_guid=quadro_guid)
+                        
+                        # ⭐⭐⭐ NOVO: Registrar o módulo no quadro específico
+                        if modulo_nome:
+                            success = self._add_module_to_specific_board(modulo_nome, quadro_guid)
+                            if not success:
+                                print(f"⚠️  Aviso: Não foi possível adicionar o módulo {modulo_nome} ao quadro específico")
 
+        # Processar módulos que não estão em quadros específicos (ficam no quadro padrão)
         for modulo in projeto.modulos:
-            print(f"Processando modulo: {modulo.nome} ({modulo.tipo})")
-            self._ensure_module_exists(modulo)
+            # Verificar se o módulo já foi processado (está em algum quadro)
+            modulo_em_quadro = False
+            for area in projeto.areas:
+                for ambiente in area.ambientes:
+                    for quadro in ambiente.quadros_eletricos:
+                        if modulo in quadro.modulos:
+                            modulo_em_quadro = True
+                            break
+                    if modulo_em_quadro:
+                        break
+                if modulo_em_quadro:
+                    break
+            
+            if not modulo_em_quadro:
+                print(f"Processando modulo (quadro padrão): {modulo.nome} ({modulo.tipo})")
+                self._ensure_module_exists(modulo)
 
+        # Processar circuitos e vinculações
         for area in projeto.areas:
             for ambiente in area.ambientes:
                 for circuito in ambiente.circuitos:
@@ -128,17 +251,17 @@ class RoehnProjectConverter:
                         try:
                             if circuito.tipo == 'luz':
                                 dimerizavel = getattr(circuito, 'dimerizavel', False)
-                                potencia = getattr(circuito, 'potencia', 0.0)  # ⭐⭐⭐ OBTER POTÊNCIA
+                                potencia = getattr(circuito, 'potencia', 0.0)
                                 guid = self._add_load(
                                     area.nome, 
                                     ambiente.nome, 
                                     circuito.nome or circuito.identificador,
-                                    power=potencia,  # ⭐⭐⭐ PASSAR POTÊNCIA
+                                    power=potencia,
                                     dimerizavel=dimerizavel
                                 )
                                 self._circuit_guid_map[circuito.id] = guid
                                 self._link_load_to_module(guid, modulo_nome, canal, dimerizavel)
-                                print(f"Circuito de luz adicionado: {guid} (Dimerizável: {dimerizavel}, Potência: {potencia}W)")
+                                print(f"Circuito de luz adicionado: {guid}")
 
                             elif circuito.tipo == 'persiana':
                                 guid = self._add_shade(area.nome, ambiente.nome, circuito.nome or circuito.identificador)
@@ -154,11 +277,166 @@ class RoehnProjectConverter:
                                 print(f"Tipo de circuito nao suportado: {circuito.tipo}")
                         except Exception as exc:
                             print(f"Erro ao processar circuito {circuito.id}: {exc}")
+                            import traceback
+                            traceback.print_exc()
                             continue
                     else:
                         print(f"Circuito {circuito.id} nao vinculado, ignorando.")
 
                 self._add_keypads_for_room(area.nome, ambiente)
+
+        # ⭐⭐⭐ NOVO: Verificação final do ACNET
+        print("Realizando verificação final do ACNET...")
+        self._verify_and_fix_acnet()
+        
+        # ⭐⭐⭐ NOVO: Log do estado final do ACNET
+        self._log_acnet_status()
+        
+        print("✅ Processamento do projeto concluído!")
+
+    def _log_acnet_status(self):
+        """Log do estado atual do ACNET para debugging"""
+        try:
+            default_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
+            if not default_board or not default_board.get("ModulesList"):
+                return
+            
+            m4_module = default_board["ModulesList"][0]
+            acnet_slot = None
+            for slot in m4_module.get("Slots", []):
+                if slot.get("Name") == "ACNET":
+                    acnet_slot = slot
+                    break
+            
+            if acnet_slot:
+                acnet_guids = [guid for guid in acnet_slot.get("SubItemsGuid", []) if guid != "00000000-0000-0000-0000-000000000000"]
+                print(f"📊 Status do ACNET: {len(acnet_guids)} módulos registrados")
+                
+                # Mapear GUIDs para nomes de módulos
+                for i, guid in enumerate(acnet_slot.get("SubItemsGuid", [])):
+                    if guid != "00000000-0000-0000-0000-000000000000":
+                        module_name = "Desconhecido"
+                        for area in self.project_data["Areas"]:
+                            for room in area.get("SubItems", []):
+                                for board in room.get("AutomationBoards", []):
+                                    for module in board.get("ModulesList", []):
+                                        if module.get("Guid") == guid:
+                                            module_name = module.get("Name", "Sem nome")
+                                            break
+                        print(f"  {i+1}. {guid} -> {module_name}")
+        except Exception as e:
+            print(f"Erro ao logar status do ACNET: {e}")
+
+    def _ensure_automation_board_exists(self, area_name, room_name, board_name):
+        """Garante que um AutomationBoard existe em um ambiente"""
+        area = self._ensure_area_exists(area_name)
+        room = self._ensure_room_exists(area_name, room_name)
+        
+        # Verificar se o quadro já existe
+        for board in room.get("AutomationBoards", []):
+            if board["Name"] == board_name:
+                return board["Guid"]
+        
+        # Criar novo quadro elétrico
+        new_board_guid = str(uuid.uuid4())
+        new_board = {
+            "$type": "AutomationBoard",
+            "Name": board_name,
+            "Notes": None,
+            "ModulesList": [],
+            "Guid": new_board_guid
+        }
+        
+        if "AutomationBoards" not in room:
+            room["AutomationBoards"] = []
+        room["AutomationBoards"].append(new_board)
+        
+        return new_board_guid
+
+    def _verify_and_fix_acnet(self):
+        """Verifica e corrige o ACNET do M4 para incluir todos os módulos"""
+        try:
+            default_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
+            if not default_board or not default_board.get("ModulesList"):
+                return
+            
+            m4_module = default_board["ModulesList"][0]
+            acnet_slot = None
+            for slot in m4_module.get("Slots", []):
+                if slot.get("Name") == "ACNET":
+                    acnet_slot = slot
+                    break
+            
+            if not acnet_slot:
+                return
+            
+            # Coletar todos os GUIDs de módulos do projeto (exceto o M4)
+            all_module_guids = set()
+            for area in self.project_data["Areas"]:
+                for room in area.get("SubItems", []):
+                    for board in room.get("AutomationBoards", []):
+                        for module in board.get("ModulesList", []):
+                            guid = module.get("Guid")
+                            if guid and guid != "00000000-0000-0000-0000-000000000000":
+                                # Não incluir o próprio M4
+                                if module.get("Name") != "AQL-GV-M4":
+                                    all_module_guids.add(guid)
+            
+            # Atualizar o ACNET
+            current_acnet_guids = set(acnet_slot.get("SubItemsGuid", []))
+            current_acnet_guids.discard("00000000-0000-0000-0000-000000000000")
+            
+            # Adicionar módulos que estão faltando
+            missing_guids = all_module_guids - current_acnet_guids
+            if missing_guids:
+                print(f"🔧 Corrigindo ACNET: Adicionando {len(missing_guids)} módulos faltantes")
+                
+                # Substituir os zeros pelos GUIDs faltantes
+                new_acnet_list = []
+                for guid in acnet_slot["SubItemsGuid"]:
+                    if guid == "00000000-0000-0000-0000-000000000000" and missing_guids:
+                        new_guid = missing_guids.pop()
+                        new_acnet_list.append(new_guid)
+                        # Log do módulo sendo adicionado
+                        module_name = "Desconhecido"
+                        for area in self.project_data["Areas"]:
+                            for room in area.get("SubItems", []):
+                                for board in room.get("AutomationBoards", []):
+                                    for module in board.get("ModulesList", []):
+                                        if module.get("Guid") == new_guid:
+                                            module_name = module.get("Name", "Sem nome")
+                                            break
+                        print(f"  ✅ Adicionado: {module_name} ({new_guid})")
+                    else:
+                        new_acnet_list.append(guid)
+                
+                # Adicionar quaisquer GUIDs restantes no final
+                for remaining_guid in missing_guids:
+                    new_acnet_list.append(remaining_guid)
+                    # Log do módulo sendo adicionado
+                    module_name = "Desconhecido"
+                    for area in self.project_data["Areas"]:
+                        for room in area.get("SubItems", []):
+                            for board in room.get("AutomationBoards", []):
+                                for module in board.get("ModulesList", []):
+                                    if module.get("Guid") == remaining_guid:
+                                        module_name = module.get("Name", "Sem nome")
+                                        break
+                    print(f"  ✅ Adicionado (final): {module_name} ({remaining_guid})")
+                
+                # Garantir que termina com um zero
+                if new_acnet_list and new_acnet_list[-1] != "00000000-0000-0000-0000-000000000000":
+                    new_acnet_list.append("00000000-0000-0000-0000-000000000000")
+                
+                acnet_slot["SubItemsGuid"] = new_acnet_list
+                print(f"✅ ACNET corrigido com sucesso!")
+            else:
+                print(f"✅ ACNET já está correto - todos os {len(all_module_guids)} módulos estão registrados")
+                
+        except Exception as e:
+            print(f"❌ Erro ao verificar/corrigir ACNET: {e}")
+            import traceback
+            traceback.print_exc()
 
     def create_project(self, project_info):
         """Cria um projeto base compatível com o ROEHN Wizard"""
@@ -487,9 +765,31 @@ class RoehnProjectConverter:
         area["SubItems"].append(new_room)
         return new_room
 
-    def _ensure_module_exists(self, model, module_name=None):
-        """Garantir que um modulo existe no projeto Roehn."""
-        modules_list = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"]
+    def _find_automation_board_by_guid(self, guid):
+        """Encontra um AutomationBoard pelo GUID em todo o projeto"""
+        for area in self.project_data["Areas"]:
+            for room in area.get("SubItems", []):
+                for board in room.get("AutomationBoards", []):
+                    if board.get("Guid") == guid:
+                        return board
+        return None
+
+    def _ensure_module_exists(self, model, module_name=None, automation_board_guid=None):
+        """Garantir que um modulo existe no projeto Roehn, opcionalmente em um quadro específico"""
+        # Determinar onde colocar o módulo
+        target_board = None
+        if automation_board_guid:
+            # Encontrar o AutomationBoard específico
+            target_board = self._find_automation_board_by_guid(automation_board_guid)
+            if not target_board:
+                print(f"Quadro elétrico {automation_board_guid} não encontrado, usando quadro padrão")
+                automation_board_guid = None
+        
+        if not automation_board_guid:
+            # Usar o quadro padrão (sala técnica)
+            target_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
+        
+        modules_list = target_board["ModulesList"]
 
         modulo_obj = None
         desired_hsnet = None
@@ -509,6 +809,7 @@ class RoehnProjectConverter:
         if not module_name:
             module_name = "Modulo"
 
+        # Verificar se o módulo já existe NO QUADRO ESPECÍFICO
         for module in modules_list:
             if module.get("Name") == module_name:
                 if modulo_obj:
@@ -518,6 +819,17 @@ class RoehnProjectConverter:
                         module["DevID"] = desired_dev_id
                 return module_name
 
+        # ⭐⭐⭐ CORREÇÃO: Se o módulo existe em outro quadro, movê-lo para este quadro
+        existing_module, existing_board = self._find_module_in_any_board(module_name)
+        if existing_module and existing_board != target_board:
+            # Remover do quadro antigo
+            existing_board["ModulesList"] = [m for m in existing_board.get("ModulesList", []) if m.get("Name") != module_name]
+            # Adicionar ao novo quadro
+            modules_list.append(existing_module)
+            print(f"Módulo {module_name} movido de {existing_board.get('Name')} para {target_board.get('Name')}")
+            return module_name
+
+        # Encontrar HSNET disponível
         if desired_hsnet is not None and not self._is_hsnet_duplicate(desired_hsnet):
             hsnet = desired_hsnet
         else:
@@ -530,23 +842,24 @@ class RoehnProjectConverter:
         else:
             dev_id = self._find_max_dev_id() + 1
 
+        # Criar módulo baseado no tipo
         key = (model_key or module_name).upper()
         if "RL12" in key:
-            self._create_rl12_module(module_name, hsnet, dev_id)
+            self._create_rl12_module(module_name, hsnet, dev_id, target_board)
         elif "RL4" in key:
-            self._create_rl4_module(module_name, hsnet, dev_id)
+            self._create_rl4_module(module_name, hsnet, dev_id, target_board)
         elif "LX4" in key:
-            self._create_lx4_module(module_name, hsnet, dev_id)
+            self._create_lx4_module(module_name, hsnet, dev_id, target_board)
         elif "SA1" in key:
-            self._create_sa1_module(module_name, hsnet, dev_id)
+            self._create_sa1_module(module_name, hsnet, dev_id, target_board)
         elif "DIM8" in key or "ADP-DIM8" in key:
-            self._create_dim8_module(module_name, hsnet, dev_id)
+            self._create_dim8_module(module_name, hsnet, dev_id, target_board)
         else:
-            self._create_rl12_module(module_name, hsnet, dev_id)
+            self._create_rl12_module(module_name, hsnet, dev_id, target_board)
 
         return module_name
 
-    def _create_rl4_module(self, name, hsnet_address, dev_id):
+    def _create_rl4_module(self, name, hsnet_address, dev_id, target_board=None):
         """Cria um módulo RL4"""
         new_module_guid = str(uuid.uuid4())
         new_module = {
@@ -582,9 +895,9 @@ class RoehnProjectConverter:
             "PIRSensorReportEnable": False,
             "PIRSensorReportID": 0
         }
-        self._add_module_to_project(new_module, new_module_guid)
+        self._add_module_to_project(new_module, new_module_guid, target_board)
 
-    def _create_lx4_module(self, name, hsnet_address, dev_id):
+    def _create_lx4_module(self, name, hsnet_address, dev_id, target_board=None):
         """Cria um módulo LX4"""
         next_unit_id = self._find_max_unit_id() + 1
         unit_composers = []
@@ -656,9 +969,9 @@ class RoehnProjectConverter:
             "PIRSensorReportEnable": False,
             "PIRSensorReportID": 0
         }
-        self._add_module_to_project(new_module, new_module_guid)
+        self._add_module_to_project(new_module, new_module_guid, target_board)
 
-    def _create_sa1_module(self, name, hsnet_address, dev_id):
+    def _create_sa1_module(self, name, hsnet_address, dev_id, target_board=None):
         """Cria um módulo SA1"""
         next_unit_id = self._find_max_unit_id() + 1
         unit_composers = []
@@ -730,9 +1043,9 @@ class RoehnProjectConverter:
             "PIRSensorReportID": 0
         }
 
-        self._add_module_to_project(new_module, new_module_guid)
+        self._add_module_to_project(new_module, new_module_guid, target_board)
 
-    def _create_dim8_module(self, name, hsnet_address, dev_id):
+    def _create_dim8_module(self, name, hsnet_address, dev_id, target_board=None):
         """Cria um módulo DIM8"""
         new_module_guid = str(uuid.uuid4())
         zero = "00000000-0000-0000-0000-000000000000"
@@ -781,9 +1094,9 @@ class RoehnProjectConverter:
             "PIRSensorReportID": 0
         }
 
-        self._add_module_to_project(new_module, new_module_guid)
+        self._add_module_to_project(new_module, new_module_guid, target_board)
 
-    def _create_rl12_module(self, name, hsnet_address, dev_id):
+    def _create_rl12_module(self, name, hsnet_address, dev_id, target_board=None):
         """Cria um módulo RL12"""
         new_module_guid = str(uuid.uuid4())
         new_module = {
@@ -829,34 +1142,55 @@ class RoehnProjectConverter:
             "PIRSensorReportEnable": False,
             "PIRSensorReportID": 0
         }
-        self._add_module_to_project(new_module, new_module_guid)
+        self._add_module_to_project(new_module, new_module_guid, target_board)
 
     # Implementar métodos similares para outros tipos de módulos:
     # _create_rl4_module, _create_lx4_module, _create_sa1_module, _create_dim8_module
 
-    def _add_module_to_project(self, new_module, new_module_guid):
-        """Adiciona um módulo ao projeto e atualiza o ACNET"""
-        modules_list = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"]
+    def _find_module_in_any_board(self, module_name):
+        """Procura um módulo pelo nome em todos os quadros elétricos do projeto"""
+        for area in self.project_data["Areas"]:
+            for room in area.get("SubItems", []):
+                for board in room.get("AutomationBoards", []):
+                    for module in board.get("ModulesList", []):
+                        if module.get("Name") == module_name:
+                            return module, board
+        return None, None
+
+    def _add_module_to_project(self, new_module, new_module_guid, target_board=None):
+        """Adiciona um módulo ao AutomationBoard especificado e ao ACNET do M4"""
+        # Adicionar o módulo ao quadro especificado (ou ao padrão se nenhum for especificado)
+        if target_board is None:
+            target_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
+        
+        modules_list = target_board["ModulesList"]
         modules_list.append(new_module)
 
-        # Atualizar o ACNET do módulo M4
-        if modules_list:
-            first_module = modules_list[0]  # O M4 é o primeiro módulo
-            for slot in first_module.get("Slots", []):
+        # ⭐⭐⭐ CORREÇÃO: SEMPRE adicionar ao ACNET do M4, independentemente do quadro
+        # Encontrar o quadro padrão (sala técnica) que contém o M4
+        default_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
+        if default_board and default_board.get("ModulesList"):
+            m4_module = default_board["ModulesList"][0]
+            for slot in m4_module.get("Slots", []):
                 if slot.get("Name") == "ACNET":
-                    # Encontrar a primeira posição vazia e substituir pelo novo GUID
-                    for i, guid in enumerate(slot["SubItemsGuid"]):
-                        if guid == "00000000-0000-0000-0000-000000000000":
-                            slot["SubItemsGuid"][i] = new_module_guid
-                            break
+                    # Verificar se o GUID já está na lista para evitar duplicatas
+                    if new_module_guid not in slot["SubItemsGuid"]:
+                        # Encontrar a primeira posição vazia e substituir pelo novo GUID
+                        for i, guid in enumerate(slot["SubItemsGuid"]):
+                            if guid == "00000000-0000-0000-0000-000000000000":
+                                slot["SubItemsGuid"][i] = new_module_guid
+                                print(f"Módulo {new_module_guid} adicionado ao ACNET na posição {i}")
+                                break
+                        else:
+                            # Se não encontrou posição vazia, adiciona ao final
+                            slot["SubItemsGuid"].append(new_module_guid)
+                            print(f"Módulo {new_module_guid} adicionado ao final do ACNET")
+                        
+                        # Garantir que há pelo menos um item vazio no final
+                        if slot["SubItemsGuid"] and slot["SubItemsGuid"][-1] != "00000000-0000-0000-0000-000000000000":
+                            slot["SubItemsGuid"].append("00000000-0000-0000-0000-000000000000")
                     else:
-                        # Se não encontrou posição vazia, adiciona ao final
-                        slot["SubItemsGuid"].append(new_module_guid)
-                    
-                    # Garantir que há pelo menos um item vazio no final
-                    if slot["SubItemsGuid"][-1] != "00000000-0000-0000-0000-000000000000":
-                        slot["SubItemsGuid"].append("00000000-0000-0000-0000-000000000000")
-                    
+                        print(f"Módulo {new_module_guid} já está no ACNET")
                     break
 
     def _add_keypads_for_room(self, area_name, ambiente):
@@ -1072,50 +1406,42 @@ class RoehnProjectConverter:
         return max_id
 
     def _find_max_hsnet(self):
-        """Encontra o maior HSNET atual"""
+        """Encontra o maior HSNET em TODO o projeto"""
         max_addr = 100
-        if not self.project_data:
-            return max_addr
-            
-        try:
-            modules = self.project_data['Areas'][0]['SubItems'][0]['AutomationBoards'][0]['ModulesList']
-            for module in modules:
-                if 'HsnetAddress' in module and module['HsnetAddress'] > max_addr:
-                    max_addr = module['HsnetAddress']
-        except (KeyError, IndexError):
-            pass
-
-        try:
-            user_interfaces = self.project_data['Areas'][0]['SubItems'][0].get('UserInterfaces', [])
-            for ui in user_interfaces:
-                if 'HsnetAddress' in ui and ui['HsnetAddress'] > max_addr:
-                    max_addr = ui['HsnetAddress']
-        except (KeyError, IndexError):
-            pass
-
+        
+        for area in self.project_data["Areas"]:
+            for room in area.get("SubItems", []):
+                # Verificar módulos nos quadros elétricos
+                for board in room.get("AutomationBoards", []):
+                    for module in board.get("ModulesList", []):
+                        addr = module.get("HsnetAddress", 0)
+                        if addr > max_addr:
+                            max_addr = addr
+                
+                # Verificar keypads no ambiente
+                for ui in room.get("UserInterfaces", []):
+                    addr = ui.get("HsnetAddress", 0)
+                    if addr > max_addr:
+                        max_addr = addr
+        
         return max_addr
 
     def _is_hsnet_duplicate(self, hsnet_address):
-        """Verifica se um endereço HSNET já está em uso"""
-        if not self.project_data:
-            return False
-            
-        try:
-            modules = self.project_data['Areas'][0]['SubItems'][0]['AutomationBoards'][0]['ModulesList']
-            for module in modules:
-                if 'HsnetAddress' in module and module['HsnetAddress'] == hsnet_address:
-                    return True
-        except (KeyError, IndexError):
-            pass
-
-        try:
-            user_interfaces = self.project_data['Areas'][0]['SubItems'][0].get('UserInterfaces', [])
-            for ui in user_interfaces:
-                if 'HsnetAddress' in ui and ui['HsnetAddress'] == hsnet_address:
-                    return True
-        except (KeyError, IndexError):
-            pass
-
+        """Verifica se um endereço HSNET já está em uso em TODO o projeto"""
+        # Verificar em todos os quadros elétricos
+        for area in self.project_data["Areas"]:
+            for room in area.get("SubItems", []):
+                # Verificar módulos nos quadros elétricos
+                for board in room.get("AutomationBoards", []):
+                    for module in board.get("ModulesList", []):
+                        if module.get("HsnetAddress") == hsnet_address:
+                            return True
+                
+                # Verificar keypads no ambiente
+                for ui in room.get("UserInterfaces", []):
+                    if ui.get("HsnetAddress") == hsnet_address:
+                        return True
+        
         return False
 
     def _add_shade(self, area, ambiente, name, description="Persiana"):
@@ -1186,36 +1512,77 @@ class RoehnProjectConverter:
         return new_hvac["Guid"]
 
     def _link_shade_to_module(self, shade_guid, module_name, canal):
-        """Vincula uma persiana a um módulo"""
+        """Vincula uma persiana a um módulo (em qualquer quadro)"""
+        module, board = self._find_module_in_any_board(module_name)
+        if not module:
+            print(f"Módulo {module_name} não encontrado para vinculação de persiana")
+            return False
+
         try:
-            modules_list = self.project_data['Areas'][0]['SubItems'][0]['AutomationBoards'][0]['ModulesList']
-            for module in modules_list:
-                if module['Name'] == module_name:
-                    for slot in module['Slots']:
-                        if slot['Name'] == 'Shade':
-                            while len(slot['SubItemsGuid']) < slot['SlotCapacity']:
-                                slot['SubItemsGuid'].append("00000000-0000-0000-0000-000000000000")
-                            slot['SubItemsGuid'][canal-1] = shade_guid
-                            return True
+            # Para persianas, procurar slots do tipo Shade
+            slot_priority = ['Shade', 'Load ON/OFF']  # Fallback para ON/OFF se necessário
+            
+            for wanted_slot in slot_priority:
+                for slot in module.get('Slots', []):
+                    if slot.get('Name') == wanted_slot:
+                        # Garantir que o slot tem capacidade suficiente
+                        while len(slot['SubItemsGuid']) < slot.get('SlotCapacity', 0):
+                            slot['SubItemsGuid'].append("00000000-0000-0000-0000-000000000000")
+                        
+                        # Verificar se o canal é válido
+                        if canal < 1 or canal > len(slot['SubItemsGuid']):
+                            print(f"Canal {canal} inválido para slot {wanted_slot} (capacidade: {len(slot['SubItemsGuid'])})")
+                            continue
+                        
+                        # Vincular a persiana ao canal
+                        slot['SubItemsGuid'][canal-1] = shade_guid
+                        print(f"Persiana vinculada ao módulo {module_name}, slot: {wanted_slot}, canal: {canal}")
+                        return True
+            
+            # Se não encontrou slot compatível, tentar fallback genérico
+            print(f"Nenhum slot compatível encontrado para persiana no módulo {module_name}")
+            return False
+            
         except Exception as e:
-            print("Erro ao linkar persiana:", e)
-        return False
+            print(f"Erro ao linkar persiana: {e}")
+            return False
 
     def _link_hvac_to_module(self, hvac_guid, module_name, canal):
-        """Vincula um HVAC a um módulo"""
+        """Vincula um HVAC a um módulo (em qualquer quadro)"""
+        module, board = self._find_module_in_any_board(module_name)
+        if not module:
+            print(f"Módulo {module_name} não encontrado para vinculação de HVAC")
+            return False
+
         try:
-            modules_list = self.project_data['Areas'][0]['SubItems'][0]['AutomationBoards'][0]['ModulesList']
-            for module in modules_list:
-                if module['Name'] == module_name:
-                    for slot in module['Slots']:
-                        if slot['Name'] == 'IR':
-                            while len(slot['SubItemsGuid']) < slot['SlotCapacity']:
-                                slot['SubItemsGuid'].append("00000000-0000-0000-0000-000000000000")
-                            slot['SubItemsGuid'][canal-1] = hvac_guid
-                            return True
+            # Para HVAC, procurar slots do tipo IR
+            slot_priority = ['IR', 'Load ON/OFF']  # Fallback para ON/OFF se necessário
+            
+            for wanted_slot in slot_priority:
+                for slot in module.get('Slots', []):
+                    if slot.get('Name') == wanted_slot:
+                        # Garantir que o slot tem capacidade suficiente
+                        while len(slot['SubItemsGuid']) < slot.get('SlotCapacity', 0):
+                            slot['SubItemsGuid'].append("00000000-0000-0000-0000-000000000000")
+                        
+                        # Verificar se o canal é válido
+                        if canal < 1 or canal > len(slot['SubItemsGuid']):
+                            print(f"Canal {canal} inválido para slot {wanted_slot} (capacidade: {len(slot['SubItemsGuid'])})")
+                            continue
+                        
+                        # Vincular o HVAC ao canal
+                        slot['SubItemsGuid'][canal-1] = hvac_guid
+                        print(f"HVAC vinculado ao módulo {module_name}, slot: {wanted_slot}, canal: {canal}")
+                        return True
+            
+            # Se não encontrou slot compatível, tentar fallback genérico
+            print(f"Nenhum slot compatível encontrado para HVAC no módulo {module_name}")
+            return False
+            
         except Exception as e:
-            print("Erro ao linkar HVAC:", e)
-        return False
+            print(f"Erro ao linkar HVAC: {e}")
+            return False
+
 
     def _add_load(self, area, ambiente, name, power=0.0, description="ON/OFF", dimerizavel=False):
         """Adiciona um circuito de iluminação"""
@@ -1282,35 +1649,32 @@ class RoehnProjectConverter:
         find_ids(self.project_data)
         return max_id
 
+    # Atualizar métodos de vinculação para procurar em todos os quadros
     def _link_load_to_module(self, load_guid, module_name, canal, dimerizavel=False):
-        """Vincula um circuito de iluminação a um módulo"""
-        try:
-            modules_list = self.project_data['Areas'][0]['SubItems'][0]['AutomationBoards'][0]['ModulesList']
-            for module in modules_list:
-                if module['Name'] == module_name:
-                    # ⭐⭐⭐ NOVO: Priorizar slots baseado no tipo de carga
-                    if dimerizavel:
-                        # Para dimerizável, tentar primeiro Load Dim, depois Load ON/OFF
-                        slot_priority = ['Load Dim', 'Load ON/OFF']
-                    else:
-                        # Para ON/OFF, tentar primeiro Load ON/OFF, depois Load Dim
-                        slot_priority = ['Load ON/OFF', 'Load Dim']
-                    
-                    for wanted_slot in slot_priority:
-                        for slot in module.get('Slots', []):
-                            if slot.get('Name') == wanted_slot:
-                                while len(slot['SubItemsGuid']) < slot.get('SlotCapacity', 0):
-                                    slot['SubItemsGuid'].append("00000000-0000-0000-0000-000000000000")
-                                slot['SubItemsGuid'][canal-1] = load_guid
-                                print(f"Circuito vinculado ao slot: {wanted_slot}, canal: {canal}")
-                                return True
-                    break
-        except Exception as e:
-            print("Erro ao linkar load:", e)
-        return False
+        """Vincula um circuito de iluminação a um módulo (em qualquer quadro)"""
+        module, board = self._find_module_in_any_board(module_name)
+        if not module:
+            print(f"Módulo {module_name} não encontrado para vinculação")
+            return False
 
-    # Implementar métodos similares para:
-    # _add_shade, _add_hvac, _link_shade_to_module, _link_hvac_to_module
+        try:
+            # ... lógica de vinculação existente ...
+            if dimerizavel:
+                slot_priority = ['Load Dim', 'Load ON/OFF']
+            else:
+                slot_priority = ['Load ON/OFF', 'Load Dim']
+            
+            for wanted_slot in slot_priority:
+                for slot in module.get('Slots', []):
+                    if slot.get('Name') == wanted_slot:
+                        while len(slot['SubItemsGuid']) < slot.get('SlotCapacity', 0):
+                            slot['SubItemsGuid'].append("00000000-0000-0000-0000-000000000000")
+                        slot['SubItemsGuid'][canal-1] = load_guid
+                        print(f"Circuito vinculado ao módulo {module_name}, slot: {wanted_slot}, canal: {canal}")
+                        return True
+        except Exception as e:
+            print(f"Erro ao linkar load: {e}")
+        return False
 
     def export_project(self):
         """Exporta o projeto como JSON (formato Roehn Wizard)"""

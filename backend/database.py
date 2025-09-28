@@ -47,9 +47,23 @@ class Ambiente(db.Model):
     area_id = db.Column(db.Integer, db.ForeignKey('area.id'), nullable=False)
     circuitos = db.relationship('Circuito', backref='ambiente', lazy=True, cascade='all, delete-orphan')
     keypads = db.relationship('Keypad', backref='ambiente', lazy=True, cascade='all, delete-orphan')
+    quadros_eletricos = db.relationship('QuadroEletrico', backref='ambiente', lazy=True, cascade='all, delete-orphan')
 
     __table_args__ = (db.UniqueConstraint('nome', 'area_id', name='unique_ambiente_por_area'),)
 
+class QuadroEletrico(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+    ambiente_id = db.Column(db.Integer, db.ForeignKey('ambiente.id'), nullable=False)
+    projeto_id = db.Column(db.Integer, db.ForeignKey('projeto.id'), nullable=False)
+    
+    # Relacionamentos
+    modulos = db.relationship('Modulo', backref='quadro_eletrico', lazy=True, cascade='all, delete-orphan')
+    
+    __table_args__ = (
+        db.UniqueConstraint('nome', 'ambiente_id', name='unique_quadro_por_ambiente'),
+    )
 
 class Circuito(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -74,10 +88,10 @@ class Modulo(db.Model):
     projeto_id = db.Column(db.Integer, db.ForeignKey('projeto.id'), nullable=False)
     hsnet = db.Column(db.Integer, nullable=True)
     dev_id = db.Column(db.Integer, nullable=True)
+    quadro_eletrico_id = db.Column(db.Integer, db.ForeignKey('quadro_eletrico.id'), nullable=True)  # NOVO CAMPO
     vinculacoes = db.relationship('Vinculacao', backref='modulo', lazy=True, cascade='all, delete-orphan')
 
     __table_args__ = (db.UniqueConstraint('nome', 'projeto_id', name='unique_modulo_por_projeto'),)
-
 
 class Vinculacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
