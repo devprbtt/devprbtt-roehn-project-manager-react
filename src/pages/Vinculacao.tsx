@@ -19,11 +19,52 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Adicione estas interfaces e constantes no início do arquivo, após as importações
+
+type EspecificacaoModulo = {
+  correntePorCanal: number;
+  grupos: { maxCorrente: number; canais: number[] }[];
+};
+
+const ESPECIFICACOES_MODULOS: Record<string, EspecificacaoModulo> = {
+  RL12: {
+    correntePorCanal: 2.5,
+    grupos: [
+      { maxCorrente: 8.0, canais: [1, 2, 3, 4] },
+      { maxCorrente: 8.0, canais: [5, 6, 7, 8] },
+      { maxCorrente: 8.0, canais: [9, 10, 11, 12] }
+    ]
+  },
+  DIM8: {
+    correntePorCanal: 2.5,
+    grupos: [
+      { maxCorrente: 8.0, canais: [1, 2, 3, 4] },
+      { maxCorrente: 8.0, canais: [5, 6, 7, 8] }
+    ]
+  },
+  LX4: {
+    correntePorCanal: 2.5,
+    grupos: [
+      { maxCorrente: 5.0, canais: [1, 2, 3, 4] },
+      { maxCorrente: 5.0, canais: [5, 6, 7, 8] }
+    ]
+  }
+};
+
+type RestricaoViolada = {
+  tipo: 'canal' | 'grupo';
+  mensagem: string;
+  correnteAtual: number;
+  correnteMaxima: number;
+};
+
 type Circuito = {
   id: number;
   identificador: string;
   nome: string;
   tipo: "luz" | "persiana" | "hvac";
+  dimerizavel?: boolean;
+  potencia?: number; // NOVO CAMPO
   area_nome?: string;
   ambiente_nome?: string;
   vinculado?: boolean;
@@ -85,6 +126,8 @@ export default function Vinculacao() {
   const [circuitoId, setCircuitoId] = useState<number | "">("");
   const [moduloId, setModuloId] = useState<number | "">("");
   const [canal, setCanal] = useState<number | "">("");
+  const [tensao, setTensao] = useState<120 | 220>(120);
+
 
   const selectedCircuito = useMemo(
     () => circuitos.find((c) => c.id === circuitoId),
@@ -94,8 +137,10 @@ export default function Vinculacao() {
   const modulosFiltrados = useMemo(() => {
     if (!selectedCircuito) return modulos;
     const compatList = compat[selectedCircuito.tipo] || [];
+    if (compatList.length === 0) return modulos; // fallback: não filtra quando o backend não trouxe compat
     return modulos.filter(m => compatList.includes(m.tipo));
   }, [selectedCircuito, modulos, compat]);
+
 
   const selectedModulo = useMemo(
     () => modulos.find((m) => m.id === moduloId),
@@ -161,6 +206,10 @@ export default function Vinculacao() {
       });
       return;
     }
+    // Verificar restrições antes de criar
+    const restricao = verificarRestricoes();
+    const hadRestriction = Boolean(restricao);
+
     setLoading(true);
     try {
       const res = await fetch("/api/vinculacoes", {
@@ -182,6 +231,24 @@ export default function Vinculacao() {
         setCanal("");
         await fetchAllData();
         toast({ title: "Sucesso!", description: "Circuito vinculado." });
+        if (hadRestriction) {
+          toast({
+            title: "Vinculado com restrição",
+            description: [
+              "A vinculação foi criada com sucesso.",
+              restricao?.mensagem ?? "Atenção aos limites elétricos deste módulo/canal/grupo.",
+            ].join(" "),
+            variant: "destructive", // ou "default" se preferir menos agressivo
+            duration: 7000,
+          });
+        } else {
+          toast({
+            title: "Vinculação criada",
+            description: "O circuito foi vinculado ao módulo/canal selecionado.",
+            duration: 3500,
+          });
+        }
+
       } else {
         toast({
           variant: "destructive",
@@ -245,6 +312,75 @@ export default function Vinculacao() {
         return { label: tipo, color: "bg-slate-100 text-slate-800" };
     }
   };
+
+  // Dentro do componente Vinculacao, antes do return
+
+  const calcularCorrente = (potencia?: number): number => {
+    if (!potencia || potencia <= 0) return 0;
+    const V = tensao || 220; // usa a tensão selecionada
+    return potencia / V;
+  };
+
+
+  const verificarRestricoes = (): RestricaoViolada | null => {
+    if (!selectedCircuito || !selectedModulo || !canal) return null;
+
+    const especificacao = ESPECIFICACOES_MODULOS[selectedModulo.tipo];
+    if (!especificacao) return null;
+
+    const correnteCircuito = calcularCorrente(selectedCircuito.potencia);
+
+    // Verificar restrição por canal individual
+    if (correnteCircuito > especificacao.correntePorCanal) {
+      return {
+        tipo: 'canal',
+        mensagem: `Corrente do circuito (${correnteCircuito.toFixed(2)}A) excede o máximo do canal (${especificacao.correntePorCanal}A)`,
+        correnteAtual: correnteCircuito,
+        correnteMaxima: especificacao.correntePorCanal
+      };
+    }
+
+    // Verificar restrição por grupo
+    const grupo = especificacao.grupos.find(g => g.canais.includes(canal as number));
+    if (grupo) {
+      // Calcular corrente total do grupo
+      const vinculacoesDoModulo = vinculacoes.filter(v => 
+        v.modulo_tipo === selectedModulo.tipo && 
+        grupo.canais.includes(v.canal)
+      );
+
+      let correnteTotalGrupo = vinculacoesDoModulo.reduce((total, v) => {
+        const circuito = circuitos.find(c => c.id === v.circuito_id);
+        return total + (circuito ? calcularCorrente(circuito.potencia) : 0);
+      }, 0);
+
+      // Adicionar o circuito atual que está sendo vinculado
+      correnteTotalGrupo += correnteCircuito;
+
+      if (correnteTotalGrupo > grupo.maxCorrente) {
+        return {
+          tipo: 'grupo',
+          mensagem: `Corrente total do grupo (${correnteTotalGrupo.toFixed(2)}A) excede o máximo permitido (${grupo.maxCorrente}A)`,
+          correnteAtual: correnteTotalGrupo,
+          correnteMaxima: grupo.maxCorrente
+        };
+      }
+    }
+
+    return null;
+  };
+
+  const obterInfoRestricoes = (moduloTipo: string): string => {
+    const especificacao = ESPECIFICACOES_MODULOS[moduloTipo];
+    if (!especificacao) return '';
+
+    const gruposInfo = especificacao.grupos.map((grupo, index) => 
+      `Grupo ${index + 1} (canais ${grupo.canais.join(',')}): máximo ${grupo.maxCorrente}A`
+    ).join('; ');
+
+    return `${especificacao.correntePorCanal}A por canal; ${gruposInfo}`;
+  };  
+  const restricao = verificarRestricoes();
 
   return (
     <Layout projectSelected={projetoSelecionado === true}>
@@ -319,11 +455,14 @@ export default function Vinculacao() {
                         disabled={isLocked || loading || circuitosNaoVinculados.length === 0}
                       >
                         <option value="">{loading ? "Carregando circuitos..." : "Selecione um circuito"}</option>
-                        {!loading && circuitosNaoVinculados.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.identificador} — {c.nome} ({c.ambiente_nome})
-                          </option>
-                        ))}
+                        {!loading && circuitosNaoVinculados.map((c) => {
+                          const corrente = calcularCorrente(c.potencia);
+                          return (
+                            <option key={c.id} value={c.id}>
+                              {c.identificador} — {c.nome} ({c.ambiente_nome}) - {c.potencia}W ({corrente.toFixed(2)}A)
+                            </option>
+                          );
+                        })}
                       </select>
                       {!loading && projetoSelecionado && circuitosNaoVinculados.length === 0 && (
                         <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
@@ -332,7 +471,32 @@ export default function Vinculacao() {
                         </p>
                       )}
                     </div>
-                    <div>
+                    <div className="mt-2">
+                      <Label htmlFor="tensao" className="text-sm font-semibold text-slate-700">
+                        Tensão de Cálculo *
+                      </Label>
+                      <select
+                        id="tensao"
+                        value={tensao}
+                        onChange={(e) => setTensao(Number(e.target.value) as 120 | 220)}
+                        className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                        disabled={isLocked || loading}
+                      >
+                        <option value={220}>220 V</option>
+                        <option value={120}>120 V</option>
+                      </select>
+                      {selectedCircuito && (
+                        <p className="text-xs text-slate-600 mt-2">
+                          Potência do circuito: {selectedCircuito.potencia ?? 0} W • Corrente estimada:{" "}
+                          {(() => {
+                            const a = calcularCorrente(selectedCircuito.potencia);
+                            return a ? `${a.toFixed(2)} A @ ${tensao} V` : "—";
+                          })()}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-2">
                       <Label htmlFor="modulo" className="text-sm font-semibold text-slate-700">
                         Módulo *
                       </Label>
@@ -354,6 +518,13 @@ export default function Vinculacao() {
                           </option>
                         ))}
                       </select>
+                      {selectedModulo && ESPECIFICACOES_MODULOS[selectedModulo.tipo] && (
+                        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm text-blue-800 font-medium">
+                            ⚡ Restrições: {obterInfoRestricoes(selectedModulo.tipo)}
+                          </p>
+                        </div>
+                      )}
                       {!loading && projetoSelecionado && modulosFiltrados.length === 0 && (
                         <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
                           <Sparkles className="w-3 h-3" />
@@ -386,11 +557,15 @@ export default function Vinculacao() {
                     </div>
                     <Button
                       type="submit"
-                      className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                      className={`w-full h-12 ${
+                        restricao 
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600' 
+                          : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                      } text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2`}
                       disabled={isLocked || loading || !selectedCircuito || !selectedModulo || canaisDisponiveis.length === 0}
                     >
                       <Plug className="h-5 w-5" />
-                      Vincular Circuito
+                      {restricao ? 'Vincular (Com Restrição)' : 'Vincular Circuito'}
                     </Button>
                   </form>
                 </CardContent>

@@ -1424,11 +1424,12 @@ def api_vinculacao_options():
         "identificador": c.identificador,
         "nome": c.nome,
         "tipo": c.tipo,
+        "potencia": c.potencia,  # ← ADICIONE ESTA LINHA
         "area_nome": getattr(c.ambiente.area, "nome", None) if c.ambiente and c.ambiente.area else None,
         "ambiente_nome": getattr(c.ambiente, "nome", None) if c.ambiente else None,
-    } for c in circuitos if c.id not in circuitos_vinculados_ids]   # <<--- FILTRO
+    } for c in circuitos if c.id not in circuitos_vinculados_ids]
 
-    # Módulos + canais livres
+    # Resto do código permanece igual...
     modulos = Modulo.query.filter_by(projeto_id=projeto_id).all()
     ocupados_por_mod = {}
     for v in vincs:
