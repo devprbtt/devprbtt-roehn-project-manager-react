@@ -1474,14 +1474,16 @@ def api_vinculacoes_list():
         area = a.area if a else None
         out.append({
             "id": v.id,
-            "circuito_id": c.id,            # <<--- ADICIONADO
+            "circuito_id": c.id,
             "identificador": c.identificador,
             "circuito_nome": c.nome,
             "area_nome": getattr(area, "nome", None),
             "ambiente_nome": getattr(a, "nome", None),
             "modulo_nome": m.nome,
             "modulo_tipo": m.tipo,
+            "modulo_id": m.id,  # ← ADICIONE ESTA LINHA
             "canal": v.canal,
+            "potencia": c.potencia,
         })
     return jsonify({"ok": True, "vinculacoes": out})
 
