@@ -241,7 +241,8 @@ export default function Vinculacao() {
     restricao: null,
     dadosVinculacao: null
   });
-
+  const [quadrosEletricos, setQuadrosEletricos] = useState<any[]>([]);
+  const [vinculacaoAutoLoading, setVinculacaoAutoLoading] = useState(false);
   const isLocked = projetoSelecionado !== true;
   
   // Refs para controle
@@ -427,7 +428,7 @@ export default function Vinculacao() {
     if (showLoading) setLoading(true);
     
     try {
-      const [optRes, listRes] = await Promise.all([
+      const [optRes, listRes, quadrosRes] = await Promise.all([
         fetch("/api/vinculacao/options", { 
           credentials: "same-origin",
           cache: 'no-cache'
@@ -436,11 +437,16 @@ export default function Vinculacao() {
           credentials: "same-origin",
           cache: 'no-cache'
         }),
+        fetch("/api/quadros_eletricos", { 
+          credentials: "same-origin",
+          cache: 'no-cache'
+        })
       ]);
 
-      const [optData, listData] = await Promise.all([
+      const [optData, listData, quadrosData] = await Promise.all([
         optRes.json().catch(() => ({ ok: false })),
-        listRes.json().catch(() => ({ ok: false }))
+        listRes.json().catch(() => ({ ok: false })),
+        quadrosRes.json().catch(() => ({ ok: false }))
       ]);
 
       if (optData?.ok || optData?.success) {
@@ -450,6 +456,9 @@ export default function Vinculacao() {
       }
       if (listData?.ok || listData?.success) {
         setVinculacoes(listData?.vinculacoes || []);
+      }
+      if (quadrosData?.ok) {
+        setQuadrosEletricos(quadrosData.quadros_eletricos || []);
       }
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
@@ -514,7 +523,7 @@ export default function Vinculacao() {
         setCircuitoId("");
         setCanal("");
         // Recarrega sem mostrar loading para evitar flickering
-        await fetchAllData(false);
+        await fetchAllData(false); // Agora passando false explicitamente
         
         toast({ 
           title: "Sucesso!", 
@@ -586,7 +595,7 @@ export default function Vinculacao() {
       const data = await res.json().catch(() => null);
 
       if (res.ok && (data?.ok || data?.success)) {
-        await fetchAllData(false);
+        await fetchAllData(false); // Passando false explicitamente
         toast({ title: "Sucesso!", description: "Vinculação excluída." });
       } else {
         toast({
@@ -676,6 +685,74 @@ export default function Vinculacao() {
     );
   }, [selectedModulo, utilizacaoGrupos, canal]);
 
+  const fetchQuadrosEletricos = async () => {
+    if (projetoSelecionado !== true) return;
+    
+    try {
+      const res = await fetch("/api/quadros_eletricos", { 
+        credentials: "same-origin",
+        cache: 'no-cache'
+      });
+      const data = await res.json();
+      
+      if (data?.ok) {
+        setQuadrosEletricos(data.quadros_eletricos || []);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar quadros elétricos:", error);
+    }
+  };
+
+  const handleVinculacaoAutomatica = async () => {
+    if (quadrosEletricos.length !== 1) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "A vinculação automática só está disponível quando há exatamente um quadro elétrico.",
+      });
+      return;
+    }
+
+    if (!confirm('Deseja realizar a vinculação automática? Esta ação irá vincular circuitos não vinculados aos módulos compatíveis disponíveis.')) {
+      return;
+    }
+
+    setVinculacaoAutoLoading(true);
+    try {
+      const res = await fetch("/api/vinculacoes/auto", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && (data?.ok || data?.success)) {
+        await fetchAllData(false);
+        toast({
+          title: "Vinculação Automática Concluída",
+          description: `Foram criadas ${data.vinculacoes_criadas} vinculações automaticamente.`,
+          duration: 5000,
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: data?.error || data?.message || "Falha ao realizar vinculação automática.",
+        });
+      }
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Falha ao se conectar ao servidor.",
+      });
+    } finally {
+      setVinculacaoAutoLoading(false);
+    }
+  };
+
+  
   // 10. Return do componente
 
 
@@ -684,6 +761,7 @@ export default function Vinculacao() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header mantido igual */}
+
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
             <div>
               <div className="flex items-center gap-4 mb-4">
@@ -694,21 +772,47 @@ export default function Vinculacao() {
                   <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Vinculações</h1>
                   <p className="text-lg text-slate-600 max-w-2xl">
                     Conecte circuitos aos canais de seus módulos físicos.
+                    {quadrosEletricos.length === 1 && (
+                      <span className="text-green-600 font-semibold ml-2">• 1 quadro detectado</span>
+                    )}
                   </p>
                 </div>
               </div>
               <div className="h-1 w-32 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-sm" />
             </div>
-            <Button
-              onClick={() => fetchAllData()}
-              variant="outline"
-              className="group flex items-center gap-2 h-12 px-6 rounded-full border-slate-200 text-slate-600 hover:text-slate-900 transition-all duration-300"
-              disabled={loading}
-            >
-              <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-              {loading ? 'Carregando...' : 'Recarregar'}
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Botão de Vinculação Automática - Só aparece quando há 1 quadro */}
+              {quadrosEletricos.length === 1 && (
+                <Button
+                  onClick={handleVinculacaoAutomatica}
+                  disabled={vinculacaoAutoLoading || loading || isLocked}
+                  className="group flex items-center gap-2 h-12 px-6 rounded-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  {vinculacaoAutoLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4" />
+                      Vinculação Automática
+                    </>
+                  )}
+                </Button>
+              )}
+              <Button
+                onClick={() => fetchAllData()}
+                variant="outline"
+                className="group flex items-center gap-2 h-12 px-6 rounded-full border-slate-200 text-slate-600 hover:text-slate-900 transition-all duration-300"
+                disabled={loading}
+              >
+                <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+                {loading ? 'Carregando...' : 'Recarregar'}
+              </Button>
+            </div>
           </div>
+
 
           {projetoSelecionado === false && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">

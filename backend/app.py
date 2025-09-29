@@ -74,6 +74,38 @@ LAYOUT_TO_COUNT = {
 
 ZERO_GUID = "00000000-0000-0000-0000-000000000000"
 
+
+COMPATIBILIDADE_MODULOS = {
+    "luz": ["RL12", "DIM8" "RL4"],
+    "persiana": ["LX4"],
+    "hvac": ["SA1"]
+}
+
+ESPECIFICACOES_MODULOS = {
+    "RL12": {
+        "correntePorCanal": 2.5,
+        "grupos": [
+            {"maxCorrente": 8.0, "canais": [1, 2, 3, 4]},
+            {"maxCorrente": 8.0, "canais": [5, 6, 7, 8]},
+            {"maxCorrente": 8.0, "canais": [9, 10, 11, 12]}
+        ]
+    },
+    "DIM8": {
+        "correntePorCanal": 2.5,
+        "grupos": [
+            {"maxCorrente": 8.0, "canais": [1, 2, 3, 4]},
+            {"maxCorrente": 8.0, "canais": [5, 6, 7, 8]}
+        ]
+    },
+    "LX4": {
+        "correntePorCanal": 2.5,
+        "grupos": [
+            {"maxCorrente": 5.0, "canais": [1, 2, 3, 4]},
+            {"maxCorrente": 5.0, "canais": [5, 6, 7, 8]}
+        ]
+    }
+}
+
 # --- serialize_user helper (ADD) ---
 def serialize_user(user):
     return {
@@ -948,8 +980,6 @@ def api_circuitos_create():
         "potencia": c.potencia  # NOVO CAMPO
     })
 
-# app.py (adições)
-
 # -------------------- Quadros Elétricos (AutomationBoards) --------------------
 
 @app.get("/api/quadros_eletricos")
@@ -1532,6 +1562,161 @@ def api_vinculacoes_create():
     db.session.add(v)
     db.session.commit()
     return jsonify({"ok": True, "id": v.id})
+
+@app.post("/api/vinculacoes/auto")
+@login_required
+def api_vinculacoes_auto():
+    projeto_id = session.get("projeto_atual_id")
+    if not projeto_id:
+        return jsonify({"ok": False, "error": "Projeto não selecionado."}), 400
+
+    # Verificar se há exatamente um quadro elétrico
+    quadros = QuadroEletrico.query.filter_by(projeto_id=projeto_id).all()
+    if len(quadros) != 1:
+        return jsonify({
+            "ok": False, 
+            "error": f"A vinculação automática requer exatamente 1 quadro elétrico. Encontrados: {len(quadros)}"
+        }), 400
+
+    try:
+        # Buscar circuitos não vinculados usando subquery
+        circuitos_vinculados_subquery = db.session.query(Vinculacao.circuito_id).subquery()
+        
+        circuitos_nao_vinculados = (
+            Circuito.query
+            .join(Ambiente, Circuito.ambiente_id == Ambiente.id)
+            .join(Area, Ambiente.area_id == Area.id)
+            .filter(Area.projeto_id == projeto_id)
+            .filter(Circuito.id.notin_(circuitos_vinculados_subquery))
+            .all()
+        )
+
+        # Buscar módulos disponíveis
+        modulos_disponiveis = (
+            Modulo.query
+            .filter_by(projeto_id=projeto_id)
+            .all()
+        )
+
+        # Mapear compatibilidade
+        compatibilidade = {
+            "luz": ["RL12", "DIM8", "RL4"],
+            "persiana": ["LX4"], 
+            "hvac": ["SA1"]
+        }
+
+        vinculacoes_criadas = 0
+        erros = []
+
+        # Para cada módulo, obter canais disponíveis
+        modulos_com_canais = []
+        for modulo in modulos_disponiveis:
+            # Obter canais ocupados para este módulo
+            canais_ocupados = [
+                v.canal for v in Vinculacao.query.filter_by(modulo_id=modulo.id).all()
+            ]
+            canais_disponiveis = [
+                i for i in range(1, (modulo.quantidade_canais or 0) + 1) 
+                if i not in canais_ocupados
+            ]
+            modulos_com_canais.append({
+                "modulo": modulo,
+                "canais_disponiveis": canais_disponiveis
+            })
+
+        # Para cada circuito, tentar encontrar um módulo compatível
+        for circuito in circuitos_nao_vinculados:
+            # Encontrar módulos compatíveis com este tipo de circuito
+            modulos_compatíveis = [
+                m for m in modulos_com_canais 
+                if m["modulo"].tipo in compatibilidade.get(circuito.tipo, [])
+                and m["canais_disponiveis"]  # Só considerar módulos com canais disponíveis
+            ]
+
+            # Ordenar por quantidade de canais disponíveis (mais canais primeiro)
+            modulos_compatíveis.sort(key=lambda m: len(m["canais_disponiveis"]), reverse=True)
+
+            vinculado = False
+            for modulo_info in modulos_compatíveis:
+                modulo = modulo_info["modulo"]
+                canais_disponiveis = modulo_info["canais_disponiveis"]
+
+                # Pegar o primeiro canal disponível
+                canal = canais_disponiveis[0]
+
+                try:
+                    # Verificar restrições elétricas antes de criar
+                    especificacao = ESPECIFICACOES_MODULOS.get(modulo.tipo)
+                    if especificacao:
+                        # Verificar corrente por canal
+                        corrente_circuito = (circuito.potencia or 0) / 220  # Usar 220V como padrão
+                        if corrente_circuito > especificacao["correntePorCanal"]:
+                            erros.append(f"Circuito {circuito.identificador} excede corrente máxima do canal ({circuito.potencia}W -> {corrente_circuito:.2f}A > {especificacao['correntePorCanal']}A)")
+                            continue
+
+                        # Verificar restrição por grupo
+                        grupo = next((g for g in especificacao["grupos"] if canal in g["canais"]), None)
+                        if grupo:
+                            # Calcular corrente atual do grupo
+                            vinculacoes_grupo = Vinculacao.query.filter_by(modulo_id=modulo.id).filter(
+                                Vinculacao.canal.in_(grupo["canais"])
+                            ).all()
+                            
+                            corrente_total = sum(
+                                (v.circuito.potencia or 0) / 220 
+                                for v in vinculacoes_grupo
+                            )
+                            corrente_total += corrente_circuito
+
+                            if corrente_total > grupo["maxCorrente"]:
+                                erros.append(f"Circuito {circuito.identificador} excede corrente máxima do grupo ({corrente_total:.2f}A > {grupo['maxCorrente']}A)")
+                                continue
+
+                    # Criar vinculação
+                    vinculacao = Vinculacao(
+                        circuito_id=circuito.id,
+                        modulo_id=modulo.id,
+                        canal=canal
+                    )
+                    db.session.add(vinculacao)
+                    
+                    vinculacoes_criadas += 1
+                    vinculado = True
+                    
+                    # Atualizar a lista de canais disponíveis para este módulo
+                    modulo_info["canais_disponiveis"].remove(canal)
+                    break  # Parar de procurar para este circuito
+
+                except Exception as e:
+                    erros.append(f"Erro ao vincular circuito {circuito.identificador}: {str(e)}")
+                    continue
+
+            if not vinculado:
+                erros.append(f"Não foi possível vincular circuito {circuito.identificador} - nenhum módulo compatível com canal livre")
+
+        db.session.commit()
+        
+        # Log para debugging
+        print(f"Vinculação automática: {vinculacoes_criadas} vinculações criadas, {len(erros)} erros")
+        for erro in erros:
+            print(f"Erro: {erro}")
+            
+        return jsonify({
+            "ok": True,
+            "vinculacoes_criadas": vinculacoes_criadas,
+            "erros": erros,
+            "total_erros": len(erros),
+            "message": f"Vinculação automática concluída: {vinculacoes_criadas} vinculações criadas"
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro na vinculação automática: {str(e)}")
+        return jsonify({
+            "ok": False,
+            "error": f"Erro ao realizar vinculação automática: {str(e)}"
+        }), 500
+
 @app.delete("/api/vinculacoes/<int:vinc_id>")
 @login_required
 def api_vinculacoes_delete(vinc_id):
