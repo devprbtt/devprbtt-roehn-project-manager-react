@@ -1563,6 +1563,8 @@ def api_vinculacoes_create():
     db.session.commit()
     return jsonify({"ok": True, "id": v.id})
 
+from sqlalchemy import select
+
 @app.post("/api/vinculacoes/auto")
 @login_required
 def api_vinculacoes_auto():
@@ -1579,8 +1581,8 @@ def api_vinculacoes_auto():
         }), 400
 
     try:
-        # Buscar circuitos não vinculados usando subquery
-        circuitos_vinculados_subquery = db.session.query(Vinculacao.circuito_id).subquery()
+        # CORREÇÃO: Usar select() explicitamente para evitar warning
+        circuitos_vinculados_subquery = select(Vinculacao.circuito_id)
         
         circuitos_nao_vinculados = (
             Circuito.query
@@ -1598,108 +1600,223 @@ def api_vinculacoes_auto():
             .all()
         )
 
-        # Mapear compatibilidade
+        # Mapear compatibilidade atualizada
         compatibilidade = {
-            "luz": ["RL12", "DIM8", "RL4"],
+            "luz": ["RL4", "RL12", "DIM8"],
             "persiana": ["LX4"], 
+            "hvac": ["SA1"]
+        }
+
+        # Prioridades por tipo de circuito
+        prioridades = {
+            "luz": {
+                "dimerizavel": ["DIM8", "RL12", "RL4"],
+                "nao_dimerizavel": ["RL12", "RL4"]
+            },
+            "persiana": ["LX4"],
             "hvac": ["SA1"]
         }
 
         vinculacoes_criadas = 0
         erros = []
 
+        # CORREÇÃO: Função para calcular corrente considerando tensão de 120V
+        def calcular_corrente(potencia):
+            if not potencia or potencia <= 0:
+                return 0
+            # CORREÇÃO: Usar 120V conforme seus circuitos
+            return potencia / 120
+
+        # CORREÇÃO: Função para calcular corrente total do grupo considerando vinculações existentes E pendentes
+        def calcular_corrente_grupo(modulo_id, canais_grupo):
+            # Corrente das vinculações existentes no banco
+            vinculacoes_existentes = Vinculacao.query.filter_by(modulo_id=modulo_id).filter(
+                Vinculacao.canal.in_(canais_grupo)
+            ).all()
+            corrente_existente = sum(calcular_corrente(v.circuito.potencia) for v in vinculacoes_existentes)
+
+            # Corrente das vinculações pendentes (na sessão atual)
+            corrente_pendente = 0
+            for obj in db.session.new:
+                if (isinstance(obj, Vinculacao) and 
+                    obj.modulo_id == modulo_id and 
+                    obj.canal in canais_grupo):
+                    circuito = Circuito.query.get(obj.circuito_id)
+                    if circuito:
+                        corrente_pendente += calcular_corrente(circuito.potencia)
+
+            return corrente_existente + corrente_pendente
+
         # Para cada módulo, obter canais disponíveis
-        modulos_com_canais = []
+        modulos_com_info = []
         for modulo in modulos_disponiveis:
             # Obter canais ocupados para este módulo
-            canais_ocupados = [
-                v.canal for v in Vinculacao.query.filter_by(modulo_id=modulo.id).all()
-            ]
+            vinculacoes_modulo = Vinculacao.query.filter_by(modulo_id=modulo.id).all()
+            canais_ocupados = [v.canal for v in vinculacoes_modulo]
+            
+            # Contar circuitos por ambiente neste módulo
+            ambientes_no_modulo = {}
+            for v in vinculacoes_modulo:
+                ambiente_id = v.circuito.ambiente_id
+                ambientes_no_modulo[ambiente_id] = ambientes_no_modulo.get(ambiente_id, 0) + 1
+            
             canais_disponiveis = [
                 i for i in range(1, (modulo.quantidade_canais or 0) + 1) 
                 if i not in canais_ocupados
             ]
-            modulos_com_canais.append({
+            
+            modulos_com_info.append({
                 "modulo": modulo,
-                "canais_disponiveis": canais_disponiveis
+                "canais_disponiveis": canais_disponiveis,
+                "ambientes": ambientes_no_modulo,
+                "vinculacoes_pendentes": []  # Para trackear vinculações sendo criadas
             })
 
-        # Para cada circuito, tentar encontrar um módulo compatível
+        # Agrupar circuitos por ambiente
+        circuitos_por_ambiente = {}
         for circuito in circuitos_nao_vinculados:
-            # Encontrar módulos compatíveis com este tipo de circuito
-            modulos_compatíveis = [
-                m for m in modulos_com_canais 
-                if m["modulo"].tipo in compatibilidade.get(circuito.tipo, [])
-                and m["canais_disponiveis"]  # Só considerar módulos com canais disponíveis
-            ]
+            ambiente_id = circuito.ambiente_id
+            if ambiente_id not in circuitos_por_ambiente:
+                circuitos_por_ambiente[ambiente_id] = []
+            circuitos_por_ambiente[ambiente_id].append(circuito)
 
-            # Ordenar por quantidade de canais disponíveis (mais canais primeiro)
-            modulos_compatíveis.sort(key=lambda m: len(m["canais_disponiveis"]), reverse=True)
+        # Ordenar ambientes por quantidade de circuitos
+        ambientes_ordenados = sorted(circuitos_por_ambiente.keys(), 
+                                   key=lambda a: len(circuitos_por_ambiente[a]), reverse=True)
 
-            vinculado = False
-            for modulo_info in modulos_compatíveis:
-                modulo = modulo_info["modulo"]
-                canais_disponiveis = modulo_info["canais_disponiveis"]
+        # Processar cada ambiente
+        for ambiente_id in ambientes_ordenados:
+            circuitos_ambiente = circuitos_por_ambiente[ambiente_id]
+            
+            # Ordenar circuitos: dimerizáveis primeiro
+            circuitos_ordenados = sorted(circuitos_ambiente, 
+                                       key=lambda c: (not c.dimerizavel, c.tipo))
+            
+            for circuito in circuitos_ordenados:
+                # Determinar módulos compatíveis
+                if circuito.tipo == "luz":
+                    if circuito.dimerizavel:
+                        modulos_compativeis_tipos = prioridades["luz"]["dimerizavel"]
+                    else:
+                        modulos_compativeis_tipos = prioridades["luz"]["nao_dimerizavel"]
+                else:
+                    modulos_compativeis_tipos = prioridades.get(circuito.tipo, [])
+                
+                # Filtrar módulos compatíveis
+                modulos_compatíveis = [
+                    m for m in modulos_com_info 
+                    if m["modulo"].tipo in modulos_compativeis_tipos
+                    and m["canais_disponiveis"]
+                ]
 
-                # Pegar o primeiro canal disponível
-                canal = canais_disponiveis[0]
-
-                try:
-                    # Verificar restrições elétricas antes de criar
-                    especificacao = ESPECIFICACOES_MODULOS.get(modulo.tipo)
-                    if especificacao:
-                        # Verificar corrente por canal
-                        corrente_circuito = (circuito.potencia or 0) / 220  # Usar 220V como padrão
-                        if corrente_circuito > especificacao["correntePorCanal"]:
-                            erros.append(f"Circuito {circuito.identificador} excede corrente máxima do canal ({circuito.potencia}W -> {corrente_circuito:.2f}A > {especificacao['correntePorCanal']}A)")
-                            continue
-
-                        # Verificar restrição por grupo
-                        grupo = next((g for g in especificacao["grupos"] if canal in g["canais"]), None)
-                        if grupo:
-                            # Calcular corrente atual do grupo
-                            vinculacoes_grupo = Vinculacao.query.filter_by(modulo_id=modulo.id).filter(
-                                Vinculacao.canal.in_(grupo["canais"])
-                            ).all()
-                            
-                            corrente_total = sum(
-                                (v.circuito.potencia or 0) / 220 
-                                for v in vinculacoes_grupo
-                            )
-                            corrente_total += corrente_circuito
-
-                            if corrente_total > grupo["maxCorrente"]:
-                                erros.append(f"Circuito {circuito.identificador} excede corrente máxima do grupo ({corrente_total:.2f}A > {grupo['maxCorrente']}A)")
-                                continue
-
-                    # Criar vinculação
-                    vinculacao = Vinculacao(
-                        circuito_id=circuito.id,
-                        modulo_id=modulo.id,
-                        canal=canal
-                    )
-                    db.session.add(vinculacao)
-                    
-                    vinculacoes_criadas += 1
-                    vinculado = True
-                    
-                    # Atualizar a lista de canais disponíveis para este módulo
-                    modulo_info["canais_disponiveis"].remove(canal)
-                    break  # Parar de procurar para este circuito
-
-                except Exception as e:
-                    erros.append(f"Erro ao vincular circuito {circuito.identificador}: {str(e)}")
+                if not modulos_compatíveis:
+                    erros.append(f"Nenhum módulo compatível disponível para circuito {circuito.identificador} ({circuito.tipo}{' - dimerizável' if circuito.dimerizavel else ''})")
                     continue
 
-            if not vinculado:
-                erros.append(f"Não foi possível vincular circuito {circuito.identificador} - nenhum módulo compatível com canal livre")
+                # Calcular score para cada módulo compatível
+                for modulo_info in modulos_compatíveis:
+                    # Pontuar por ambiente
+                    score_ambiente = modulo_info["ambientes"].get(ambiente_id, 0) * 10
+                    # Pontuar por canais disponíveis
+                    score_canais = len(modulo_info["canais_disponiveis"])
+                    # Pontuar por prioridade do tipo
+                    tipo_modulo = modulo_info["modulo"].tipo
+                    prioridade_tipo = modulos_compativeis_tipos.index(tipo_modulo) if tipo_modulo in modulos_compativeis_tipos else 999
+                    score_prioridade = (len(modulos_compativeis_tipos) - prioridade_tipo) * 5
+                    
+                    # Penalizar DIM8 para circuitos não-dimerizáveis
+                    if circuito.tipo == "luz" and not circuito.dimerizavel and tipo_modulo == "DIM8":
+                        score_prioridade = -100
+                    
+                    modulo_info["score_agrupamento"] = score_ambiente + score_canais + score_prioridade
+
+                # Ordenar módulos por score
+                modulos_compatíveis.sort(key=lambda m: m["score_agrupamento"], reverse=True)
+
+                vinculado = False
+                for modulo_info in modulos_compatíveis:
+                    modulo = modulo_info["modulo"]
+                    canais_disponiveis = modulo_info["canais_disponiveis"]
+
+                    # Tentar cada canal disponível
+                    for canal in canais_disponiveis[:]:
+                        try:
+                            # CORREÇÃO: Calcular corrente com tensão correta
+                            corrente_circuito = calcular_corrente(circuito.potencia)
+                            
+                            # Verificar restrições elétricas
+                            especificacao = ESPECIFICACOES_MODULOS.get(modulo.tipo)
+                            if especificacao:
+                                # Verificar corrente por canal individual
+                                if corrente_circuito > especificacao["correntePorCanal"]:
+                                    erros.append(f"Circuito {circuito.identificador} excede corrente do canal ({corrente_circuito:.2f}A > {especificacao['correntePorCanal']}A)")
+                                    continue
+
+                                # CORREÇÃO: Verificação rigorosa do grupo
+                                grupo = next((g for g in especificacao["grupos"] if canal in g["canais"]), None)
+                                if grupo:
+                                    # Calcular corrente total do grupo (existente + pendente + atual)
+                                    corrente_total_grupo = calcular_corrente_grupo(modulo.id, grupo["canais"])
+                                    corrente_total_grupo += corrente_circuito
+
+                                    if corrente_total_grupo > grupo["maxCorrente"]:
+                                        erros.append(f"Circuito {circuito.identificador} excede corrente do grupo ({corrente_total_grupo:.2f}A > {grupo['maxCorrente']}A) no módulo {modulo.nome}")
+                                        continue
+
+                            # Se passou em todas as verificações, criar vinculação
+                            vinculacao = Vinculacao(
+                                circuito_id=circuito.id,
+                                modulo_id=modulo.id,
+                                canal=canal
+                            )
+                            db.session.add(vinculacao)
+                            
+                            # CORREÇÃO: Adicionar à lista de pendentes para cálculos futuros
+                            modulo_info["vinculacoes_pendentes"].append({
+                                "canal": canal,
+                                "corrente": corrente_circuito
+                            })
+                            
+                            vinculacoes_criadas += 1
+                            vinculado = True
+                            
+                            # Atualizar informações do módulo
+                            modulo_info["canais_disponiveis"].remove(canal)
+                            modulo_info["ambientes"][ambiente_id] = modulo_info["ambientes"].get(ambiente_id, 0) + 1
+                            
+                            print(f"Vinculado: {circuito.identificador} -> {modulo.nome} (canal {canal}) - {corrente_circuito:.2f}A")
+                            break
+
+                        except Exception as e:
+                            erros.append(f"Erro ao vincular circuito {circuito.identificador} no canal {canal}: {str(e)}")
+                            continue
+
+                    if vinculado:
+                        break
+
+                if not vinculado:
+                    erros.append(f"Não foi possível vincular circuito {circuito.identificador} - restrições elétricas ou nenhum canal livre compatível")
 
         db.session.commit()
         
-        # Log para debugging
-        print(f"Vinculação automática: {vinculacoes_criadas} vinculações criadas, {len(erros)} erros")
+        # Log detalhado
+        print(f"=== RESUMO VINCULAÇÃO AUTOMÁTICA ===")
+        print(f"Vinculações criadas: {vinculacoes_criadas}")
+        print(f"Erros: {len(erros)}")
+        
+        # CORREÇÃO: Log de distribuição por módulo
+        for modulo_info in modulos_com_info:
+            modulo = modulo_info["modulo"]
+            especificacao = ESPECIFICACOES_MODULOS.get(modulo.tipo)
+            if especificacao:
+                print(f"\nMódulo {modulo.nome} ({modulo.tipo}):")
+                for grupo in especificacao["grupos"]:
+                    corrente_grupo = calcular_corrente_grupo(modulo.id, grupo["canais"])
+                    print(f"  Grupo {grupo['canais']}: {corrente_grupo:.2f}A / {grupo['maxCorrente']}A")
+        
         for erro in erros:
             print(f"Erro: {erro}")
+        print(f"=====================================")
             
         return jsonify({
             "ok": True,
@@ -1712,6 +1829,8 @@ def api_vinculacoes_auto():
     except Exception as e:
         db.session.rollback()
         print(f"Erro na vinculação automática: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "ok": False,
             "error": f"Erro ao realizar vinculação automática: {str(e)}"
