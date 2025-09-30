@@ -78,13 +78,17 @@ const Cenas = () => {
 
   return (
     <Layout>
-      <Layout.Header>
-        <div className="flex items-center gap-4">
-            <Clapperboard className="w-8 h-8 text-slate-700" />
-            <h1 className="text-2xl font-bold">Gerenciar Cenas</h1>
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="flex items-center gap-4 mb-10">
+            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center shadow-lg">
+                <Clapperboard className="w-8 h-8 text-white" />
+            </div>
+            <div>
+                <h1 className="text-4xl font-bold text-slate-900">Gerenciar Cenas</h1>
+                <p className="text-lg text-slate-600">Crie e configure cenas para automatizar seus ambientes.</p>
+            </div>
         </div>
-      </Layout.Header>
-      <Layout.Body>
+
         <div className="grid grid-cols-1 gap-8">
           <Card>
             <CardHeader>
@@ -147,7 +151,7 @@ const Cenas = () => {
             </Card>
           )}
         </div>
-      </Layout.Body>
+      </div>
 
       {selectedAmbiente && (
         <SceneForm
