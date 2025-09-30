@@ -31,7 +31,7 @@ const acaoSchema = z.object({
 
 const cenaSchema = z.object({
   nome: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
-  ambiente_id: z.number({ required_error: "É obrigatório selecionar um ambiente." }),
+  ambiente_id: z.coerce.number({ required_error: "É obrigatório selecionar um ambiente." }).min(1, "É obrigatório selecionar um ambiente."),
   acoes: z.array(acaoSchema),
 });
 
