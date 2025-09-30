@@ -191,11 +191,13 @@ const ActionItem = ({ index, control, getValues, setValue, remove, projectCircui
 
     const getTargetName = (action: Partial<Acao>): string => {
         if (!action.target_guid) return "Selecione...";
-        if (action.action_type === 0) {
+        if (action.action_type === 0) { // Circuit
             const circuit = projectCircuits.find(c => String(c.id) === String(action.target_guid));
-            return circuit ? `${circuit.nome} (${circuit.identificador})` : "Circuito não encontrado";
+            if (!circuit) return "Circuito não encontrado";
+            if (circuit.tipo === 'hvac') return `Circuito Inválido (HVAC): ${circuit.nome}`;
+            return `${circuit.nome} (${circuit.identificador})`;
         }
-        if (action.action_type === 7) {
+        if (action.action_type === 7) { // Room
             const ambiente = projectAmbientes.find(a => String(a.id) === String(action.target_guid));
             return ambiente ? `Todas as luzes - ${ambiente.nome}` : "Ambiente não encontrado";
         }
@@ -221,7 +223,9 @@ const ActionItem = ({ index, control, getValues, setValue, remove, projectCircui
                                 </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                                {currentAction.action_type === 0 && projectCircuits.map(c => (
+                                    {currentAction.action_type === 0 && projectCircuits
+                                    .filter(c => c.tipo !== 'hvac')
+                                    .map(c => (
                                 <SelectItem key={c.id} value={String(c.id)}>
                                     {c.nome} ({c.identificador})
                                 </SelectItem>

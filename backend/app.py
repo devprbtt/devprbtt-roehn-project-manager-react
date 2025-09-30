@@ -3027,6 +3027,18 @@ def create_cena():
     if ambiente.area.projeto_id != projeto_id:
         return jsonify({"ok": False, "error": "Ambiente não pertence ao projeto atual."}), 403
 
+    # Validação para não permitir circuitos HVAC
+    for acao_data in acoes_data:
+        if acao_data.get("action_type") == 0: # Ação de Circuito
+            try:
+                circuito_id = int(acao_data.get("target_guid"))
+                circuito = db.session.get(Circuito, circuito_id)
+                if circuito and circuito.tipo == 'hvac':
+                    return jsonify({"ok": False, "error": "Não é permitido adicionar circuitos do tipo HVAC em cenas de iluminação."}), 400
+            except (ValueError, TypeError):
+                # Ignora GUIDs inválidos, a validação do form deve pegar
+                pass
+
     nova_cena = Cena(nome=nome, ambiente_id=ambiente.id)
     db.session.add(nova_cena)
 
@@ -3078,11 +3090,25 @@ def update_cena(cena_id):
         cena.nome = (data["nome"] or "").strip()
 
     if "acoes" in data:
+        acoes_data = data.get("acoes", [])
+        # Validação para não permitir circuitos HVAC
+        for acao_data in acoes_data:
+            if acao_data.get("action_type") == 0:
+                try:
+                    circuito_id = int(acao_data.get("target_guid"))
+                    circuito = db.session.get(Circuito, circuito_id)
+                    if circuito and circuito.tipo == 'hvac':
+                        return jsonify({"ok": False, "error": "Não é permitido adicionar circuitos do tipo HVAC em cenas de iluminação."}), 400
+                except (ValueError, TypeError):
+                    pass
+
+        # Limpar ações antigas
         for acao in cena.acoes:
             CustomAcao.query.filter_by(acao_id=acao.id).delete()
         Acao.query.filter_by(cena_id=cena.id).delete()
 
-        for acao_data in data.get("acoes", []):
+        # Adicionar novas ações
+        for acao_data in acoes_data:
             nova_acao = Acao(
                 cena_id=cena.id,
                 level=acao_data.get("level", 100),
