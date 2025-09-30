@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray, Controller, useWatch, UseFormGetValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCreateCena, useUpdateCena } from "@/hooks/useCenas";
-import type { Cena, CenaFormData } from "@/types/cena";
+import type { Cena, Acao, CenaFormData } from "@/types/cena";
 import type { Circuito, Ambiente, Area } from "@/types/project";
 import { PlusCircle, Trash2 } from "lucide-react";
 
@@ -42,9 +42,18 @@ const cenaSchema = z.object({
   acoes: z.array(acaoSchema),
 });
 
+// --- Types for Props ---
+interface CustomActionsArrayProps {
+    actionIndex: number;
+    control: any; // Control<CenaFormData>
+    getValues: UseFormGetValues<CenaFormData>;
+    projectCircuits: Circuito[];
+    targetAmbienteId: string | null;
+}
+
 
 // --- Sub-component for Custom Actions ---
-const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, targetAmbienteId }) => {
+const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, targetAmbienteId }: CustomActionsArrayProps) => {
     const { fields, replace } = useFieldArray({
       control,
       name: `acoes.${actionIndex}.custom_acoes`,
@@ -80,9 +89,15 @@ const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, 
       <div className="mt-4 space-y-3 p-3 bg-slate-100 rounded-lg">
         <h4 className="text-sm font-semibold text-slate-600">Configurações Individuais do Grupo</h4>
         {fields.map((field, customIndex) => {
-          const circuit = projectCircuits.find(c => String(c.id) === field.target_guid);
+          const customAction = getValues(`acoes.${actionIndex}.custom_acoes.${customIndex}`);
+          const circuit = projectCircuits.find(c => String(c.id) === customAction.target_guid);
           if (!circuit) return null;
-          const isEnabled = getValues(`acoes.${actionIndex}.custom_acoes.${customIndex}.enable`);
+
+          const isEnabled = useWatch({
+            control,
+            name: `acoes.${actionIndex}.custom_acoes.${customIndex}.enable`,
+          });
+
           return (
             <div key={field.id} className="flex items-center gap-4 p-2 border-b">
               <FormField
@@ -260,8 +275,7 @@ export const SceneForm = ({
               <h3 className="text-lg font-semibold">Ações</h3>
               <ScrollArea className="h-[400px] p-4 border rounded-md">
                 {fields.map((field, index) => {
-                  const actionType = form.watch(`acoes.${index}.action_type`);
-                  const targetAmbienteId = actionType === 7 ? form.watch(`acoes.${index}.target_guid`) : null;
+                  const currentAction = useWatch({ control: form.control, name: `acoes.${index}` });
                   return (
                     <div key={field.id} className="p-4 mb-4 border rounded-lg space-y-4 bg-slate-50">
                       <div className="flex justify-between items-start">
@@ -276,17 +290,17 @@ export const SceneForm = ({
                                     <FormControl>
                                       <SelectTrigger>
                                         <SelectValue placeholder="Selecione o alvo...">
-                                            {getTargetName(form.getValues(`acoes.${index}`))}
+                                            {getTargetName(currentAction)}
                                         </SelectValue>
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      {actionType === 0 && projectCircuits.map(c => (
+                                      {currentAction.action_type === 0 && projectCircuits.map(c => (
                                         <SelectItem key={c.id} value={String(c.id)}>
                                           {c.nome} ({c.identificador})
                                         </SelectItem>
                                       ))}
-                                      {actionType === 7 && projectAmbientes.map(a => (
+                                      {currentAction.action_type === 7 && projectAmbientes.map(a => (
                                         <SelectItem key={a.id} value={String(a.id)}>
                                           Todas as Luzes - {a.nome} ({a.area.nome})
                                         </SelectItem>
@@ -324,13 +338,13 @@ export const SceneForm = ({
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                      {actionType === 7 && (
+                      {currentAction.action_type === 7 && (
                         <CustomActionsArray
                           actionIndex={index}
                           control={form.control}
                           getValues={form.getValues}
                           projectCircuits={projectCircuits}
-                          targetAmbienteId={targetAmbienteId}
+                          targetAmbienteId={currentAction.target_guid}
                         />
                       )}
                     </div>
