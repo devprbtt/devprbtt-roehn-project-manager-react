@@ -44,6 +44,12 @@ const cenaSchema = z.object({
 
 
 // --- Types for Props ---
+interface CustomActionItemProps {
+    actionIndex: number;
+    customIndex: number;
+    control: any;
+    circuit: Circuito;
+}
 interface CustomActionsArrayProps {
     actionIndex: number;
     control: any;
@@ -62,6 +68,50 @@ interface ActionItemProps {
 }
 
 // --- Sub-components ---
+
+const CustomActionItem = ({ actionIndex, customIndex, control, circuit }: CustomActionItemProps) => {
+    const isEnabled = useWatch({
+      control,
+      name: `acoes.${actionIndex}.custom_acoes.${customIndex}.enable`,
+    });
+
+    return (
+      <div className="flex items-center gap-4 p-2 border-b">
+        <FormField
+          control={control}
+          name={`acoes.${actionIndex}.custom_acoes.${customIndex}.enable`}
+          render={({ field }) => (
+            <FormItem className="flex items-center space-x-2 space-y-0">
+              <FormControl>
+                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+              </FormControl>
+              <FormLabel className="text-sm font-medium !mt-0">
+                {circuit.nome}
+              </FormLabel>
+            </FormItem>
+          )}
+        />
+        <Controller
+          name={`acoes.${actionIndex}.custom_acoes.${customIndex}.level`}
+          control={control}
+          render={({ field: { onChange, value } }) => (
+            <div className="flex-1 flex items-center gap-3">
+              <Slider
+                value={[value]}
+                onValueChange={(vals) => onChange(vals[0])}
+                max={100}
+                step={1}
+                disabled={!isEnabled}
+              />
+              <span className="text-xs font-mono w-10 text-right">
+                {value}%
+              </span>
+            </div>
+          )}
+        />
+      </div>
+    );
+  };
 
 const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, targetAmbienteId }: CustomActionsArrayProps) => {
     const { fields, replace } = useFieldArray({
@@ -103,46 +153,14 @@ const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, 
           const circuit = projectCircuits.find(c => String(c.id) === customAction.target_guid);
           if (!circuit) return null;
 
-          const isEnabled = useWatch({
-            control,
-            name: `acoes.${actionIndex}.custom_acoes.${customIndex}.enable`,
-          });
-
           return (
-            <div key={field.id} className="flex items-center gap-4 p-2 border-b">
-              <FormField
+            <CustomActionItem
+                key={field.id}
+                actionIndex={actionIndex}
+                customIndex={customIndex}
                 control={control}
-                name={`acoes.${actionIndex}.custom_acoes.${customIndex}.enable`}
-                render={({ field }) => (
-                  <FormItem className="flex items-center space-x-2 space-y-0">
-                    <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <FormLabel className="text-sm font-medium !mt-0">
-                      {circuit.nome}
-                    </FormLabel>
-                  </FormItem>
-                )}
-              />
-              <Controller
-                name={`acoes.${actionIndex}.custom_acoes.${customIndex}.level`}
-                control={control}
-                render={({ field: { onChange, value } }) => (
-                  <div className="flex-1 flex items-center gap-3">
-                    <Slider
-                      value={[value]}
-                      onValueChange={(vals) => onChange(vals[0])}
-                      max={100}
-                      step={1}
-                      disabled={!isEnabled}
-                    />
-                    <span className="text-xs font-mono w-10 text-right">
-                      {value}%
-                    </span>
-                  </div>
-                )}
-              />
-            </div>
+                circuit={circuit}
+            />
           );
         })}
       </div>
