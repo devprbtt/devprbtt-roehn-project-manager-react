@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCenas, useDeleteCena } from "@/hooks/useCenas";
 import { SceneForm } from "@/components/cenas/SceneForm";
-import { PlusCircle, Trash2, Clapperboard, Edit } from "lucide-react";
+import { Trash2, Clapperboard, Edit, Sparkles } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import type { Cena } from "@/types/cena";
 import type { Circuito, Ambiente, Area } from "@/types/project";
+import { motion } from "framer-motion";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Cenas = () => {
   // State for data
@@ -18,11 +20,10 @@ const Cenas = () => {
   const [loadingData, setLoadingData] = useState(true);
 
   // State for UI
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingScene, setEditingScene] = useState<Cena | null>(null);
 
   // Hooks
-  const { data: cenas, isLoading: loadingCenas } = useCenas(selectedAmbiente);
+  const { data: cenas, isLoading: loadingCenas, refetch: refetchCenas } = useCenas(selectedAmbiente);
   const { mutate: deleteCena } = useDeleteCena();
 
   // Fetch all necessary project data
@@ -55,18 +56,9 @@ const Cenas = () => {
     fetchAllData();
   }, []);
 
-  const handleOpenCreateForm = () => {
-    if (!selectedAmbiente) {
-        toast({ title: "Atenção", description: "Por favor, selecione um ambiente primeiro.", variant: "default" });
-        return;
-    }
-    setEditingScene(null);
-    setIsFormOpen(true);
-  };
-
-  const handleOpenEditForm = (scene: Cena) => {
+  const handleEdit = (scene: Cena) => {
     setEditingScene(scene);
-    setIsFormOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = (cenaId: number) => {
@@ -75,6 +67,11 @@ const Cenas = () => {
       deleteCena({ id: cenaId, ambienteId: selectedAmbiente });
     }
   };
+
+  const handleFormSuccess = () => {
+    setEditingScene(null);
+    refetchCenas();
+  }
 
   return (
     <Layout>
@@ -89,80 +86,93 @@ const Cenas = () => {
             </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Selecione um Ambiente</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select
-                onValueChange={(value) => setSelectedAmbiente(Number(value))}
-                disabled={loadingData || ambientes.length === 0}
-              >
-                <SelectTrigger className="w-full md:w-1/3">
-                  <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione um ambiente"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {ambientes.map((ambiente) => (
-                    <SelectItem key={ambiente.id} value={String(ambiente.id)}>
-                      {ambiente.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
-          {selectedAmbiente && (
+        <div className="mb-8">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Cenas do Ambiente</CardTitle>
-                <Button onClick={handleOpenCreateForm}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Criar Cena
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {loadingCenas ? (
-                  <p>Carregando cenas...</p>
-                ) : cenas && cenas.length > 0 ? (
-                  <div className="space-y-4">
-                    {cenas.map((cena) => (
-                      <div key={cena.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <p className="font-semibold">{cena.nome}</p>
-                          <p className="text-sm text-muted-foreground">{cena.acoes.length} ações</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="icon" onClick={() => handleOpenEditForm(cena)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="destructive" size="icon" onClick={() => handleDelete(cena.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
+                <CardHeader>
+                <CardTitle>Selecione um Ambiente</CardTitle>
+                </CardHeader>
+                <CardContent>
+                <Select
+                    onValueChange={(value) => setSelectedAmbiente(Number(value))}
+                    disabled={loadingData || ambientes.length === 0}
+                >
+                    <SelectTrigger className="w-full md:w-1/3">
+                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione um ambiente"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                    {ambientes.map((ambiente) => (
+                        <SelectItem key={ambiente.id} value={String(ambiente.id)}>
+                        {ambiente.nome}
+                        </SelectItem>
                     ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">Nenhuma cena encontrada para este ambiente.</p>
-                )}
-              </CardContent>
+                    </SelectContent>
+                </Select>
+                </CardContent>
             </Card>
-          )}
         </div>
-      </div>
 
-      {selectedAmbiente && (
-        <SceneForm
-            isOpen={isFormOpen}
-            onOpenChange={setIsFormOpen}
-            scene={editingScene}
-            ambienteId={selectedAmbiente}
-            projectCircuits={circuitos}
-            projectAmbientes={ambientes}
-        />
-      )}
+        {!selectedAmbiente && !loadingData && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+              <Alert className="bg-blue-50 border-blue-200 shadow-sm">
+                <Sparkles className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  Por favor, selecione um ambiente acima para começar a gerenciar as cenas.
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+        )}
+
+        {selectedAmbiente && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Coluna do Formulário */}
+                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+                    <SceneForm
+                        key={editingScene ? editingScene.id : 'new'}
+                        scene={editingScene}
+                        ambienteId={selectedAmbiente}
+                        projectCircuits={circuitos}
+                        projectAmbientes={ambientes}
+                        onSuccess={handleFormSuccess}
+                    />
+                </motion.div>
+
+                {/* Coluna da Lista de Cenas */}
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+                    <Card>
+                    <CardHeader>
+                        <CardTitle>Cenas do Ambiente</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {loadingCenas ? (
+                        <p>Carregando cenas...</p>
+                        ) : cenas && cenas.length > 0 ? (
+                        <div className="space-y-4">
+                            {cenas.map((cena) => (
+                            <div key={cena.id} className="flex items-center justify-between p-4 border rounded-lg">
+                                <div>
+                                <p className="font-semibold">{cena.nome}</p>
+                                <p className="text-sm text-muted-foreground">{cena.acoes.length} ações</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                <Button variant="outline" size="icon" onClick={() => handleEdit(cena)}>
+                                    <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="destructive" size="icon" onClick={() => handleDelete(cena.id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                                </div>
+                            </div>
+                            ))}
+                        </div>
+                        ) : (
+                        <p className="text-center text-muted-foreground py-8">Nenhuma cena encontrada para este ambiente.</p>
+                        )}
+                    </CardContent>
+                    </Card>
+                </motion.div>
+            </div>
+        )}
+      </div>
     </Layout>
   );
 };

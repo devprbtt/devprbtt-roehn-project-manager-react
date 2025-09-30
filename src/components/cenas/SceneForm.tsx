@@ -3,14 +3,7 @@ import { useForm, useFieldArray, Controller, useWatch, UseFormGetValues, UseForm
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCreateCena, useUpdateCena } from "@/hooks/useCenas";
 import type { Cena, Acao, CenaFormData } from "@/types/cena";
 import type { Circuito, Ambiente, Area } from "@/types/project";
-import { PlusCircle, Trash2 } from "lucide-react";
+import { PlusCircle, Trash2, FolderPlus } from "lucide-react";
 
 // --- Zod Schema for Validation ---
 const customAcaoSchema = z.object({
@@ -41,7 +34,6 @@ const cenaSchema = z.object({
   ambiente_id: z.number(),
   acoes: z.array(acaoSchema),
 });
-
 
 // --- Types for Props ---
 interface CustomActionItemProps {
@@ -66,6 +58,14 @@ interface ActionItemProps {
     remove: (index: number) => void;
     projectCircuits: Circuito[];
     projectAmbientes: (Ambiente & { area: Area })[];
+}
+
+interface SceneFormProps {
+  scene?: Cena | null;
+  ambienteId: number;
+  projectCircuits: Circuito[];
+  projectAmbientes: (Ambiente & { area: Area })[];
+  onSuccess: () => void;
 }
 
 // --- Sub-components ---
@@ -186,11 +186,11 @@ const ActionItem = ({ index, control, getValues, setValue, remove, projectCircui
 
     const getTargetName = (action: Partial<Acao>): string => {
         if (!action.target_guid) return "Selecione...";
-        if (action.action_type === 0) { // Circuit
+        if (action.action_type === 0) {
             const circuit = projectCircuits.find(c => String(c.id) === String(action.target_guid));
             return circuit ? `${circuit.nome} (${circuit.identificador})` : "Circuito não encontrado";
         }
-        if (action.action_type === 7) { // Room
+        if (action.action_type === 7) {
             const ambiente = projectAmbientes.find(a => String(a.id) === String(action.target_guid));
             return ambiente ? `Todas as luzes - ${ambiente.nome}` : "Ambiente não encontrado";
         }
@@ -200,64 +200,64 @@ const ActionItem = ({ index, control, getValues, setValue, remove, projectCircui
     return (
         <div className="p-4 mb-4 border rounded-lg space-y-4 bg-slate-50">
             <div className="flex justify-between items-start">
-            <div className="flex-1 space-y-2">
-                <FormField
-                    control={control}
-                    name={`acoes.${index}.target_guid`}
-                    render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Alvo da Ação</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                            <SelectTrigger>
-                            <SelectValue placeholder="Selecione o alvo...">
-                                {getTargetName(currentAction)}
-                            </SelectValue>
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            {currentAction.action_type === 0 && projectCircuits.map(c => (
-                            <SelectItem key={c.id} value={String(c.id)}>
-                                {c.nome} ({c.identificador})
-                            </SelectItem>
-                            ))}
-                            {currentAction.action_type === 7 && projectAmbientes.map(a => (
-                            <SelectItem key={a.id} value={String(a.id)}>
-                                Todas as Luzes - {a.nome} ({a.area.nome})
-                            </SelectItem>
-                            ))}
-                        </SelectContent>
-                        </Select>
-                        <FormMessage />
-                    </FormItem>
-                    )}
-                />
+                <div className="flex-1 space-y-2">
+                    <FormField
+                        control={control}
+                        name={`acoes.${index}.target_guid`}
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Alvo da Ação</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                                <SelectTrigger>
+                                <SelectValue placeholder="Selecione o alvo...">
+                                    {getTargetName(currentAction)}
+                                </SelectValue>
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {currentAction.action_type === 0 && projectCircuits.map(c => (
+                                <SelectItem key={c.id} value={String(c.id)}>
+                                    {c.nome} ({c.identificador})
+                                </SelectItem>
+                                ))}
+                                {currentAction.action_type === 7 && projectAmbientes.map(a => (
+                                <SelectItem key={a.id} value={String(a.id)}>
+                                    Todas as Luzes - {a.nome} ({a.area.nome})
+                                </SelectItem>
+                                ))}
+                            </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
 
-                <Controller
-                    name={`acoes.${index}.level`}
-                    control={control}
-                    render={({ field: { onChange, value } }) => (
-                        <div className="space-y-2">
-                            <FormLabel>Intensidade Master: {value}%</FormLabel>
-                            <Slider
-                                value={[value]}
-                                onValueChange={(vals) => onChange(vals[0])}
-                                max={100}
-                                step={1}
-                            />
-                        </div>
-                    )}
-                />
-            </div>
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => remove(index)}
-                className="ml-4 flex-shrink-0"
-            >
-                <Trash2 className="h-4 w-4" />
-            </Button>
+                    <Controller
+                        name={`acoes.${index}.level`}
+                        control={control}
+                        render={({ field: { onChange, value } }) => (
+                            <div className="space-y-2">
+                                <FormLabel>Intensidade Master: {value}%</FormLabel>
+                                <Slider
+                                    value={[value]}
+                                    onValueChange={(vals) => onChange(vals[0])}
+                                    max={100}
+                                    step={1}
+                                />
+                            </div>
+                        )}
+                    />
+                </div>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => remove(index)}
+                    className="ml-4 flex-shrink-0"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
             </div>
             {currentAction.action_type === 7 && (
             <CustomActionsArray
@@ -274,22 +274,12 @@ const ActionItem = ({ index, control, getValues, setValue, remove, projectCircui
 
 
 // --- Main Form Component ---
-interface SceneFormProps {
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  scene?: Cena | null;
-  ambienteId: number;
-  projectCircuits: Circuito[];
-  projectAmbientes: (Ambiente & { area: Area })[];
-}
-
 export const SceneForm = ({
-  isOpen,
-  onOpenChange,
   scene,
   ambienteId,
   projectCircuits,
   projectAmbientes,
+  onSuccess,
 }: SceneFormProps) => {
   const isEditing = !!scene;
   const createCenaMutation = useCreateCena();
@@ -297,35 +287,16 @@ export const SceneForm = ({
 
   const form = useForm<CenaFormData>({
     resolver: zodResolver(cenaSchema),
-    defaultValues: useMemo(() => {
-      if (isEditing && scene) {
-        return {
-          nome: scene.nome,
-          ambiente_id: scene.ambiente_id,
-          acoes: scene.acoes.map(a => ({
-            ...a,
-            target_guid: String(a.target_guid),
-            custom_acoes: a.custom_acoes.map(ca => ({ ...ca, target_guid: String(ca.target_guid) }))
-          }))
-        };
-      }
-      return {
+    defaultValues: {
         nome: "",
         ambiente_id: ambienteId,
         acoes: [],
-      };
-    }, [scene, isEditing, ambienteId]),
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "acoes",
+    },
   });
 
   useEffect(() => {
-    form.reset(
-        isEditing && scene
-        ? {
+    if (scene && isEditing) {
+        form.reset({
             nome: scene.nome,
             ambiente_id: scene.ambiente_id,
             acoes: scene.acoes.map(a => ({
@@ -333,14 +304,20 @@ export const SceneForm = ({
                 target_guid: String(a.target_guid),
                 custom_acoes: a.custom_acoes.map(ca => ({ ...ca, target_guid: String(ca.target_guid) }))
               }))
-          }
-        : {
+        });
+    } else {
+        form.reset({
             nome: "",
             ambiente_id: ambienteId,
             acoes: [],
-          }
-    )
-  }, [scene, isEditing, ambienteId, form.reset, form])
+        });
+    }
+  }, [scene, isEditing, ambienteId, form]);
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "acoes",
+  });
 
   const onSubmit = (data: CenaFormData) => {
     const submissionData = {
@@ -351,12 +328,15 @@ export const SceneForm = ({
       }))
     };
 
-    if (isEditing && scene) {
-      updateCenaMutation.mutate({ id: scene.id, ...submissionData });
-    } else {
-      createCenaMutation.mutate(submissionData);
-    }
-    onOpenChange(false);
+    const mutation = isEditing ? updateCenaMutation : createCenaMutation;
+    const mutationData = isEditing ? { id: scene!.id, ...submissionData } : submissionData;
+
+    mutation.mutate(mutationData as any, {
+        onSuccess: () => {
+            onSuccess();
+            form.reset();
+        }
+    });
   };
 
   const addAction = (type: 'circuit' | 'room') => {
@@ -368,14 +348,23 @@ export const SceneForm = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Editar Cena" : "Criar Nova Cena"}</DialogTitle>
-          <DialogDescription>
-            Configure as ações e intensidades para os circuitos e grupos de luzes.
-          </DialogDescription>
-        </DialogHeader>
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+        <CardHeader className="pb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <FolderPlus className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-2xl font-bold text-slate-900">
+                {isEditing ? "Editar Cena" : "Adicionar Nova Cena"}
+              </CardTitle>
+              <p className="text-slate-600 mt-1">
+                {isEditing ? `Editando "${scene?.nome}"` : "Preencha as informações da nova cena"}
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
@@ -418,17 +407,17 @@ export const SceneForm = ({
               </div>
             </div>
 
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={createCenaMutation.isPending || updateCenaMutation.isPending}>
-                {isEditing ? "Salvar Alterações" : "Criar Cena"}
-              </Button>
-            </DialogFooter>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={() => form.reset()}>
+                    Cancelar
+                </Button>
+                <Button type="submit" disabled={createCenaMutation.isPending || updateCenaMutation.isPending}>
+                    {isEditing ? "Salvar Alterações" : "Criar Cena"}
+                </Button>
+            </div>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
+        </CardContent>
+    </Card>
   );
 };
