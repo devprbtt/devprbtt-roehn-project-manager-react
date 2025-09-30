@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -18,9 +18,8 @@ import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCreateCena, useUpdateCena } from "@/hooks/useCenas";
-import type { Cena, Acao, CustomAcao, CenaFormData } from "@/types/cena";
+import type { Cena, CenaFormData } from "@/types/cena";
 import type { Circuito, Ambiente, Area } from "@/types/project";
-import { toast } from "@/hooks/use-toast";
 import { PlusCircle, Trash2 } from "lucide-react";
 
 // --- Zod Schema for Validation ---
@@ -43,8 +42,9 @@ const cenaSchema = z.object({
   acoes: z.array(acaoSchema),
 });
 
+
 // --- Sub-component for Custom Actions ---
-const CustomActionsArray = ({ actionIndex, control, projectCircuits, targetAmbienteId }) => {
+const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, targetAmbienteId }) => {
     const { fields, replace } = useFieldArray({
       control,
       name: `acoes.${actionIndex}.custom_acoes`,
@@ -60,7 +60,7 @@ const CustomActionsArray = ({ actionIndex, control, projectCircuits, targetAmbie
         (c) => c.ambiente.id === Number(targetAmbienteId)
       );
 
-      const existingCustomActions = control.getValues(`acoes.${actionIndex}.custom_acoes`);
+      const existingCustomActions = getValues(`acoes.${actionIndex}.custom_acoes`) || [];
       const newCustomActions = circuitsInRoom.map(circuit => {
         const existing = existingCustomActions.find(ca => ca.target_guid === String(circuit.id));
         return existing || {
@@ -72,7 +72,7 @@ const CustomActionsArray = ({ actionIndex, control, projectCircuits, targetAmbie
 
       replace(newCustomActions);
 
-    }, [targetAmbienteId, projectCircuits, replace, actionIndex, control]);
+    }, [targetAmbienteId, projectCircuits, replace, actionIndex, getValues]);
 
     if (!targetAmbienteId) return null;
 
@@ -82,6 +82,7 @@ const CustomActionsArray = ({ actionIndex, control, projectCircuits, targetAmbie
         {fields.map((field, customIndex) => {
           const circuit = projectCircuits.find(c => String(c.id) === field.target_guid);
           if (!circuit) return null;
+          const isEnabled = getValues(`acoes.${actionIndex}.custom_acoes.${customIndex}.enable`);
           return (
             <div key={field.id} className="flex items-center gap-4 p-2 border-b">
               <FormField
@@ -108,7 +109,7 @@ const CustomActionsArray = ({ actionIndex, control, projectCircuits, targetAmbie
                       onValueChange={(vals) => onChange(vals[0])}
                       max={100}
                       step={1}
-                      disabled={!control.getValues(`acoes.${actionIndex}.custom_acoes.${customIndex}.enable`)}
+                      disabled={!isEnabled}
                     />
                     <span className="text-xs font-mono w-10 text-right">
                       {value}%
@@ -327,6 +328,7 @@ export const SceneForm = ({
                         <CustomActionsArray
                           actionIndex={index}
                           control={form.control}
+                          getValues={form.getValues}
                           projectCircuits={projectCircuits}
                           targetAmbienteId={targetAmbienteId}
                         />
