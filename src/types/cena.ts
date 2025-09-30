@@ -1,3 +1,5 @@
+import type { Ambiente } from './project';
+
 export interface CustomAcao {
   id?: number;
   target_guid: string;
@@ -19,7 +21,8 @@ export interface Cena {
   nome: string;
   ambiente_id: number;
   acoes: Acao[];
+  ambiente: Ambiente; // Adicionado para incluir os dados do ambiente
 }
 
 // Para criação e edição
-export type CenaFormData = Omit<Cena, "id" | "guid">;
+export type CenaFormData = Omit<Cena, "id" | "guid" | "ambiente">;
