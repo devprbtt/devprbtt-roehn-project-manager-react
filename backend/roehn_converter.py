@@ -1759,11 +1759,9 @@ class RoehnProjectConverter:
                 else: # Other types, assume GUID is direct
                     action_payload["TargetGuid"] = acao_db.target_guid
 
-                # Processar CustomAcoes se houver
+                # Processar CustomAcoes e forçar a desativação de HVAC em grupos
+                custom_values = { "$type": "CustomActionValueDictionary" }
                 if acao_db.custom_acoes:
-                    custom_values = {
-                        "$type": "CustomActionValueDictionary"
-                    }
                     for custom_acao_db in acao_db.custom_acoes:
                         try:
                             circuito_id = int(custom_acao_db.target_guid)
@@ -1781,6 +1779,24 @@ class RoehnProjectConverter:
                             print(f"⚠️ Aviso: target_guid inválido para CustomAcao ID {custom_acao_db.id}: {custom_acao_db.target_guid}")
                             continue
 
+                # Se for uma ação de grupo, garantir que circuitos HVAC sejam desativados
+                if acao_db.action_type == 7:
+                    try:
+                        target_ambiente_id = int(acao_db.target_guid)
+                        all_circuits_in_room = Circuito.query.filter_by(ambiente_id=target_ambiente_id).all()
+                        for circuit in all_circuits_in_room:
+                            if circuit.tipo == 'hvac':
+                                circuit_guid = self._circuit_guid_map.get(circuit.id)
+                                if circuit_guid:
+                                    custom_values[circuit_guid] = {
+                                        "$type": "CustomActionValue",
+                                        "Enable": False,
+                                        "Level": 0
+                                    }
+                    except (ValueError, TypeError):
+                        pass # Ignora se o target_guid não for um ID de ambiente válido
+
+                if len(custom_values) > 1: # Se houver algo além do $type
                     action_payload["CustomActionValuesSerialized"] = custom_values
 
                 scene_payload["Actions"].append(action_payload)

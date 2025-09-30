@@ -126,7 +126,7 @@ const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, 
       }
 
       const circuitsInRoom = projectCircuits.filter(
-        (c) => c.ambiente.id === Number(targetAmbienteId)
+        (c) => c.ambiente.id === Number(targetAmbienteId) && c.tipo !== 'hvac'
       );
 
       const existingCustomActions = getValues(`acoes.${actionIndex}.custom_acoes`) || [];
