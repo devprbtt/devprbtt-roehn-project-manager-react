@@ -2947,6 +2947,43 @@ def serialize_cena(cena):
 def cenas_spa():
     return current_app.send_static_file("index.html")
 
+@app.get("/api/cenas")
+@login_required
+def get_all_cenas():
+    projeto_id = session.get("projeto_atual_id")
+    if not projeto_id:
+        return jsonify({"ok": True, "cenas": []})
+
+    cenas = (
+        Cena.query
+        .join(Ambiente, Cena.ambiente_id == Ambiente.id)
+        .join(Area, Ambiente.area_id == Area.id)
+        .filter(Area.projeto_id == projeto_id)
+        .options(
+            joinedload(Cena.ambiente).joinedload(Ambiente.area),
+            joinedload(Cena.acoes).joinedload(Acao.custom_acoes)
+        )
+        .order_by(Area.nome, Ambiente.nome, Cena.nome)
+        .all()
+    )
+
+    # Adicionar dados do ambiente na serialização
+    cenas_serializadas = []
+    for c in cenas:
+        cena_data = serialize_cena(c)
+        cena_data['ambiente'] = {
+            'id': c.ambiente.id,
+            'nome': c.ambiente.nome,
+            'area': {
+                'id': c.ambiente.area.id,
+                'nome': c.ambiente.area.nome
+            }
+        }
+        cenas_serializadas.append(cena_data)
+
+    return jsonify({"ok": True, "cenas": cenas_serializadas})
+
+
 @app.get("/api/ambientes/<int:ambiente_id>/cenas")
 @login_required
 def get_cenas_por_ambiente(ambiente_id):

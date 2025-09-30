@@ -7,8 +7,8 @@ const CENA_QUERY_KEY = "cenas";
 
 // --- Funções da API ---
 
-async function fetchCenas(ambienteId: number): Promise<Cena[]> {
-  const response = await fetch(`/api/ambientes/${ambienteId}/cenas`);
+async function fetchAllCenas(): Promise<Cena[]> {
+  const response = await fetch(`/api/cenas`);
   if (!response.ok) {
     throw new Error("Falha ao buscar cenas");
   }
@@ -60,11 +60,10 @@ async function deleteCena(id: number): Promise<void> {
 
 // --- Hooks do React Query ---
 
-export const useCenas = (ambienteId: number | null) => {
+export const useCenas = () => {
   return useQuery<Cena[], Error>({
-    queryKey: [CENA_QUERY_KEY, ambienteId],
-    queryFn: () => fetchCenas(ambienteId!),
-    enabled: !!ambienteId, // Só executa a query se ambienteId não for nulo
+    queryKey: [CENA_QUERY_KEY],
+    queryFn: fetchAllCenas,
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 };
@@ -73,8 +72,8 @@ export const useCreateCena = () => {
   const queryClient = useQueryClient();
   return useMutation<Cena, Error, CenaFormData>({
     mutationFn: createCena,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [CENA_QUERY_KEY, data.ambiente_id] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CENA_QUERY_KEY] });
       toast({ title: "Sucesso!", description: "Cena criada com sucesso." });
     },
     onError: (error) => {
@@ -91,9 +90,8 @@ export const useUpdateCena = () => {
   const queryClient = useQueryClient();
   return useMutation<Cena, Error, { id: number } & Partial<CenaFormData>>({
     mutationFn: updateCena,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [CENA_QUERY_KEY, data.ambiente_id] });
-      queryClient.invalidateQueries({ queryKey: ["cena", data.id] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CENA_QUERY_KEY] });
       toast({ title: "Sucesso!", description: "Cena atualizada com sucesso." });
     },
     onError: (error) => {
@@ -108,10 +106,10 @@ export const useUpdateCena = () => {
 
 export const useDeleteCena = () => {
   const queryClient = useQueryClient();
-  return useMutation<void, Error, { id: number, ambienteId: number }>({
+  return useMutation<void, Error, { id: number }>({
     mutationFn: ({ id }) => deleteCena(id),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: [CENA_QUERY_KEY, variables.ambienteId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CENA_QUERY_KEY] });
       toast({ title: "Sucesso!", description: "Cena excluída com sucesso." });
     },
     onError: (error) => {

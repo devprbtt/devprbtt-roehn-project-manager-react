@@ -31,7 +31,7 @@ const acaoSchema = z.object({
 
 const cenaSchema = z.object({
   nome: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
-  ambiente_id: z.number(),
+  ambiente_id: z.number({ required_error: "É obrigatório selecionar um ambiente." }),
   acoes: z.array(acaoSchema),
 });
 
@@ -62,7 +62,6 @@ interface ActionItemProps {
 
 interface SceneFormProps {
   scene?: Cena | null;
-  ambienteId: number;
   projectCircuits: Circuito[];
   projectAmbientes: (Ambiente & { area: Area })[];
   onSuccess: () => void;
@@ -171,7 +170,6 @@ const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, 
 const ActionItem = ({ index, control, getValues, setValue, remove, projectCircuits, projectAmbientes }: ActionItemProps) => {
     const currentAction = useWatch({ control, name: `acoes.${index}` });
 
-    // Sincroniza os sliders individuais com o master
     useEffect(() => {
         if (currentAction.action_type === 7) {
             const customActions = getValues(`acoes.${index}.custom_acoes`);
@@ -276,7 +274,6 @@ const ActionItem = ({ index, control, getValues, setValue, remove, projectCircui
 // --- Main Form Component ---
 export const SceneForm = ({
   scene,
-  ambienteId,
   projectCircuits,
   projectAmbientes,
   onSuccess,
@@ -289,7 +286,7 @@ export const SceneForm = ({
     resolver: zodResolver(cenaSchema),
     defaultValues: {
         nome: "",
-        ambiente_id: ambienteId,
+        ambiente_id: undefined,
         acoes: [],
     },
   });
@@ -308,11 +305,11 @@ export const SceneForm = ({
     } else {
         form.reset({
             nome: "",
-            ambiente_id: ambienteId,
+            ambiente_id: undefined,
             acoes: [],
         });
     }
-  }, [scene, isEditing, ambienteId, form]);
+  }, [scene, isEditing, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -334,7 +331,7 @@ export const SceneForm = ({
     mutation.mutate(mutationData as any, {
         onSuccess: () => {
             onSuccess();
-            form.reset();
+            form.reset({ nome: "", ambiente_id: undefined, acoes: [] });
         }
     });
   };
@@ -367,19 +364,45 @@ export const SceneForm = ({
         <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="nome"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome da Cena</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: Jantar, Cinema, Leitura..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid md:grid-cols-2 gap-4">
+                <FormField
+                    control={form.control}
+                    name="nome"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Nome da Cena</FormLabel>
+                        <FormControl>
+                            <Input placeholder="Ex: Jantar, Cinema..." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="ambiente_id"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Ambiente</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value ? String(field.value) : ""}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione um ambiente" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                {projectAmbientes.map(a => (
+                                    <SelectItem key={a.id} value={String(a.id)}>
+                                    {a.nome} ({a.area.nome})
+                                    </SelectItem>
+                                ))}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            </div>
 
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Ações</h3>
@@ -408,7 +431,7 @@ export const SceneForm = ({
             </div>
 
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="ghost" onClick={() => form.reset()}>
+                <Button type="button" variant="ghost" onClick={() => form.reset({ nome: "", ambiente_id: undefined, acoes: [] })}>
                     Cancelar
                 </Button>
                 <Button type="submit" disabled={createCenaMutation.isPending || updateCenaMutation.isPending}>

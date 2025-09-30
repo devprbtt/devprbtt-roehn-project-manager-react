@@ -1,29 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useCenas, useDeleteCena } from "@/hooks/useCenas";
 import { SceneForm } from "@/components/cenas/SceneForm";
-import { Trash2, Clapperboard, Edit, Sparkles } from "lucide-react";
+import { Trash2, Clapperboard, Edit, Search, Filter, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import type { Cena } from "@/types/cena";
 import type { Circuito, Ambiente, Area } from "@/types/project";
 import { motion } from "framer-motion";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Cenas = () => {
   // State for data
   const [ambientes, setAmbientes] = useState<(Ambiente & { area: Area })[]>([]);
   const [circuitos, setCircuitos] = useState<Circuito[]>([]);
-  const [selectedAmbiente, setSelectedAmbiente] = useState<number | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
   // State for UI
   const [editingScene, setEditingScene] = useState<Cena | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [ambienteFilter, setAmbienteFilter] = useState<number | "todos">("todos");
 
   // Hooks
-  const { data: cenas, isLoading: loadingCenas, refetch: refetchCenas } = useCenas(selectedAmbiente);
+  const { data: cenas, isLoading: loadingCenas, refetch: refetchCenas } = useCenas();
   const { mutate: deleteCena } = useDeleteCena();
 
   // Fetch all necessary project data
@@ -56,15 +57,24 @@ const Cenas = () => {
     fetchAllData();
   }, []);
 
+  const filteredCenas = useMemo(() => {
+    if (!cenas) return [];
+    return cenas.filter(cena => {
+        const matchesSearch = searchTerm === "" || cena.nome.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesAmbiente = ambienteFilter === "todos" || cena.ambiente.id === ambienteFilter;
+        return matchesSearch && matchesAmbiente;
+    });
+  }, [cenas, searchTerm, ambienteFilter]);
+
+
   const handleEdit = (scene: Cena) => {
     setEditingScene(scene);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = (cenaId: number) => {
-    if (!selectedAmbiente) return;
     if (window.confirm("Tem certeza que deseja excluir esta cena?")) {
-      deleteCena({ id: cenaId, ambienteId: selectedAmbiente });
+      deleteCena({ id: cenaId });
     }
   };
 
@@ -86,92 +96,79 @@ const Cenas = () => {
             </div>
         </div>
 
-        <div className="mb-8">
-            <Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Coluna do Formulário */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+                <SceneForm
+                    key={editingScene ? editingScene.id : 'new'}
+                    scene={editingScene}
+                    projectCircuits={circuitos}
+                    projectAmbientes={ambientes}
+                    onSuccess={handleFormSuccess}
+                />
+            </motion.div>
+
+            {/* Coluna da Lista de Cenas */}
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+                <Card>
                 <CardHeader>
-                <CardTitle>Selecione um Ambiente</CardTitle>
+                    <CardTitle>Cenas Cadastradas</CardTitle>
+                    <div className="mt-4 space-y-4">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                            <Input
+                                placeholder="Buscar por nome..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10 pr-10 h-10"
+                            />
+                            {searchTerm && <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8" onClick={() => setSearchTerm("")}><X className="w-4 h-4" /></Button>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Filter className="h-4 w-4 text-slate-500" />
+                            <Select value={String(ambienteFilter)} onValueChange={(v) => setAmbienteFilter(v === "todos" ? "todos" : Number(v))}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Filtrar por ambiente..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="todos">Todos os Ambientes</SelectItem>
+                                    {ambientes.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.nome}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
-                <Select
-                    onValueChange={(value) => setSelectedAmbiente(Number(value))}
-                    disabled={loadingData || ambientes.length === 0}
-                >
-                    <SelectTrigger className="w-full md:w-1/3">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione um ambiente"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {ambientes.map((ambiente) => (
-                        <SelectItem key={ambiente.id} value={String(ambiente.id)}>
-                        {ambiente.nome}
-                        </SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-                </CardContent>
-            </Card>
-        </div>
-
-        {!selectedAmbiente && !loadingData && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-              <Alert className="bg-blue-50 border-blue-200 shadow-sm">
-                <Sparkles className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-800">
-                  Por favor, selecione um ambiente acima para começar a gerenciar as cenas.
-                </AlertDescription>
-              </Alert>
-            </motion.div>
-        )}
-
-        {selectedAmbiente && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Coluna do Formulário */}
-                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                    <SceneForm
-                        key={editingScene ? editingScene.id : 'new'}
-                        scene={editingScene}
-                        ambienteId={selectedAmbiente}
-                        projectCircuits={circuitos}
-                        projectAmbientes={ambientes}
-                        onSuccess={handleFormSuccess}
-                    />
-                </motion.div>
-
-                {/* Coluna da Lista de Cenas */}
-                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                    <Card>
-                    <CardHeader>
-                        <CardTitle>Cenas do Ambiente</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {loadingCenas ? (
-                        <p>Carregando cenas...</p>
-                        ) : cenas && cenas.length > 0 ? (
+                    {loadingCenas ? (
+                    <p>Carregando cenas...</p>
+                    ) : filteredCenas && filteredCenas.length > 0 ? (
+                    <ScrollArea className="h-[500px] pr-4">
                         <div className="space-y-4">
-                            {cenas.map((cena) => (
+                        {filteredCenas.map((cena) => (
                             <div key={cena.id} className="flex items-center justify-between p-4 border rounded-lg">
-                                <div>
+                            <div>
                                 <p className="font-semibold">{cena.nome}</p>
-                                <p className="text-sm text-muted-foreground">{cena.acoes.length} ações</p>
-                                </div>
-                                <div className="flex items-center gap-2">
+                                <p className="text-sm text-muted-foreground">{cena.ambiente.nome} ({cena.ambiente.area.nome})</p>
+                            </div>
+                            <div className="flex items-center gap-2">
                                 <Button variant="outline" size="icon" onClick={() => handleEdit(cena)}>
-                                    <Edit className="h-4 w-4" />
+                                <Edit className="h-4 w-4" />
                                 </Button>
                                 <Button variant="destructive" size="icon" onClick={() => handleDelete(cena.id)}>
-                                    <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4" />
                                 </Button>
-                                </div>
                             </div>
-                            ))}
+                            </div>
+                        ))}
                         </div>
-                        ) : (
-                        <p className="text-center text-muted-foreground py-8">Nenhuma cena encontrada para este ambiente.</p>
-                        )}
-                    </CardContent>
-                    </Card>
-                </motion.div>
-            </div>
-        )}
+                    </ScrollArea>
+                    ) : (
+                    <p className="text-center text-muted-foreground py-8">Nenhuma cena encontrada.</p>
+                    )}
+                </CardContent>
+                </Card>
+            </motion.div>
+        </div>
       </div>
     </Layout>
   );
