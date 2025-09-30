@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useForm, useFieldArray, Controller, useWatch, UseFormGetValues, UseFormSetValue } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -169,8 +169,15 @@ const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, 
 
 const ActionItem = ({ index, control, getValues, setValue, remove, projectCircuits, projectAmbientes }: ActionItemProps) => {
     const currentAction = useWatch({ control, name: `acoes.${index}` });
+    const isInitialMount = useRef(true);
 
+    // Sincroniza os sliders individuais com o master, ignorando a primeira renderização
     useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
         if (currentAction.action_type === 7) {
             const customActions = getValues(`acoes.${index}.custom_acoes`);
             if (customActions) {
@@ -179,7 +186,7 @@ const ActionItem = ({ index, control, getValues, setValue, remove, projectCircui
                 });
             }
         }
-    }, [currentAction.level, currentAction.action_type, index, getValues, setValue]);
+    }, [currentAction.level]);
 
 
     const getTargetName = (action: Partial<Acao>): string => {
