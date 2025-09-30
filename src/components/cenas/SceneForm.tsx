@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { useForm, useFieldArray, Controller, useWatch, UseFormGetValues } from "react-hook-form";
+import { useForm, useFieldArray, Controller, useWatch, UseFormGetValues, UseFormSetValue } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,7 @@ interface ActionItemProps {
     index: number;
     control: any;
     getValues: UseFormGetValues<CenaFormData>;
+    setValue: UseFormSetValue<CenaFormData>;
     remove: (index: number) => void;
     projectCircuits: Circuito[];
     projectAmbientes: (Ambiente & { area: Area })[];
@@ -167,8 +168,21 @@ const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, 
     );
   };
 
-const ActionItem = ({ index, control, getValues, remove, projectCircuits, projectAmbientes }: ActionItemProps) => {
+const ActionItem = ({ index, control, getValues, setValue, remove, projectCircuits, projectAmbientes }: ActionItemProps) => {
     const currentAction = useWatch({ control, name: `acoes.${index}` });
+
+    // Sincroniza os sliders individuais com o master
+    useEffect(() => {
+        if (currentAction.action_type === 7) {
+            const customActions = getValues(`acoes.${index}.custom_acoes`);
+            if (customActions) {
+                customActions.forEach((_, customIndex) => {
+                    setValue(`acoes.${index}.custom_acoes.${customIndex}.level`, currentAction.level);
+                });
+            }
+        }
+    }, [currentAction.level, currentAction.action_type, index, getValues, setValue]);
+
 
     const getTargetName = (action: Partial<Acao>): string => {
         if (!action.target_guid) return "Selecione...";
@@ -387,6 +401,7 @@ export const SceneForm = ({
                         index={index}
                         control={form.control}
                         getValues={form.getValues}
+                        setValue={form.setValue}
                         remove={remove}
                         projectCircuits={projectCircuits}
                         projectAmbientes={projectAmbientes}
