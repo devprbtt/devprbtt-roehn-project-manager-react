@@ -17,8 +17,6 @@ import {
   DoorOpen,
   Link2,
   X,
-  Edit,
-  RefreshCw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -26,23 +24,18 @@ import { motion, AnimatePresence } from "framer-motion";
 type AreaLite = { id: number; nome: string };
 type Ambiente = { id: number; nome: string; area?: AreaLite };
 
-type KeypadButton = {
-    id: number;
-    ordem: number;
-    circuito_id: number | null;
-};
-
 type Keypad = {
   id: number;
   nome: string;
   hsnet: number;
-  color: string;
-  button_color: string;
-  button_count: number;
+  color: string;          // <- backend
+  button_color: string;   // <- backend
+  button_count: number;   // <- backend
+  // layout opcional, só como fallback (se vc ainda devolver do back):
+  layout?: "ONE" | "TWO" | "FOUR";
   ambiente?: { id: number; nome: string; area?: AreaLite };
-  buttons: KeypadButton[];
 };
-
+// 1) Tipos (ou ajuste o tipo atual para este shape)
 type Circuito = {
   id: number;
   identificador: string;
@@ -58,7 +51,7 @@ type Circuito = {
 
 type ButtonBinding = {
   index: number;
-  circuito_id: number | null;
+  circuito_id: number | null; // null = limpar
 };
 
 const COLORS = [
@@ -74,11 +67,19 @@ const COLORS = [
 
 const KEYCOLORS = ["WHITE", "BLACK"] as const;
 
-const BUTTON_COUNTS: { label: string; value: 1 | 2 | 4 }[] = [
-  { label: "1 tecla", value: 1 },
-  { label: "2 teclas", value: 2 },
-  { label: "4 teclas", value: 4 },
+const LAYOUTS: { label: string; value: "ONE" | "TWO" | "FOUR"; hint: string }[] = [
+  { label: "1 tecla", value: "ONE", hint: "Layout 1" },
+  { label: "2 teclas", value: "TWO", hint: "Layout 2" },
+  { label: "4 teclas", value: "FOUR", hint: "Layout 4" },
 ];
+
+function layoutToCount(layout?: Keypad["layout"]): number | undefined {
+  if (!layout) return undefined;
+  if (layout === "ONE") return 1;
+  if (layout === "TWO") return 2;
+  if (layout === "FOUR") return 4;
+  return undefined;
+}
 
 
 // ---------- Componente ----------
@@ -93,20 +94,17 @@ export default function Keypads() {
 
   // Estados de controle
   const [loading, setLoading] = useState(true);
-  const [loadingSubmit, setLoadingSubmit] = useState(false);
+  const [loadingCreate, setLoadingCreate] = useState(false);
   const [projetoSelecionado, setProjetoSelecionado] = useState(false);
-  const [selectedKeypadId, setSelectedKeypadId] = useState<number | null>(null);
 
-  // Form
-  const [form, setForm] = useState({
-      nome: "",
-      hsnet: '' as number | '',
-      color: "" as (typeof COLORS)[number] | "",
-      button_color: "" as (typeof KEYCOLORS)[number] | "",
-      button_count: '' as 1 | 2 | 4 | '',
-      ambiente_id: '' as number | '',
-  });
+  // Form de criação
+  const [nome, setNome] = useState("");
+  const [hsnet, setHsnet] = useState<number | ''>('');
   const [loadingNextHsnet, setLoadingNextHsnet] = useState(false);
+  const [cor, setCor] = useState<(typeof COLORS)[number] | "">("");
+  const [corTeclas, setCorTeclas] = useState<(typeof KEYCOLORS)[number] | "">("");
+  const [layout, setLayout] = useState<"ONE" | "TWO" | "FOUR" | "">("");
+  const [ambienteId, setAmbienteId] = useState<number | "">("");
 
   // Modal de vinculação
   const [bindingsOpen, setBindingsOpen] = useState(false);
@@ -120,26 +118,7 @@ export default function Keypads() {
   const [ambIdFilter, setAmbIdFilter] = useState<number | "">("");
   const [btnCountFilter, setBtnCountFilter] = useState<1 | 2 | 4 | "">("");
 
-  const isEditing = selectedKeypadId !== null;
-
-  // Popula o formulário quando um keypad é selecionado
-  useEffect(() => {
-    if (isEditing) {
-      const keypad = keypads.find(k => k.id === selectedKeypadId);
-      if (keypad) {
-        setForm({
-          nome: keypad.nome,
-          hsnet: keypad.hsnet,
-          color: keypad.color as any,
-          button_color: keypad.button_color as any,
-          button_count: keypad.button_count as any,
-          ambiente_id: keypad.ambiente?.id ?? '',
-        });
-      }
-    } else {
-      resetForm();
-    }
-  }, [selectedKeypadId, keypads, isEditing]);
+  // options
 
   // Opções únicas de Área/Ambiente a partir dos keypads
   const areaOptions = useMemo(() => {
@@ -161,32 +140,45 @@ export default function Keypads() {
         seen.add(amb.id);
       }
     });
+    // Se filtrar por área, restringe ambientes dela
     return list
       .filter(x => (areaIdFilter ? x.areaId === areaIdFilter : true))
       .sort((a,b)=>a.nome.localeCompare(b.nome));
   }, [keypads, areaIdFilter]);
 
-  const filteredKeypads = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    return keypads.filter(k => {
-      const matchesQ = !term || [
-        k.nome,
-        k.ambiente?.nome,
-        k.ambiente?.area?.nome,
-        String(k.hsnet ?? "")
-      ].some(v => String(v ?? "").toLowerCase().includes(term));
-      const matchesArea = !areaIdFilter || k.ambiente?.area?.id === areaIdFilter;
-      const matchesAmb = !ambIdFilter || k.ambiente?.id === ambIdFilter;
-      const matchesCount = !btnCountFilter || k.button_count === btnCountFilter;
-      return matchesQ && matchesArea && matchesAmb && matchesCount;
-    });
-  }, [keypads, q, areaIdFilter, ambIdFilter, btnCountFilter]);
+    // Aplicação de filtros/busca
+    const filteredKeypads = useMemo(() => {
+      const term = q.trim().toLowerCase();
+      return keypads.filter(k => {
+        // Busca livre
+        const matchesQ = !term || [
+          k.nome,
+          k.ambiente?.nome,
+          k.ambiente?.area?.nome,
+          String(k.hsnet ?? "")
+        ].some(v => String(v ?? "").toLowerCase().includes(term));
+
+        // Área
+        const matchesArea = !areaIdFilter || k.ambiente?.area?.id === areaIdFilter;
+
+        // Ambiente
+        const matchesAmb = !ambIdFilter || k.ambiente?.id === ambIdFilter;
+
+        // Nº teclas
+        const matchesCount = !btnCountFilter || k.button_count === btnCountFilter;
+
+        return matchesQ && matchesArea && matchesAmb && matchesCount;
+      });
+    }, [keypads, q, areaIdFilter, ambIdFilter, btnCountFilter]);
 
   useEffect(() => {
-    if (projetoSelecionado && !isEditing && form.hsnet === '') {
+    // supondo que você tenha `keypads` no estado
+    if (projetoSelecionado && (hsnet === '' || hsnet === undefined || hsnet === null)) {
       fetchNextHsnet();
     }
-  }, [projetoSelecionado, isEditing, form.hsnet]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projetoSelecionado, keypads.length]); // re-sugere quando a quantidade muda
+
 
   async function fetchNextHsnet() {
     try {
@@ -194,10 +186,10 @@ export default function Keypads() {
       const res = await fetch("/api/keypads/next-hsnet", { credentials: "same-origin" });
       const data = await res.json();
       if (res.ok && data?.ok && typeof data.hsnet === "number") {
-        setForm(prev => ({ ...prev, hsnet: data.hsnet }));
+        setHsnet(data.hsnet);
       }
     } catch (e) {
-      // ignore
+      // opcional: toast de aviso
     } finally {
       setLoadingNextHsnet(false);
     }
@@ -234,13 +226,55 @@ export default function Keypads() {
     }
   }
 
-  useEffect(() => {
-    loadData();
-  }, [projeto?.id]);
+  // --------- Fetch base ----------
+  async function checkAndFetch() {
+    setLoading(true);
+    try {
+      const p = await fetch("/api/projeto_atual", { credentials: "same-origin" }).then((r) => r.json());
+      if (p?.ok && p?.projeto_atual) {
+        setProjetoSelecionado(true);
+
+        const [ambRes, kpRes, circRes] = await Promise.all([
+          fetch("/api/ambientes", { credentials: "same-origin" }),
+          fetch("/api/keypads", { credentials: "same-origin" }),
+          fetch("/api/circuitos", { credentials: "same-origin" }),
+        ]);
+
+        if (!ambRes.ok || !kpRes.ok || !circRes.ok) throw new Error("Falha ao carregar dados.");
+
+        const ambData = await ambRes.json();
+        const kpData = await kpRes.json();
+        const circData = await circRes.json();
+
+        setAmbientes(ambData?.ambientes || ambData || []);
+        setKeypads(kpData?.keypads || kpData || []);
+        setCircuitos(circData?.circuitos || circData || []);
+      } else {
+        setProjetoSelecionado(false);
+        setAmbientes([]);
+        setKeypads([]);
+        setCircuitos([]);
+      }
+    } catch (e) {
+      console.error(e);
+      setProjetoSelecionado(false);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Falha ao carregar dados. Verifique se há um projeto selecionado.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
 
   type KeypadStatus = "vazio" | "parcial" | "completo";
 
-  function computeKeypadStatus(kp: Keypad): { status: KeypadStatus; linked: number; total: number } {
+  function computeKeypadStatus(kp: {
+    button_count: number;
+    buttons?: { circuito_id?: number | null }[];
+  }): { status: KeypadStatus; linked: number; total: number } {
     const total = kp.button_count || 0;
     const linked = (kp.buttons || []).filter(b => !!b?.circuito_id).length;
     if (total === 0) return { status: "vazio", linked: 0, total: 0 };
@@ -251,89 +285,189 @@ export default function Keypads() {
 
   function statusBadgeClasses(status: KeypadStatus) {
     switch (status) {
-      case "completo": return "bg-emerald-100 text-emerald-800 border border-emerald-200";
-      case "parcial": return "bg-amber-100 text-amber-800 border border-amber-200";
-      default: return "bg-slate-100 text-slate-700 border border-slate-200";
+      case "completo":
+        return "bg-emerald-100 text-emerald-800 border border-emerald-200";
+      case "parcial":
+        return "bg-amber-100 text-amber-800 border border-amber-200";
+      case "vazio":
+      default:
+        return "bg-slate-100 text-slate-700 border border-slate-200";
     }
   }
 
   function statusLabel(status: KeypadStatus) {
-    return status === "completo" ? "Completo" : status === "parcial" ? "Parcial" : "Vazio";
+    return status === "completo"
+      ? "Completo"
+      : status === "parcial"
+      ? "Parcial"
+      : "Vazio";
   }
 
+
+  useEffect(() => {
+    loadData();
+  }, [projeto?.id]); // ou [] se preferir
+
+
+  // --------- Criação ----------
   function resetForm() {
-    setForm({
-        nome: "", hsnet: '', color: "", button_color: "",
-        button_count: '', ambiente_id: '',
-    });
-    setSelectedKeypadId(null);
+    setNome("");
+    setHsnet("");
+    setCor("");
+    setCorTeclas("");
+    setLayout("");
+    setAmbienteId("");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    const { nome, hsnet, color, button_color, button_count, ambiente_id } = form;
-    if (!nome.trim() || !hsnet || !color || !button_color || !button_count || !ambiente_id) {
-      toast({ variant: "destructive", title: "Erro", description: "Preencha todos os campos obrigatórios." });
+
+    // helper local para mapear layout -> button_count
+    const layoutToCount = (l: string): 1 | 2 | 4 | 0 => {
+      const L = String(l || "").toUpperCase();
+      if (L === "ONE") return 1 as const;
+      if (L === "TWO") return 2 as const;
+      if (L === "FOUR") return 4 as const;
+      return 0 as const; // inválido
+    };
+
+    const count = layoutToCount(layout);
+    const hs = Number(hsnet);
+    const ambId = Number(ambienteId);
+
+    if (
+      !nome.trim() ||
+      !cor ||
+      !corTeclas ||
+      !layout ||
+      count === 0 ||
+      Number.isNaN(hs) ||
+      hs <= 0 ||
+      Number.isNaN(ambId) ||
+      ambId <= 0
+    ) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios corretamente.",
+      });
       return;
     }
 
-    const payload = {
-      nome: nome.trim(),
-      hsnet: Number(hsnet),
-      color,
-      button_color,
-      button_count: Number(button_count),
-      ambiente_id: Number(ambiente_id),
-    };
-
-    const url = isEditing ? `/api/keypads/${selectedKeypadId}` : "/api/keypads";
-    const method = isEditing ? "PUT" : "POST";
-
     try {
-      setLoadingSubmit(true);
-      const res = await fetch(url, {
-        method,
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Falha ao salvar keypad.");
+      setLoadingCreate(true);
 
-      toast({ title: "Sucesso!", description: `Keypad ${isEditing ? 'atualizado' : 'criado'}.` });
-      resetForm();
-      await loadData();
+      const res = await fetch("/api/keypads", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          nome: nome.trim(),
+          hsnet: hs,
+          color: cor,                 // esperado pelo backend
+          button_color: corTeclas,    // esperado pelo backend
+          button_count: count,        // esperado pelo backend
+          ambiente_id: ambId,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({} as any));
+
+      if (!res.ok || !(data?.ok || data?.success)) {
+        throw new Error(
+          data?.error || data?.message || `Falha na criação (HTTP ${res.status})`
+        );
+      }
+
+      toast({ title: "Sucesso!", description: "Keypad adicionado." });
+
+      // Limpa o formulário…
+      resetForm?.();
+      // …e força o campo hsnet a vazio para o auto-suggest preencher o próximo (≥110)
+      setHsnet("");
+
+      // Recarrega a lista; um useEffect pode chamar fetchNextHsnet se hsnet estiver vazio
+      await checkAndFetch();
     } catch (err: any) {
-      toast({ variant: "destructive", title: "Erro", description: String(err?.message || err) });
+      console.error(err);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: String(err?.message || err),
+      });
     } finally {
-      setLoadingSubmit(false);
+      setLoadingCreate(false);
     }
   }
 
+
+  // --------- Exclusão ----------
   async function handleDelete(id: number) {
     if (!confirm("Tem certeza que deseja excluir este keypad?")) return;
     try {
-      const res = await fetch(`/api/keypads/${id}`, { method: "DELETE", credentials: "same-origin" });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Falha ao excluir.");
+      const res = await fetch(`/api/keypads/${id}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
 
-      if (selectedKeypadId === id) resetForm();
-      await loadData();
+      if (!res.ok || !(data?.ok || data?.success)) {
+        throw new Error(data?.error || data?.message || `Falha ao excluir (HTTP ${res.status})`);
+      }
+
+      setKeypads((prev) => prev.filter((k) => k.id !== id));
       toast({ title: "Sucesso!", description: "Keypad excluído." });
     } catch (err: any) {
+      console.error(err);
       toast({ variant: "destructive", title: "Erro", description: String(err?.message || err) });
     }
   }
 
+  // --------- Vinculação (modal) ----------
   function openBindings(kp: Keypad) {
     setBindingKeypad(kp);
-    const base: ButtonBinding[] = Array.from({ length: kp.button_count }, (_, i) => {
-        const existing = kp.buttons.find(b => b.ordem === i + 1);
-        return { index: i, circuito_id: existing?.circuito_id ?? null };
-    });
+
+    const count =
+      (typeof kp.button_count === "number" && kp.button_count > 0
+        ? kp.button_count
+        : layoutToCount(kp.layout)) ?? 0;
+
+    if (count <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Não foi possível abrir o vínculo",
+        description: "Layout/quantidade de teclas do keypad é inválido.",
+      });
+      return;
+    }
+
+    const base: ButtonBinding[] = Array.from({ length: count }, (_, i) => ({
+      index: i,
+      circuito_id: null,
+    }));
     setButtonBindings(base);
-    setBindingsOpen(true);
+
+    fetch(`/api/keypads/${kp.id}`, { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (json?.ok && Array.isArray(json.keypad?.buttons)) {
+          const buttons = json.keypad.buttons; // [{ordem, circuito_id}, ...]
+          const merged = base.map((b) => {
+            const found = buttons.find((x: any) => x.ordem === b.index + 1);
+            return found ? { index: b.index, circuito_id: found.circuito_id ?? null } : b;
+          });
+          setButtonBindings(merged);
+        }
+        setBindingsOpen(true);
+      })
+      .catch(() => setBindingsOpen(true));
   }
+
+
 
   function closeBindings() {
     setBindingsOpen(false);
@@ -343,8 +477,8 @@ export default function Keypads() {
   }
 
   function setBinding(index: number, value: number | "") {
-    setButtonBindings(prev =>
-      prev.map(b => (b.index === index ? { ...b, circuito_id: value ? Number(value) : null } : b))
+    setButtonBindings((prev) =>
+      prev.map((b) => (b.index === index ? { ...b, circuito_id: value ? Number(value) : null } : b))
     );
   }
 
@@ -352,8 +486,10 @@ export default function Keypads() {
     if (!bindingKeypad) return;
     try {
       setBindingLoading(true);
+
+      // 1) Atualiza cada tecla
       await Promise.all(
-        buttonBindings.map(b =>
+        buttonBindings.map((b) =>
           fetch(`/api/keypads/${bindingKeypad.id}/buttons/${b.index + 1}`, {
             method: "PUT",
             credentials: "same-origin",
@@ -362,217 +498,428 @@ export default function Keypads() {
           })
         )
       );
-      await loadData();
+
+      // 2) Busca esse keypad atualizado
+      const res = await fetch(`/api/keypads/${bindingKeypad.id}`, { credentials: "same-origin" });
+      const json = await res.json().catch(() => ({} as any));
+
+      if (res.ok && json?.ok && json.keypad) {
+        // 3) Atualiza só ele na lista
+        setKeypads((prev) => prev.map((k) => (k.id === bindingKeypad.id ? json.keypad : k)));
+      } else {
+        // fallback: recarrega tudo
+        await checkAndFetch();
+      }
+
       toast({ title: "Vinculações salvas!", description: "As teclas foram atualizadas." });
       closeBindings();
     } catch (err: any) {
+      console.error(err);
       toast({ variant: "destructive", title: "Erro", description: String(err?.message || err) });
-    } finally {
-        setBindingLoading(false);
+      setBindingLoading(false);
     }
   }
 
+
+  // ---------- Render ----------
   return (
     <Layout projectSelected={projetoSelecionado}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center gap-4 mb-10">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-              <Keyboard className="w-8 h-8 text-white" />
-            </div>
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
             <div>
-              <h1 className="text-4xl font-bold text-slate-900">Gerenciar Keypads</h1>
-              <p className="text-lg text-slate-600">Cadastre, edite e vincule os keypads RQR-K do seu projeto.</p>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                  <Keyboard className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Keypads</h1>
+                  <p className="text-lg text-slate-600 max-w-2xl">
+                    Cadastre e gerencie os keypads RQR-K do seu projeto.
+                  </p>
+                </div>
+              </div>
+              <div className="h-1 w-32 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-sm" />
             </div>
           </div>
 
+          {/* Alerta quando não há projeto (somente após loading terminar) */}
           {!projetoSelecionado && !loading && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
               <Alert className="bg-amber-50 border-amber-200 shadow-sm">
                 <Sparkles className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-amber-800">
-                  Selecione um projeto na página inicial para gerenciar keypads.
+                  Selecione um projeto na página inicial para cadastrar keypads.
                 </AlertDescription>
               </Alert>
             </motion.div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Coluna do Formulário */}
-            <motion.div
-                className="lg:col-span-4"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 }}
-            >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5 sticky top-24">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Formulário */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
                 <CardHeader className="pb-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className={`w-12 h-12 bg-gradient-to-br ${isEditing ? 'from-orange-500 to-amber-500' : 'from-green-500 to-emerald-600'} rounded-2xl flex items-center justify-center shadow-lg`}>
-                            {isEditing ? <Edit className="w-6 h-6 text-white" /> : <PlusCircle className="w-6 h-6 text-white" />}
-                        </div>
-                        <div>
-                            <CardTitle className="text-2xl font-bold text-slate-900">{isEditing ? 'Editar Keypad' : 'Novo Keypad'}</CardTitle>
-                            <p className="text-slate-600 mt-1">{isEditing ? 'Altere as informações do dispositivo.' : 'Preencha os dados para criar.'}</p>
-                        </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <PlusCircle className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-2xl font-bold text-slate-900">Adicionar Novo Keypad</CardTitle>
+                      <p className="text-slate-600 mt-1">Preencha as informações do dispositivo</p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <form className="space-y-4" onSubmit={handleSubmit}>
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="space-y-1">
-                        <Label htmlFor="nome">Nome *</Label>
-                        <Input id="nome" value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} placeholder="Ex: Keypad da Suíte" required disabled={!projetoSelecionado} />
+                  <form className="space-y-6" onSubmit={handleCreate}>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="nome" className="text-sm font-semibold text-slate-700">
+                          Nome *
+                        </Label>
+                        <Input
+                          id="nome"
+                          value={nome}
+                          onChange={(e) => setNome(e.target.value)}
+                          placeholder="Ex.: Keypad Sala"
+                          required
+                          disabled={!projetoSelecionado}
+                          className="h-12 px-4 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                        />
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         <Label htmlFor="hsnet">HSNET *</Label>
                         <div className="flex gap-2">
-                          <Input id="hsnet" type="number" value={form.hsnet} onChange={e => setForm({...form, hsnet: Number(e.target.value) || ''})} placeholder="Ex: 110" required />
-                          <Button type="button" variant="outline" size="icon" onClick={fetchNextHsnet} disabled={loadingNextHsnet}><RefreshCw className={`h-4 w-4 ${loadingNextHsnet ? 'animate-spin' : ''}`} /></Button>
+                          <Input
+                            id="hsnet"
+                            type="number"
+                            value={hsnet}
+                            onChange={(e) => setHsnet(Number(e.target.value) || '')}
+                            placeholder="Ex.: 110"
+                            required
+                            className="h-12 px-4 rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20"
+                          />
+                          <Button type="button" variant="outline" onClick={fetchNextHsnet} disabled={loadingNextHsnet}>
+                            {loadingNextHsnet ? "..." : "Sugerir"}
+                          </Button>
                         </div>
+                        <p className="text-xs text-slate-500 mt-1">Sugerimos o primeiro HSNET livre a partir de 110.</p>
+
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <Label htmlFor="color">Corpo *</Label>
-                        <select id="color" className="w-full h-10 px-3 rounded-md border border-slate-200 bg-white" value={form.color} onChange={e => setForm({...form, color: e.target.value as any})} required>
+                    <div className="grid md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="cor" className="text-sm font-semibold text-slate-700">
+                          Cor *
+                        </Label>
+                        <select
+                          id="cor"
+                          className="h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          value={cor}
+                          onChange={(e) => setCor(e.target.value as any)}
+                          required
+                          disabled={!projetoSelecionado}
+                        >
                           <option value="">Selecione</option>
-                          {COLORS.map(c => <option key={c} value={c}>{c}</option>)}
+                          {COLORS.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
                         </select>
                       </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="button_color">Teclas *</Label>
-                        <select id="button_color" className="w-full h-10 px-3 rounded-md border border-slate-200 bg-white" value={form.button_color} onChange={e => setForm({...form, button_color: e.target.value as any})} required>
+                      <div className="space-y-2">
+                        <Label htmlFor="cor_teclas" className="text-sm font-semibold text-slate-700">
+                          Cor das Teclas *
+                        </Label>
+                        <select
+                          id="cor_teclas"
+                          className="h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          value={corTeclas}
+                          onChange={(e) => setCorTeclas(e.target.value as any)}
+                          required
+                          disabled={!projetoSelecionado}
+                        >
                           <option value="">Selecione</option>
-                          {KEYCOLORS.map(c => <option key={c} value={c}>{c}</option>)}
+                          {KEYCOLORS.map((kc) => (
+                            <option key={kc} value={kc}>
+                              {kc}
+                            </option>
+                          ))}
                         </select>
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-1">
-                        <div className="space-y-1">
-                            <Label>Layout *</Label>
-                            <div className="flex gap-2">
-                                {BUTTON_COUNTS.map(bc => (
-                                    <Button key={bc.value} type="button" variant={form.button_count === bc.value ? 'default' : 'outline'} className="flex-1" onClick={() => setForm({...form, button_count: bc.value})}>
-                                        {bc.label}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label htmlFor="ambiente_id">Ambiente *</Label>
-                      <select id="ambiente_id" className="w-full h-10 px-3 rounded-md border border-slate-200 bg-white" value={form.ambiente_id} onChange={e => setForm({...form, ambiente_id: Number(e.target.value) || ''})} required disabled={!projetoSelecionado || loading}>
-                        <option value="">{loading ? "Carregando..." : "Selecione"}</option>
-                        {ambientes.sort((a,b) => a.nome.localeCompare(b.nome)).map(amb => (
-                          <option key={amb.id} value={amb.id}>{amb.nome}{amb.area?.nome ? ` (${amb.area.nome})` : ""}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="flex flex-col gap-2 pt-2">
-                        <Button type="submit" className="w-full" disabled={!projetoSelecionado || loadingSubmit}>
-                            {loadingSubmit ? "Salvando..." : (isEditing ? 'Salvar Alterações' : 'Criar Keypad')}
-                        </Button>
-                        {isEditing && (
-                            <Button type="button" variant="ghost" className="w-full" onClick={resetForm}>
-                                Limpar (Criar Novo)
-                            </Button>
+                      <div className="space-y-2">
+                        <Label htmlFor="layout" className="text-sm font-semibold text-slate-700">
+                          Layout *
+                        </Label>
+                        <select
+                          id="layout"
+                          className="h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          value={layout}
+                          onChange={(e) => setLayout(e.target.value as any)}
+                          required
+                          disabled={!projetoSelecionado}
+                        >
+                          <option value="">Selecione</option>
+                          {LAYOUTS.map((l) => (
+                            <option key={l.value} value={l.value}>
+                              {l.label}
+                            </option>
+                          ))}
+                        </select>
+                        {layout && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            {LAYOUTS.find((l) => l.value === layout)?.hint}
+                          </p>
                         )}
+                      </div>
                     </div>
+
+                    <div>
+                      <Label htmlFor="ambiente_id" className="text-sm font-semibold text-slate-700">
+                        Ambiente *
+                      </Label>
+                      <select
+                        id="ambiente_id"
+                        className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        value={ambienteId === "" ? "" : String(ambienteId)}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setAmbienteId(v === "" ? "" : Number(v)); // <- evita NaN
+                        }}
+                        required
+                        disabled={!projetoSelecionado || loading || ambientes.length === 0}
+                      >
+                        <option value="">{loading ? "Carregando ambientes..." : "Selecione um ambiente"}</option>
+                        {!loading &&
+                          ambientes
+                            .slice() // copia para ordenar sem mutar estado
+                            .sort((a, b) => a.nome.localeCompare(b.nome))
+                            .map((amb) => (
+                              <option key={amb.id} value={amb.id}>
+                                {amb.nome}
+                                {amb.area?.nome ? ` — ${amb.area.nome}` : ""}
+                              </option>
+                            ))}
+                      </select>
+                      {!loading && projetoSelecionado && ambientes.length === 0 && (
+                        <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" />
+                          Nenhum ambiente disponível. Crie ambientes primeiro.
+                        </p>
+                      )}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                      disabled={!projetoSelecionado || loadingCreate}
+                    >
+                      <PlusCircle className="h-5 w-5" />
+                      {loadingCreate ? "Adicionando..." : "Adicionar Keypad"}
+                    </Button>
                   </form>
                 </CardContent>
               </Card>
             </motion.div>
 
-            {/* Coluna da Lista */}
-            <motion.div
-                className="lg:col-span-8"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-            >
+            {/* Lista */}
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
                 <CardHeader className="pb-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                <PanelsTopLeft className="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                                <CardTitle className="text-2xl font-bold text-slate-900">Keypads Cadastrados</CardTitle>
-                                <p className="text-slate-600 mt-1">Selecione um keypad para editar ou vincular suas teclas.</p>
-                            </div>
-                        </div>
-                        <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-medium px-3 py-1">
-                          {keypads.length} {keypads.length === 1 ? "keypad" : "keypads"}
-                        </Badge>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                        <PanelsTopLeft className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-2xl font-bold text-slate-900">Keypads Cadastrados</CardTitle>
+                        <p className="text-slate-600 mt-1">Lista com todos os keypads do projeto</p>
+                      </div>
                     </div>
+                    <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-medium px-3 py-1">
+                      {keypads.length} {keypads.length === 1 ? "keypad" : "keypads"}
+                    </Badge>
+                  </div>
                 </CardHeader>
                 <CardContent>
+                  {/* Filtros */}
                   <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <Input placeholder="Buscar..." value={q} onChange={(e) => setQ(e.target.value)} className="md:col-span-2 h-10" />
-                    <select className="h-10 w-full px-3 rounded-md border" value={areaIdFilter} onChange={e => { setAreaIdFilter(Number(e.target.value) || ""); setAmbIdFilter(""); }}>
-                      <option value="">Todas as Áreas</option>
-                      {areaOptions.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-                    </select>
-                    <select className="h-10 w-full px-3 rounded-md border" value={ambIdFilter} onChange={e => setAmbIdFilter(Number(e.target.value) || "")}>
-                      <option value="">Todos os Ambientes</option>
-                      {ambienteOptions.map(amb => <option key={amb.id} value={amb.id}>{amb.nome}</option>)}
-                    </select>
+                    <div className="col-span-1">
+                      <Input
+                        placeholder="Buscar"
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                        className="h-10"
+                      />
+                    </div>
+
+                    <div>
+                      <select
+                        className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                        value={areaIdFilter === "" ? "" : String(areaIdFilter)}
+                        onChange={(e) => {
+                          const v = e.target.value ? Number(e.target.value) : "";
+                          setAreaIdFilter(v as any);
+                          setAmbIdFilter(""); // reset ambiente quando muda área
+                        }}
+                      >
+                        <option value="">Áreas</option>
+                        {areaOptions.map(a => (
+                          <option key={a.id} value={a.id}>{a.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <select
+                        className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                        value={ambIdFilter === "" ? "" : String(ambIdFilter)}
+                        onChange={(e) => setAmbIdFilter(e.target.value ? Number(e.target.value) as any : "")}
+                        disabled={areaIdFilter === ""}
+                        title={areaIdFilter === "" ? "Selecione uma área para filtrar ambientes" : undefined}
+                      >
+                        <option value="">Ambientes</option>
+                        {ambienteOptions.map(amb => (
+                          <option key={amb.id} value={amb.id}>{amb.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <select
+                        className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                        value={btnCountFilter === "" ? "" : String(btnCountFilter)}
+                        onChange={(e) => {
+                          const v = e.target.value ? Number(e.target.value) as 1|2|4 : "";
+                          setBtnCountFilter(v as any);
+                        }}
+                      >
+                        <option value="">Teclas</option>
+                        <option value="1">1 tecla</option>
+                        <option value="2">2 teclas</option>
+                        <option value="4">4 teclas</option>
+                      </select>
+                    </div>
                   </div>
 
-                  <p className="text-sm text-slate-600 mb-2">Mostrando <span className="font-semibold">{filteredKeypads.length}</span> de {keypads.length}</p>
+                  {/* Contagem de resultados */}
+                  <p className="text-sm text-slate-600 mb-2">
+                    Mostrando <span className="font-semibold">{filteredKeypads.length}</span> de {keypads.length}
+                  </p>
 
                   {loading ? (
-                    <div className="text-center py-12"><div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div><p>Carregando...</p></div>
+                    <div className="flex flex-col justify-center items-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
+                      <p className="text-slate-600 font-medium">Carregando keypads...</p>
+                    </div>
                   ) : keypads.length === 0 ? (
-                    <div className="text-center py-12"><Keyboard className="h-12 w-12 text-slate-300 mx-auto mb-4" /><h4 className="text-xl font-semibold">Nenhum keypad cadastrado</h4><p className="text-slate-500">Use o formulário ao lado para criar.</p></div>
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">
+
+                      <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Keyboard className="h-10 w-10 text-slate-400" />
+                      </div>
+                      <h4 className="text-xl font-semibold text-slate-900 mb-2">
+                        {projetoSelecionado ? "Nenhum keypad cadastrado" : "Selecione um projeto"}
+                      </h4>
+                      <p className="text-slate-600 max-w-sm mx-auto">
+                        {projetoSelecionado
+                          ? "Comece adicionando seu primeiro keypad usando o formulário ao lado."
+                          : "Selecione um projeto para visualizar e gerenciar os keypads."}
+                      </p>
+                    </motion.div>
                   ) : (
-                    <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2">
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                       <AnimatePresence>
-                        {filteredKeypads.map((k, index) => {
-                            const { status, linked, total } = computeKeypadStatus(k);
-                            return (
-                                <motion.div
-                                    key={k.id}
-                                    layout
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -20 }}
-                                    transition={{ delay: index * 0.03 }}
-                                    onClick={() => setSelectedKeypadId(k.id)}
-                                    className={`group relative overflow-hidden rounded-xl border p-4 transition-all duration-300 cursor-pointer ${selectedKeypadId === k.id ? 'bg-blue-50 border-blue-400 shadow-md' : 'bg-white/60 hover:bg-slate-50'}`}
+                        {filteredKeypads.map((k, index) => (
+                          <motion.div
+                            key={k.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 mr-4">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <Badge className="text-xs font-medium px-2 py-1 bg-blue-100 text-blue-800">
+                                    {k.button_count === 4 ? "4 teclas" : k.button_count === 2 ? "2 teclas" : "1 tecla"}
+                                  </Badge>
+                                  <span className="text-sm font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                    HSNET: {k.hsnet}
+                                  </span>
+                                </div>
+                                {/* título e meta */}
+                                <div className="flex items-center justify-between gap-3">
+                                  <h4 className="font-bold text-slate-900 text-lg">{k.nome}</h4>
+
+                                  {(() => {
+                                    const { status, linked, total } = computeKeypadStatus(k);
+                                    return (
+                                      <span
+                                        className={
+                                          "inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs font-medium " +
+                                          statusBadgeClasses(status)
+                                        }
+                                        title={`${linked}/${total} teclas vinculadas`}
+                                      >
+                                        <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+                                        {statusLabel(status)} • {linked}/{total}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+
+
+                                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 mb-2">
+                                  <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                                    Corpo: {k.color}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                                    Teclas: {k.button_color}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                  <DoorOpen className="h-4 w-4 text-slate-400" />
+                                  <span className="font-medium">{k.ambiente?.nome || "Sem ambiente"}</span>
+                                  {k.ambiente?.area?.nome && (
+                                    <>
+                                      <span className="text-slate-400">•</span>
+                                      <span className="text-slate-500">Área: {k.ambiente.area.nome}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openBindings(k)}
+                                  disabled={!projetoSelecionado}
+                                  className="rounded-xl shadow hover:shadow-md"
+                                  title="Vincular teclas a circuitos"
                                 >
-                                    <div className="flex items-start justify-between">
-                                    <div className="flex-1 mr-4">
-                                        <div className="flex items-center justify-between gap-3 mb-1">
-                                            <h4 className="font-bold text-slate-900 text-lg">{k.nome}</h4>
-                                            <span className={`inline-flex items-center gap-2 px-2 py-0.5 rounded-lg text-xs font-medium ${statusBadgeClasses(status)}`} title={`${linked}/${total} vinculadas`}>
-                                                <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
-                                                {statusLabel(status)} • {linked}/{total}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                                            <DoorOpen className="h-4 w-4 text-slate-400" />
-                                            <span className="font-medium">{k.ambiente?.nome || "-"}</span>
-                                            {k.ambiente?.area?.nome && <><span className="text-slate-400">•</span><span className="text-slate-500">{k.ambiente.area.nome}</span></>}
-                                        </div>
-                                        <div className="text-sm font-mono text-slate-500 mt-1">HSNET: {k.hsnet}</div>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openBindings(k); }} className="rounded-lg shadow-sm"><Link2 className="h-4 w-4 mr-1.5" />Vincular</Button>
-                                        <Button variant="destructive" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(k.id); }} className="rounded-lg shadow-sm h-9 w-9"><Trash2 className="h-4 w-4" /></Button>
-                                    </div>
-                                    </div>
-                                </motion.div>
-                            )
-                        })}
+                                  <Link2 className="h-4 w-4 mr-2" />
+                                  Vincular Teclas
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleDelete(k.id)}
+                                  disabled={!projetoSelecionado}
+                                  className="opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
                       </AnimatePresence>
                     </div>
                   )}
@@ -599,25 +946,44 @@ export default function Keypads() {
               >
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h3 className="text-2xl font-bold">Vincular Teclas: {bindingKeypad.nome}</h3>
-                    <p className="text-sm text-muted-foreground">{bindingKeypad.button_count} Teclas</p>
+                    <h3 className="text-2xl font-bold">Vincular Teclas</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {bindingKeypad.nome} — {
+                        (bindingKeypad.button_count ?? layoutToCount(bindingKeypad.layout)) === 4 ? "4 teclas" :
+                        (bindingKeypad.button_count ?? layoutToCount(bindingKeypad.layout)) === 2 ? "2 teclas" : "1 tecla"
+                      }
+                    </p>
+
                   </div>
-                  <Button variant="ghost" size="icon" onClick={closeBindings} className="rounded-full"><X className="w-5 h-5" /></Button>
+                  <Button variant="ghost" size="icon" onClick={closeBindings} className="rounded-full">
+                    <X className="w-5 h-5" />
+                  </Button>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-4 max-h-[50vh] overflow-y-auto pr-2">
                   {buttonBindings.map((b) => (
-                    <div key={b.index} className="rounded-xl border p-4 bg-slate-50/50">
+                    <div key={b.index} className="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
                       <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-semibold">Tecla {b.index + 1}</div>
-                        <Button type="button" size="sm" variant="ghost" onClick={() => setBinding(b.index, "")}>Limpar</Button>
+                        <div className="text-sm font-semibold text-slate-700">
+                          Tecla {b.index + 1}
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setBinding(b.index, "")}
+                          className="h-8"
+                          title="Limpar vinculação"
+                        >
+                          Limpar
+                        </Button>
                       </div>
 
                       <Label className="text-xs text-slate-600">Circuito</Label>
                       <select
                         value={b.circuito_id ?? ''}
                         onChange={(e) => setBinding(b.index, e.target.value ? Number(e.target.value) : '')}
-                        className="mt-1 h-10 w-full rounded-xl border bg-white px-3"
+                        className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3"
                       >
                         <option value="">— Não vinculado —</option>
                         {circuitos.map((c) => (
@@ -632,9 +998,11 @@ export default function Keypads() {
                 </div>
 
                 <div className="flex justify-end gap-2 mt-6">
-                  <Button type="button" variant="ghost" onClick={closeBindings}>Cancelar</Button>
+                  <Button type="button" variant="ghost" onClick={closeBindings}>
+                    Cancelar
+                  </Button>
                   <Button onClick={saveBindings} disabled={bindingLoading}>
-                    {bindingLoading ? "Salvando..." : "Salvar Vinculações"}
+                    {bindingLoading ? "Salvando..." : "Salvar"}
                   </Button>
                 </div>
               </motion.div>
