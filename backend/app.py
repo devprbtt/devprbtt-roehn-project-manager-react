@@ -117,6 +117,7 @@ def serialize_user(user):
 
 def serialize_keypad_button(button):
     circuito = button.circuito
+    cena = button.cena
     return {
         "id": button.id,
         "ordem": button.ordem,
@@ -135,6 +136,11 @@ def serialize_keypad_button(button):
             "nome": circuito.nome,
             "tipo": circuito.tipo,
         } if circuito else None,
+        "cena_id": cena.id if cena else None,
+        "cena": {
+            "id": cena.id,
+            "nome": cena.nome,
+        } if cena else None,
     }
 
 
@@ -2850,10 +2856,29 @@ def api_keypad_button_update(keypad_id, ordem):
 
     data = request.get_json(silent=True) or {}
 
-    if "circuito_id" in data:
+    # Lidar com vinculação de cena
+    if "cena_id" in data and data.get("cena_id") not in (None, "", 0, "0"):
+        try:
+            cena_id = int(data["cena_id"])
+            cena = db.get_or_404(Cena, cena_id)
+            if cena.ambiente.area.projeto_id != projeto_id:
+                return jsonify({"ok": False, "error": "Cena não pertence ao projeto."}), 400
+            
+            button.cena = cena
+            button.circuito = None  # Desvincular circuito
+            button.modo = 1  # Modo "Activate Scene"
+            button.command_on = 1 # Comando para ativar
+            button.command_off = 0
+
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "cena_id inválido."}), 400
+
+    # Lidar com vinculação de circuito (apenas se cena não foi vinculada)
+    elif "circuito_id" in data:
         raw_circuit = data.get("circuito_id")
         if raw_circuit in (None, "", 0, "0"):
             button.circuito = None
+            button.cena = None # Desvincular cena
             button.target_object_guid = ZERO_GUID
             button.modo = 3
             button.command_on = 0
@@ -2863,6 +2888,7 @@ def api_keypad_button_update(keypad_id, ordem):
                 circuito_id = int(raw_circuit)
             except (TypeError, ValueError):
                 return jsonify({"ok": False, "error": "circuito_id inválido."}), 400
+            
             circuito = db.get_or_404(Circuito, circuito_id)
             ambiente_circ = circuito.ambiente
             area_circ = ambiente_circ.area if ambiente_circ else None
@@ -2870,6 +2896,7 @@ def api_keypad_button_update(keypad_id, ordem):
                 return jsonify({"ok": False, "error": "Circuito não pertence ao projeto."}), 400
 
             button.circuito = circuito
+            button.cena = None # Desvincular cena
             button.target_object_guid = ZERO_GUID
             button.modo = 2  # Send Command
 

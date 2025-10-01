@@ -261,14 +261,14 @@ class RoehnProjectConverter:
 
                         if guid:
                             self._circuit_guid_map[circuito.id] = guid
-
+                        
                         # Se o circuito estiver vinculado, fazer o link físico
                         if circuito.vinculacao:
                             vinculacao = circuito.vinculacao
                             modulo = vinculacao.modulo
                             canal = vinculacao.canal
                             modulo_nome = modulo.nome if modulo else None
-
+                            
                             if modulo_nome and guid:
                                 if circuito.tipo == 'luz':
                                     dimerizavel = getattr(circuito, 'dimerizavel', False)
@@ -279,13 +279,13 @@ class RoehnProjectConverter:
                                     self._link_hvac_to_module(guid, modulo_nome, canal)
                             elif not modulo_nome:
                                 print(f"Circuito {circuito.identificador} com vinculação, mas sem módulo associado.")
-
+                        
                     except Exception as exc:
                         print(f"Erro ao processar circuito {circuito.id}: {exc}")
                         import traceback
                         traceback.print_exc()
                         continue
-
+        
         # Etapa 2: Processar Keypads e Cenas, agora com o mapa de GUIDs completo
         for area in projeto.areas:
             for ambiente in area.ambientes:
@@ -1209,7 +1209,7 @@ class RoehnProjectConverter:
         keypads = getattr(ambiente, "keypads", None)
         if not keypads:
             return
-
+        
         print(f"Processing keypads for room: {ambiente.nome} (ID: {ambiente.id})")
 
         try:
@@ -1234,7 +1234,7 @@ class RoehnProjectConverter:
     def _build_keypad_payload(self, area_idx, room_idx, keypad):
         zero_guid = self.zero_guid
         keypad_guid = str(uuid.uuid4())
-
+        
         print(f"    - Building keypad payload for: {keypad.nome}")
 
         base_unit_id = self._find_max_unit_id() + 1
@@ -1334,14 +1334,19 @@ class RoehnProjectConverter:
 
             target_guid = zero_guid
             circuito = button.circuito
-            if circuito and circuito.id in self._circuit_guid_map:
+            cena = button.cena
+
+            if cena:
+                target_guid = cena.guid
+                print(f"      - Button {button.ordem}: Linked to scene '{cena.nome}' (ID: {cena.id}) -> GUID: {target_guid}")
+            elif circuito and circuito.id in self._circuit_guid_map:
                 target_guid = self._circuit_guid_map[circuito.id]
                 print(f"      - Button {button.ordem}: Linked to circuit '{circuito.nome}' (ID: {circuito.id}) -> GUID: {target_guid}")
             else:
                 if circuito:
                     print(f"      - Button {button.ordem}: WARNING - Circuit '{circuito.nome}' (ID: {circuito.id}) found but its GUID is not in the map.")
                 else:
-                    print(f"      - Button {button.ordem}: Not linked to any circuit.")
+                    print(f"      - Button {button.ordem}: Not linked.")
 
             style_properties = None
             if target_guid != zero_guid:
@@ -1362,9 +1367,9 @@ class RoehnProjectConverter:
                 "CanHold": bool(button.can_hold),
                 "Guid": button.guid or str(uuid.uuid4()),
                 "TargetObjectGuid": target_guid,
-                "Modo": button.modo or (2 if target_guid != zero_guid else 3),
-                "CommandOn": button.command_on if button.command_on is not None else (1 if target_guid != zero_guid else 0),
-                "CommandOff": button.command_off if button.command_off is not None else 0,
+                "Modo": button.modo,
+                "CommandOn": button.command_on,
+                "CommandOff": button.command_off,
                 "PortNumber": 0,
                 "UnitControleLed": 0,
                 "LedColor": 0,
