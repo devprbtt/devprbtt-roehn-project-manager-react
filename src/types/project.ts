@@ -39,6 +39,25 @@ export interface Circuito {
   potencia?: number;
   ambiente: Ambiente;
   sak?: string | null;
+  vinculacao?: {
+    modulo_nome: string;
+    canal: number;
+  } | null;
+}
+
+export interface KeypadButton {
+    id: number;
+    ordem: number;
+    circuito_id: number | null;
+}
+
+export interface Keypad {
+    id: number;
+    nome: string;
+    hsnet: number;
+    button_count: number;
+    buttons: KeypadButton[];
+    ambiente?: { id: number; nome: string; area?: { id: number; nome: string } };
 }
 
 export interface ProjetoTree {
