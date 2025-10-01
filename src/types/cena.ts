@@ -22,7 +22,7 @@ export interface Cena {
   ambiente_id: number;
   scene_movers: boolean;
   acoes: Acao[];
-  ambiente: Ambiente; // Adicionado para incluir os dados do ambiente
+  ambiente?: Ambiente; // Tornou-se opcional
 }
 
 // Para criação e edição

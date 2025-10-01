@@ -1883,10 +1883,11 @@ def api_projeto_tree():
     if not projeto_id:
         return jsonify({"ok": True, "projeto": None, "areas": []})
 
-    # Carrega Áreas -> Ambientes -> Circuitos, Quadros Elétricos -> Módulos
+    # Carrega Áreas -> Ambientes -> Circuitos, Cenas, Quadros Elétricos -> Módulos
     areas = (
         Area.query
         .options(
+            joinedload(Area.ambientes).joinedload(Ambiente.cenas),
             joinedload(Area.ambientes)
             .joinedload(Ambiente.circuitos)
             .joinedload(Circuito.vinculacao)
@@ -1942,19 +1943,26 @@ def api_projeto_tree():
                     ]
                 })
             
+            cenas_out = [serialize_cena(c) for c in amb.cenas]
+
             ambs.append({
                 "id": amb.id,
                 "nome": amb.nome,
                 "circuitos": circs,
                 "keypads": keypads_out,
-                "quadros_eletricos": quadros_out,  # Novo
+                "quadros_eletricos": quadros_out,
+                "cenas": cenas_out,
             })
         out_areas.append({"id": a.id, "nome": a.nome, "ambientes": ambs})
+
+    modulos = Modulo.query.filter_by(projeto_id=projeto_id).all()
+    modulos_out = [{"id": m.id, "nome": m.nome, "tipo": m.tipo} for m in modulos]
 
     return jsonify({
         "ok": True,
         "projeto": {"id": projeto_id, "nome": session.get("projeto_atual_nome")},
         "areas": out_areas,
+        "modulos": modulos_out,
     })
 
 # app.py (atualização da rota exportar_csv)

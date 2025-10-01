@@ -8,15 +8,26 @@ export type Project = {
   selected?: boolean;
 };
 
+import { Cena } from './cena';
+
+export interface Modulo {
+  id: number;
+  nome: string;
+  tipo: string;
+}
+
 export interface Area {
   id: number;
   nome: string;
+  ambientes: Ambiente[];
 }
 
 export interface Ambiente {
   id: number;
   nome: string;
   area: Area;
+  circuitos: Circuito[];
+  cenas: Cena[];
 }
 
 export interface Circuito {
@@ -28,4 +39,13 @@ export interface Circuito {
   potencia?: number;
   ambiente: Ambiente;
   sak?: string | null;
+}
+
+export interface ProjetoTree {
+    projeto: {
+        id: number;
+        nome: string;
+    },
+    areas: Area[];
+    modulos: Modulo[];
 }
