@@ -24,7 +24,7 @@ import json
 import re
 import os
 from datetime import datetime
-from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao, Keypad, KeypadButton, QuadroEletrico, Cena, Acao, CustomAcao
+from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao, Keypad, KeypadButton, QuadroEletrico
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///projetos.db'
@@ -1611,7 +1611,7 @@ def api_vinculacoes_auto():
         prioridades = {
             "luz": {
                 "dimerizavel": ["DIM8", "RL12", "RL4"],
-                "nao_dimerizavel": ["RL12", "RL4", "DIM8"]
+                "nao_dimerizavel": ["RL12", "RL4"]
             },
             "persiana": ["LX4"],
             "hvac": ["SA1"]
@@ -1883,11 +1883,10 @@ def api_projeto_tree():
     if not projeto_id:
         return jsonify({"ok": True, "projeto": None, "areas": []})
 
-    # Carrega Áreas -> Ambientes -> Circuitos, Cenas, Quadros Elétricos -> Módulos
+    # Carrega Áreas -> Ambientes -> Circuitos, Quadros Elétricos -> Módulos
     areas = (
         Area.query
         .options(
-            joinedload(Area.ambientes).joinedload(Ambiente.cenas),
             joinedload(Area.ambientes)
             .joinedload(Ambiente.circuitos)
             .joinedload(Circuito.vinculacao)
@@ -1943,26 +1942,19 @@ def api_projeto_tree():
                     ]
                 })
             
-            cenas_out = [serialize_cena(c) for c in amb.cenas]
-
             ambs.append({
                 "id": amb.id,
                 "nome": amb.nome,
                 "circuitos": circs,
                 "keypads": keypads_out,
-                "quadros_eletricos": quadros_out,
-                "cenas": cenas_out,
+                "quadros_eletricos": quadros_out,  # Novo
             })
         out_areas.append({"id": a.id, "nome": a.nome, "ambientes": ambs})
-
-    modulos = Modulo.query.filter_by(projeto_id=projeto_id).all()
-    modulos_out = [{"id": m.id, "nome": m.nome, "tipo": m.tipo} for m in modulos]
 
     return jsonify({
         "ok": True,
         "projeto": {"id": projeto_id, "nome": session.get("projeto_atual_nome")},
         "areas": out_areas,
-        "modulos": modulos_out,
     })
 
 # app.py (atualização da rota exportar_csv)
@@ -2868,13 +2860,19 @@ def api_keypad_button_update(keypad_id, ordem):
             area_circ = ambiente_circ.area if ambiente_circ else None
             if not area_circ or area_circ.projeto_id != projeto_id:
                 return jsonify({"ok": False, "error": "Circuito não pertence ao projeto."}), 400
-
+            # REMOVED: Validation for circuit type
             button.circuito = circuito
-            # A lógica de modo/comando será tratada pelo frontend ou em outra chamada
-            # button.target_object_guid = ZERO_GUID
-            # button.modo = 2
-            # button.command_on = 1
-            # button.command_off = 0
+            button.target_object_guid = ZERO_GUID
+
+            # Set mode and commands based on circuit type
+            if circuito.tipo == 'persiana':
+                button.modo = 5  # Up/Down Mode
+                button.command_on = 1  # Command for Up
+                button.command_off = 2  # Command for Down
+            else:  # Default for light, hvac, etc.
+                button.modo = 2  # Toggle Mode
+                button.command_on = 1
+                button.command_off = 0
 
     if "modo" in data:
         try:
@@ -2919,336 +2917,6 @@ def api_keypad_button_update(keypad_id, ordem):
 
     db.session.commit()
     return jsonify({"ok": True, "keypad": serialize_keypad(keypad)})
-
-# -------------------- Cenas (Scenes) --------------------
-
-def serialize_custom_acao(custom_acao):
-    """Serializes a CustomAcao object."""
-    return {
-        "id": custom_acao.id,
-        "target_guid": custom_acao.target_guid,
-        "enable": custom_acao.enable,
-        "level": custom_acao.level,
-    }
-
-def serialize_acao(acao):
-    """Serializes an Acao object."""
-    return {
-        "id": acao.id,
-        "level": acao.level,
-        "action_type": acao.action_type,
-        "target_guid": acao.target_guid,
-        "custom_acoes": [serialize_custom_acao(ca) for ca in sorted(acao.custom_acoes, key=lambda x: x.id)],
-    }
-
-def serialize_cena(cena):
-    """Serializes a Cena object."""
-    return {
-        "id": cena.id,
-        "guid": cena.guid,
-        "nome": cena.nome,
-        "ambiente_id": cena.ambiente_id,
-        "scene_movers": cena.scene_movers,
-        "acoes": [serialize_acao(a) for a in sorted(cena.acoes, key=lambda x: x.id)],
-    }
-
-@app.get("/cenas")
-def cenas_spa():
-    return current_app.send_static_file("index.html")
-
-@app.get("/api/cenas")
-@login_required
-def get_all_cenas():
-    projeto_id = session.get("projeto_atual_id")
-    if not projeto_id:
-        return jsonify({"ok": True, "cenas": []})
-
-    cenas = (
-        Cena.query
-        .join(Ambiente, Cena.ambiente_id == Ambiente.id)
-        .join(Area, Ambiente.area_id == Area.id)
-        .filter(Area.projeto_id == projeto_id)
-        .options(
-            joinedload(Cena.ambiente).joinedload(Ambiente.area),
-            joinedload(Cena.acoes).joinedload(Acao.custom_acoes)
-        )
-        .order_by(Area.nome, Ambiente.nome, Cena.nome)
-        .all()
-    )
-
-    # Adicionar dados do ambiente na serialização
-    cenas_serializadas = []
-    for c in cenas:
-        cena_data = serialize_cena(c)
-        cena_data['ambiente'] = {
-            'id': c.ambiente.id,
-            'nome': c.ambiente.nome,
-            'area': {
-                'id': c.ambiente.area.id,
-                'nome': c.ambiente.area.nome
-            }
-        }
-        cenas_serializadas.append(cena_data)
-
-    return jsonify({"ok": True, "cenas": cenas_serializadas})
-
-
-@app.get("/api/ambientes/<int:ambiente_id>/cenas")
-@login_required
-def get_cenas_por_ambiente(ambiente_id):
-    projeto_id = session.get("projeto_atual_id")
-    ambiente = db.get_or_404(Ambiente, ambiente_id)
-    if not projeto_id or ambiente.area.projeto_id != projeto_id:
-        return jsonify({"ok": False, "error": "Ambiente não pertence ao projeto atual."}), 404
-
-    cenas = Cena.query.filter_by(ambiente_id=ambiente_id).order_by(Cena.nome).all()
-    return jsonify({"ok": True, "cenas": [serialize_cena(c) for c in cenas]})
-
-@app.get("/api/cenas/<int:cena_id>")
-@login_required
-def get_cena(cena_id):
-    projeto_id = session.get("projeto_atual_id")
-    cena = db.get_or_404(Cena, cena_id)
-    if not projeto_id or cena.ambiente.area.projeto_id != projeto_id:
-        return jsonify({"ok": False, "error": "Cena não encontrada no projeto atual."}), 404
-
-    return jsonify({"ok": True, "cena": serialize_cena(cena)})
-
-@app.post("/api/cenas")
-@login_required
-def create_cena():
-    projeto_id = session.get("projeto_atual_id")
-    if not projeto_id:
-        return jsonify({"ok": False, "error": "Projeto não selecionado."}), 400
-
-    data = request.get_json()
-    if not data:
-        return jsonify({"ok": False, "error": "Requisição sem dados."}), 400
-
-    nome = (data.get("nome") or "").strip()
-    ambiente_id = data.get("ambiente_id")
-    acoes_data = data.get("acoes", [])
-    scene_movers = data.get("scene_movers", False)
-
-    if not nome or not ambiente_id:
-        return jsonify({"ok": False, "error": "Nome e ambiente_id são obrigatórios."}), 400
-
-    ambiente = db.get_or_404(Ambiente, int(ambiente_id))
-    if ambiente.area.projeto_id != projeto_id:
-        return jsonify({"ok": False, "error": "Ambiente não pertence ao projeto atual."}), 403
-
-    # Validação para scene_movers
-    if scene_movers:
-        all_circuit_ids = set()
-        all_group_ambiente_ids = set()
-        if not acoes_data:
-            return jsonify({"ok": False, "error": "Movimentadores de cena não podem ser habilitados para uma cena vazia."}), 400
-
-        for acao_data in acoes_data:
-            if acao_data.get("action_type") == 0:
-                try:
-                    all_circuit_ids.add(int(acao_data.get("target_guid")))
-                except (ValueError, TypeError):
-                    pass
-            elif acao_data.get("action_type") == 7:
-                try:
-                    all_group_ambiente_ids.add(int(acao_data.get("target_guid")))
-                except (ValueError, TypeError):
-                    pass
-
-        if all_circuit_ids:
-            circuits = Circuito.query.filter(Circuito.id.in_(list(all_circuit_ids))).all()
-            if any(c.tipo != 'persiana' for c in circuits):
-                return jsonify({"ok": False, "error": "Movimentadores de cena só podem ser habilitados se todos os itens da cena forem persianas."}), 400
-
-        if all_group_ambiente_ids:
-            group_circuits = Circuito.query.filter(Circuito.ambiente_id.in_(list(all_group_ambiente_ids))).all()
-            for c in group_circuits:
-                if c.tipo in ['luz', 'persiana'] and c.tipo != 'persiana':
-                    return jsonify({"ok": False, "error": "Movimentadores de cena só podem ser habilitados se todos os itens da cena forem persianas (encontrado em grupo)."}), 400
-
-    # Validação para não permitir circuitos HVAC
-    for acao_data in acoes_data:
-        if acao_data.get("action_type") == 0: # Ação de Circuito
-            try:
-                circuito_id = int(acao_data.get("target_guid"))
-                circuito = db.session.get(Circuito, circuito_id)
-                if circuito and circuito.tipo == 'hvac':
-                    return jsonify({"ok": False, "error": "Não é permitido adicionar circuitos do tipo HVAC em cenas de iluminação."}), 400
-            except (ValueError, TypeError):
-                # Ignora GUIDs inválidos, a validação do form deve pegar
-                pass
-
-    # Validação para não permitir circuitos duplicados
-    circuit_guids_in_scene = [
-        acao.get("target_guid") for acao in acoes_data
-        if acao.get("action_type") == 0 and acao.get("target_guid")
-    ]
-    if len(circuit_guids_in_scene) != len(set(circuit_guids_in_scene)):
-        return jsonify({"ok": False, "error": "Não é permitido adicionar o mesmo circuito mais de uma vez na mesma cena."}), 400
-
-    nova_cena = Cena(
-        nome=nome,
-        ambiente_id=ambiente.id,
-        scene_movers=scene_movers
-    )
-    db.session.add(nova_cena)
-
-    for acao_data in acoes_data:
-        nova_acao = Acao(
-            cena=nova_cena,
-            level=acao_data.get("level", 100),
-            action_type=acao_data.get("action_type", 0),
-            target_guid=acao_data.get("target_guid")
-        )
-        if not nova_acao.target_guid:
-            continue
-        db.session.add(nova_acao)
-
-        for custom_acao_data in acao_data.get("custom_acoes", []):
-            novo_custom_acao = CustomAcao(
-                acao=nova_acao,
-                target_guid=custom_acao_data.get("target_guid"),
-                enable=custom_acao_data.get("enable", True),
-                level=custom_acao_data.get("level", 50)
-            )
-            if not novo_custom_acao.target_guid:
-                continue
-            db.session.add(novo_custom_acao)
-
-    try:
-        db.session.commit()
-    except IntegrityError as e:
-        db.session.rollback()
-        if "unique_cena_por_ambiente" in str(e.orig):
-            return jsonify({"ok": False, "error": "Já existe uma cena com este nome neste ambiente."}), 409
-        return jsonify({"ok": False, "error": f"Não foi possível salvar a cena."}), 400
-
-    return jsonify({"ok": True, "cena": serialize_cena(nova_cena)}), 201
-
-@app.put("/api/cenas/<int:cena_id>")
-@login_required
-def update_cena(cena_id):
-    projeto_id = session.get("projeto_atual_id")
-    cena = db.get_or_404(Cena, cena_id)
-    if not projeto_id or cena.ambiente.area.projeto_id != projeto_id:
-        return jsonify({"ok": False, "error": "Cena não encontrada no projeto atual."}), 404
-
-    data = request.get_json()
-    if not data:
-        return jsonify({"ok": False, "error": "Requisição sem dados."}), 400
-
-    if "nome" in data:
-        cena.nome = (data["nome"] or "").strip()
-
-    if "scene_movers" in data:
-        cena.scene_movers = data["scene_movers"]
-
-    if "acoes" in data:
-        acoes_data = data.get("acoes", [])
-
-        # Validação para scene_movers
-        if data.get("scene_movers"):
-            all_circuit_ids = set()
-            all_group_ambiente_ids = set()
-            if not acoes_data:
-                return jsonify({"ok": False, "error": "Movimentadores de cena não podem ser habilitados para uma cena vazia."}), 400
-
-            for acao_data in acoes_data:
-                if acao_data.get("action_type") == 0:
-                    try:
-                        all_circuit_ids.add(int(acao_data.get("target_guid")))
-                    except (ValueError, TypeError):
-                        pass
-                elif acao_data.get("action_type") == 7:
-                    try:
-                        # O target_guid de um grupo é o ID do AMBIENTE
-                        ambiente_id_grupo = int(acao_data.get("target_guid"))
-                        # Pegar todos os circuitos daquele ambiente
-                        circs_no_grupo = Circuito.query.filter_by(ambiente_id=ambiente_id_grupo).all()
-                        for c in circs_no_grupo:
-                            if c.tipo != 'hvac': # Ignorar HVAC na validação
-                                all_circuit_ids.add(c.id)
-                    except (ValueError, TypeError):
-                        pass
-
-            if all_circuit_ids:
-                circuits = Circuito.query.filter(Circuito.id.in_(list(all_circuit_ids))).all()
-                if any(c.tipo != 'persiana' for c in circuits):
-                    return jsonify({"ok": False, "error": "Movimentadores de cena só podem ser habilitados se todos os itens da cena forem persianas."}), 400
-
-        # Validação para não permitir circuitos HVAC
-        for acao_data in acoes_data:
-            if acao_data.get("action_type") == 0:
-                try:
-                    circuito_id = int(acao_data.get("target_guid"))
-                    circuito = db.session.get(Circuito, circuito_id)
-                    if circuito and circuito.tipo == 'hvac':
-                        return jsonify({"ok": False, "error": "Não é permitido adicionar circuitos do tipo HVAC em cenas de iluminação."}), 400
-                except (ValueError, TypeError):
-                    pass
-
-        # Validação para não permitir circuitos duplicados
-        circuit_guids_in_scene = [
-            acao.get("target_guid") for acao in acoes_data
-            if acao.get("action_type") == 0 and acao.get("target_guid")
-        ]
-        if len(circuit_guids_in_scene) != len(set(circuit_guids_in_scene)):
-            return jsonify({"ok": False, "error": "Não é permitido adicionar o mesmo circuito mais de uma vez na mesma cena."}), 400
-
-        # Limpar ações antigas
-        for acao in cena.acoes:
-            CustomAcao.query.filter_by(acao_id=acao.id).delete()
-        Acao.query.filter_by(cena_id=cena.id).delete()
-
-        # Adicionar novas ações
-        for acao_data in acoes_data:
-            nova_acao = Acao(
-                cena_id=cena.id,
-                level=acao_data.get("level", 100),
-                action_type=acao_data.get("action_type", 0),
-                target_guid=acao_data.get("target_guid")
-            )
-            if not nova_acao.target_guid:
-                continue
-            db.session.add(nova_acao)
-            db.session.flush()
-
-            for custom_acao_data in acao_data.get("custom_acoes", []):
-                novo_custom_acao = CustomAcao(
-                    acao_id=nova_acao.id,
-                    target_guid=custom_acao_data.get("target_guid"),
-                    enable=custom_acao_data.get("enable", True),
-                    level=custom_acao_data.get("level", 50)
-                )
-                if not novo_custom_acao.target_guid:
-                    continue
-                db.session.add(novo_custom_acao)
-
-    try:
-        db.session.commit()
-    except IntegrityError as e:
-        db.session.rollback()
-        if "unique_cena_por_ambiente" in str(e.orig):
-            return jsonify({"ok": False, "error": "Já existe uma cena com este nome neste ambiente."}), 409
-        return jsonify({"ok": False, "error": "Não foi possível atualizar a cena."}), 400
-
-    db.session.refresh(cena)
-    return jsonify({"ok": True, "cena": serialize_cena(cena)})
-
-@app.delete("/api/cenas/<int:cena_id>")
-@login_required
-def delete_cena(cena_id):
-    projeto_id = session.get("projeto_atual_id")
-    cena = db.get_or_404(Cena, cena_id)
-    if not projeto_id or cena.ambiente.area.projeto_id != projeto_id:
-        return jsonify({"ok": False, "error": "Cena não encontrada no projeto atual."}), 404
-
-    db.session.delete(cena)
-    db.session.commit()
-
-    return jsonify({"ok": True})
-
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

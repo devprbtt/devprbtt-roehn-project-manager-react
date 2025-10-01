@@ -15,7 +15,6 @@ import {
   Eye,
   Users as UsersIcon,
   LogOut,
-  Clapperboard,
 } from "lucide-react";
 import {
   Sidebar,
@@ -59,7 +58,6 @@ const baseItems: NavItem[] = [
   { title: "Módulos", url: createPageUrl("modulos"), icon: Boxes, requiresProject: true },
   { title: "Vinculação", url: createPageUrl("vinculacao"), icon: GitBranch, requiresProject: true },
   { title: "Keypads", url: createPageUrl("keypads"), icon: KeySquare, requiresProject: true },
-  { title: "Cenas", url: createPageUrl("cenas"), icon: Clapperboard, requiresProject: true },
   { title: "Visualizar Projeto", url: createPageUrl("projeto"), icon: Eye, requiresProject: true },
 ];
 

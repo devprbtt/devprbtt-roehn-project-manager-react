@@ -4,7 +4,7 @@ import csv
 import uuid
 import io
 from datetime import datetime
-from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao, Keypad, KeypadButton, Cena, Acao, CustomAcao
+from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao, Keypad, KeypadButton
 
 class RoehnProjectConverter:
     # --- AQUI ESTÁ A CORREÇÃO ---
@@ -186,7 +186,6 @@ class RoehnProjectConverter:
 
         self._circuit_guid_map = {}
         self._quadro_guid_map = {}
-        self._room_guid_map = {}
 
         # Primeiro, processar quadros elétricos e seus módulos
         for area in projeto.areas:
@@ -195,7 +194,7 @@ class RoehnProjectConverter:
 
             for ambiente in area.ambientes:
                 print(f"Processando ambiente: {ambiente.nome}")
-                self._ensure_room_exists(area.nome, ambiente.nome, ambiente.id)
+                self._ensure_room_exists(area.nome, ambiente.nome)
                 
                 # Processar quadros elétricos do ambiente
                 for quadro in ambiente.quadros_eletricos:
@@ -285,7 +284,6 @@ class RoehnProjectConverter:
                         print(f"Circuito {circuito.id} nao vinculado, ignorando.")
 
                 self._add_keypads_for_room(area.nome, ambiente)
-                self._add_scenes_for_room(area.nome, ambiente)
 
         # ⭐⭐⭐ NOVO: Verificação final do ACNET
         print("Realizando verificação final do ACNET...")
@@ -735,18 +733,15 @@ class RoehnProjectConverter:
         self.project_data["Areas"].append(new_area)
         return new_area
 
-    def _ensure_room_exists(self, area_name, room_name, room_id=None):
+    def _ensure_room_exists(self, area_name, room_name):
         """Garante que um ambiente existe em uma área"""
         area = self._ensure_area_exists(area_name)
         
         for room in area["SubItems"]:
             if room["Name"] == room_name:
-                if room_id and room_id not in self._room_guid_map:
-                    self._room_guid_map[room_id] = room["Guid"]
                 return room
         
         # Se o ambiente não existe, cria um novo
-        new_room_guid = str(uuid.uuid4())
         new_room = {
             "$type": "Room",
             "NotDisplayOnROEHNApp": False,
@@ -765,11 +760,9 @@ class RoehnProjectConverter:
                 {"$type": "SpecialAction", "Name": "OFF", "Guid": str(uuid.uuid4()), "Type": 0},
                 {"$type": "SpecialAction", "Name": "Volume", "Guid": str(uuid.uuid4()), "Type": 1}
             ],
-            "Guid": new_room_guid
+            "Guid": str(uuid.uuid4())
         }
         area["SubItems"].append(new_room)
-        if room_id:
-            self._room_guid_map[room_id] = new_room_guid
         return new_room
 
     def _find_automation_board_by_guid(self, guid):
@@ -1682,140 +1675,6 @@ class RoehnProjectConverter:
         except Exception as e:
             print(f"Erro ao linkar load: {e}")
         return False
-
-    def _add_scenes_for_room(self, area_name, ambiente):
-        """Adiciona as cenas de um ambiente ao projeto Roehn"""
-        if not hasattr(ambiente, "cenas") or not ambiente.cenas:
-            return
-
-        try:
-            area_json = next(a for a in self.project_data["Areas"] if a.get("Name") == area_name)
-            room_json = next(r for r in area_json["SubItems"] if r.get("Name") == ambiente.nome)
-        except StopIteration:
-            print(f"⚠️  Aviso: Não foi possível encontrar a área '{area_name}' ou o ambiente '{ambiente.nome}' no JSON para adicionar cenas.")
-            return
-
-        scenes_list = room_json.setdefault("Scenes", [])
-
-        for cena_db in ambiente.cenas:
-            next_unit_id = self._find_max_unit_id() + 1
-
-            scene_payload = {
-                "$type": "Scene",
-                "Guid": cena_db.guid,
-                "Operator": 6 if cena_db.scene_movers else 1,
-                "ParentSlot": None,
-                "Unit": {
-                    "$type": "Unit",
-                    "Id": next_unit_id,
-                    "Event": 0,
-                    "Scene": 0,
-                    "Disabled": False,
-                    "Logged": False,
-                    "Memo": False,
-                    "Increment": False,
-                },
-                "Name": cena_db.nome,
-                "Delay": 0,
-                "Actions": [],
-                "SceneMovers": cena_db.scene_movers,
-                "AutoProgrammedID": 0,
-                "AutoProgrammedScene": False,
-                "OnlyShades": 2,
-            }
-
-            for acao_db in cena_db.acoes:
-                action_payload = {
-                    "$type": "Action",
-                    "Level": acao_db.level,
-                    "ActionType": acao_db.action_type,
-                    "CustomActionValuesSerialized": None,
-                    "TargetGuid": None,
-                }
-
-                # Resolve TargetGuid
-                if acao_db.action_type == 0: # Circuit
-                    try:
-                        circuito_id = int(acao_db.target_guid)
-                        target_guid_resolved = self._circuit_guid_map.get(circuito_id)
-                        if not target_guid_resolved:
-                            print(f"⚠️ Aviso: GUID para o circuito ID {circuito_id} não encontrado no mapa.")
-                            continue
-                        action_payload["TargetGuid"] = target_guid_resolved
-                    except (ValueError, TypeError):
-                        print(f"⚠️ Aviso: target_guid de circuito inválido para Acao ID {acao_db.id}: {acao_db.target_guid}")
-                        continue
-                elif acao_db.action_type == 7: # Group (Room)
-                    try:
-                        ambiente_id = int(acao_db.target_guid)
-                        target_guid_resolved = self._room_guid_map.get(ambiente_id)
-                        if not target_guid_resolved:
-                             print(f"⚠️ Aviso: GUID para o ambiente ID {ambiente_id} não encontrado no mapa.")
-                             continue
-                        action_payload["TargetGuid"] = target_guid_resolved
-                    except (ValueError, TypeError):
-                        print(f"⚠️ Aviso: target_guid de ambiente inválido para Acao ID {acao_db.id}: {acao_db.target_guid}")
-                        continue
-                else: # Other types, assume GUID is direct
-                    action_payload["TargetGuid"] = acao_db.target_guid
-
-                custom_values = { "$type": "CustomActionValueDictionary" }
-
-                if acao_db.action_type == 7: # Group (All Lights) Action
-                    try:
-                        target_ambiente_id = int(acao_db.target_guid)
-                        all_circuits_in_room = Circuito.query.filter_by(ambiente_id=target_ambiente_id).all()
-
-                        custom_actions_map = {
-                            int(ca.target_guid): ca for ca in acao_db.custom_acoes if ca.target_guid.isdigit()
-                        }
-
-                        for circuit in all_circuits_in_room:
-                            circuit_guid = self._circuit_guid_map.get(circuit.id)
-                            if not circuit_guid:
-                                continue
-
-                            # For "All Lights" groups, only circuits of type 'luz' should be affected.
-                            # All other types (persiana, hvac, etc.) must be explicitly disabled.
-                            if circuit.tipo == 'luz':
-                                if circuit.id in custom_actions_map:
-                                    custom_acao_db = custom_actions_map[circuit.id]
-                                    custom_values[circuit_guid] = {
-                                        "$type": "CustomActionValue",
-                                        "Enable": custom_acao_db.enable,
-                                        "Level": custom_acao_db.level
-                                    }
-                            else:
-                                # Disable non-light circuits
-                                custom_values[circuit_guid] = {
-                                    "$type": "CustomActionValue",
-                                    "Enable": False,
-                                    "Level": 0
-                                }
-                    except (ValueError, TypeError):
-                        pass # Ignore if target_guid is not a valid room ID
-
-                elif acao_db.custom_acoes: # For individual circuit actions
-                    for custom_acao_db in acao_db.custom_acoes:
-                        try:
-                            circuito_id = int(custom_acao_db.target_guid)
-                            custom_target_guid = self._circuit_guid_map.get(circuito_id)
-                            if custom_target_guid:
-                                custom_values[custom_target_guid] = {
-                                    "$type": "CustomActionValue",
-                                    "Enable": custom_acao_db.enable,
-                                    "Level": custom_acao_db.level
-                                }
-                        except (ValueError, TypeError):
-                            continue
-
-                if len(custom_values) > 1:
-                    action_payload["CustomActionValuesSerialized"] = custom_values
-
-                scene_payload["Actions"].append(action_payload)
-
-            scenes_list.append(scene_payload)
-        print(f"✅ Cenas adicionadas para o ambiente: {ambiente.nome}")
 
     def export_project(self):
         """Exporta o projeto como JSON (formato Roehn Wizard)"""
