@@ -48,6 +48,7 @@ class Ambiente(db.Model):
     circuitos = db.relationship('Circuito', backref='ambiente', lazy=True, cascade='all, delete-orphan')
     keypads = db.relationship('Keypad', backref='ambiente', lazy=True, cascade='all, delete-orphan')
     quadros_eletricos = db.relationship('QuadroEletrico', backref='ambiente', lazy=True, cascade='all, delete-orphan')
+    cenas = db.relationship('Cena', backref='ambiente', lazy=True, cascade='all, delete-orphan')
 
     __table_args__ = (db.UniqueConstraint('nome', 'area_id', name='unique_ambiente_por_area'),)
 
@@ -145,3 +146,33 @@ class KeypadButton(db.Model):
         db.UniqueConstraint('keypad_id', 'ordem', name='unique_keypad_button_ordem'),
         db.UniqueConstraint('guid', name='unique_keypad_button_guid'),
     )
+
+
+class Cena(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    guid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    nome = db.Column(db.String(100), nullable=False)
+    ambiente_id = db.Column(db.Integer, db.ForeignKey('ambiente.id'), nullable=False)
+    scene_movers = db.Column(db.Boolean, nullable=False, default=False)
+    acoes = db.relationship('Acao', backref='cena', lazy=True, cascade='all, delete-orphan')
+
+    __table_args__ = (db.UniqueConstraint('nome', 'ambiente_id', name='unique_cena_por_ambiente'),)
+
+
+class Acao(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    cena_id = db.Column(db.Integer, db.ForeignKey('cena.id'), nullable=False)
+    level = db.Column(db.Integer, nullable=False, default=100)
+    action_type = db.Column(db.Integer, nullable=False, default=0)  # 0: Circuit, 7: Group
+    target_guid = db.Column(db.String(36), nullable=False)
+    custom_acoes = db.relationship('CustomAcao', backref='acao', lazy=True, cascade='all, delete-orphan')
+
+
+class CustomAcao(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    acao_id = db.Column(db.Integer, db.ForeignKey('acao.id'), nullable=False)
+    target_guid = db.Column(db.String(36), nullable=False)  # GUID of the circuit inside the group
+    enable = db.Column(db.Boolean, nullable=False, default=True)
+    level = db.Column(db.Integer, nullable=False, default=50)
+
+    __table_args__ = (db.UniqueConstraint('acao_id', 'target_guid', name='unique_custom_acao'),)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,23 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useProject } from "@/store/project";
-import { FileDown, FileOutput, Lightbulb, Blinds, Snowflake, LayoutList, RefreshCcw, Sparkles, KeySquare, Link2 } from "lucide-react";
+import {
+  FileDown, FileOutput, Lightbulb, Blinds, Snowflake, LayoutList,
+  RefreshCcw, Sparkles, KeySquare, Link2, Film, Cpu
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-type VincInfo = { modulo_nome: string; canal: number };
-type Circuito = { id: number; tipo: "luz" | "persiana" | "hvac"; identificador: string; nome: string; vinculacao?: VincInfo | null; };
-type Ambiente = { id: number; nome: string; circuitos: Circuito[] };
-type Area = { id: number; nome: string; ambientes: Ambiente[] };
-type ProjetoTree = { projeto: { id: number; nome: string } | null; areas: Area[] };
-type KeypadButton = { id: number; ordem: number; circuito_id: number | null };
-type Keypad = {
-  id: number;
-  nome: string;
-  hsnet: number;
-  button_count: number;
-  buttons: KeypadButton[];
-  ambiente?: { id: number; nome: string; area?: { id: number; nome: string } };
-};
+import { ProjetoTree, Keypad, Area } from "@/types/project";
 
 export default function Projeto() {
   const { projeto } = useProject();
@@ -53,7 +42,7 @@ export default function Projeto() {
 
   const { toast } = useToast();
 
-  const [data, setData] = useState<ProjetoTree>({ projeto: null, areas: [] });
+  const [data, setData] = useState<ProjetoTree>({ projeto: null, areas: [], modulos: [] });
   const [loading, setLoading] = useState(true);
 
   // Form de download .rwp
@@ -104,7 +93,7 @@ export default function Projeto() {
     try {
       const res = await fetch("/api/projeto_tree", { credentials: "same-origin" });
       const json = await res.json();
-      setData({ projeto: json?.projeto || null, areas: json?.areas || [] });
+      setData({ projeto: json?.projeto || null, areas: json?.areas || [], modulos: json?.modulos || [] });
       if (json?.projeto?.nome) setProjectName(json.projeto.nome);
     } catch {
       toast({
@@ -121,21 +110,25 @@ export default function Projeto() {
     fetchProjectData();
   }, [projetoSelecionado]);
 
-  const countCircuitos = (areas: Area[]) => {
-    const counts = { luz: 0, persiana: 0, hvac: 0 };
-    areas.forEach(area => {
+  const stats = useMemo(() => {
+    const newStats = { luz: 0, persiana: 0, hvac: 0, cenas: 0, modulos: 0 };
+    if (!data || !data.areas) return newStats;
+
+    data.areas.forEach(area => {
       area.ambientes.forEach(ambiente => {
+        newStats.cenas += ambiente.cenas?.length || 0;
         ambiente.circuitos.forEach(circuito => {
-          if (circuito.tipo in counts) {
-            counts[circuito.tipo as keyof typeof counts] += 1;
+          if (circuito.tipo === 'luz' || circuito.tipo === 'persiana' || circuito.tipo === 'hvac') {
+            newStats[circuito.tipo] += 1;
           }
         });
       });
     });
-    return counts;
-  };
 
-  const counts = countCircuitos(data.areas);
+    newStats.modulos = data.modulos?.length || 0;
+
+    return newStats;
+  }, [data]);
 
   const validateAndSubmitRwp = (e: React.FormEvent<HTMLFormElement>) => {
     const numbers = clientPhone.replace(/\D/g, "");
@@ -243,28 +236,37 @@ export default function Projeto() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="flex flex-col items-center justify-center rounded-xl p-6 bg-slate-50/50">
+                  <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="flex flex-col items-center justify-center rounded-xl p-4 bg-slate-50/50">
                       <Lightbulb className="h-8 w-8 text-yellow-500 mb-2" />
-                      <div className="text-2xl font-bold text-slate-900">{counts.luz}</div>
+                      <div className="text-2xl font-bold text-slate-900">{stats.luz}</div>
                       <div className="text-sm text-slate-600">Luz</div>
                     </div>
-                    <div className="flex flex-col items-center justify-center rounded-xl p-6 bg-slate-50/50">
+                    <div className="flex flex-col items-center justify-center rounded-xl p-4 bg-slate-50/50">
                       <Blinds className="h-8 w-8 text-blue-500 mb-2" />
-                      <div className="text-2xl font-bold text-slate-900">{counts.persiana}</div>
+                      <div className="text-2xl font-bold text-slate-900">{stats.persiana}</div>
                       <div className="text-sm text-slate-600">Persiana</div>
                     </div>
-                    <div className="flex flex-col items-center justify-center rounded-xl p-6 bg-slate-50/50">
+                    <div className="flex flex-col items-center justify-center rounded-xl p-4 bg-slate-50/50">
                       <Snowflake className="h-8 w-8 text-green-500 mb-2" />
-                      <div className="text-2xl font-bold text-slate-900">{counts.hvac}</div>
+                      <div className="text-2xl font-bold text-slate-900">{stats.hvac}</div>
                       <div className="text-sm text-slate-600">HVAC</div>
                     </div>
-                    <div className="flex flex-col items-center justify-center rounded-xl p-6 bg-slate-50/50">
+                    <div className="flex flex-col items-center justify-center rounded-xl p-4 bg-slate-50/50">
                       <KeySquare className="h-8 w-8 text-violet-600 mb-2" />
                       <div className="text-2xl font-bold text-slate-900">{keypadCount}</div>
                       <div className="text-sm text-slate-600">Keypads</div>
                     </div>
-
+                    <div className="flex flex-col items-center justify-center rounded-xl p-4 bg-slate-50/50">
+                      <Cpu className="h-8 w-8 text-slate-500 mb-2" />
+                      <div className="text-2xl font-bold text-slate-900">{stats.modulos}</div>
+                      <div className="text-sm text-slate-600">Módulos</div>
+                    </div>
+                    <div className="flex flex-col items-center justify-center rounded-xl p-4 bg-slate-50/50">
+                      <Film className="h-8 w-8 text-red-500 mb-2" />
+                      <div className="text-2xl font-bold text-slate-900">{stats.cenas}</div>
+                      <div className="text-sm text-slate-600">Cenas</div>
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
