@@ -3071,6 +3071,14 @@ def create_cena():
                 # Ignora GUIDs inválidos, a validação do form deve pegar
                 pass
 
+    # Validação para não permitir circuitos duplicados
+    circuit_guids_in_scene = [
+        acao.get("target_guid") for acao in acoes_data
+        if acao.get("action_type") == 0 and acao.get("target_guid")
+    ]
+    if len(circuit_guids_in_scene) != len(set(circuit_guids_in_scene)):
+        return jsonify({"ok": False, "error": "Não é permitido adicionar o mesmo circuito mais de uma vez na mesma cena."}), 400
+
     nova_cena = Cena(
         nome=nome,
         ambiente_id=ambiente.id,
@@ -3171,6 +3179,14 @@ def update_cena(cena_id):
                         return jsonify({"ok": False, "error": "Não é permitido adicionar circuitos do tipo HVAC em cenas de iluminação."}), 400
                 except (ValueError, TypeError):
                     pass
+
+        # Validação para não permitir circuitos duplicados
+        circuit_guids_in_scene = [
+            acao.get("target_guid") for acao in acoes_data
+            if acao.get("action_type") == 0 and acao.get("target_guid")
+        ]
+        if len(circuit_guids_in_scene) != len(set(circuit_guids_in_scene)):
+            return jsonify({"ok": False, "error": "Não é permitido adicionar o mesmo circuito mais de uma vez na mesma cena."}), 400
 
         # Limpar ações antigas
         for acao in cena.acoes:

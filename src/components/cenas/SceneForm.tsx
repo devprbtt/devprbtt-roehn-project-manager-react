@@ -169,7 +169,8 @@ const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, 
   };
 
 const ActionItem = ({ index, control, getValues, setValue, remove, projectCircuits, projectAmbientes }: ActionItemProps) => {
-    const currentAction = useWatch({ control, name: `acoes.${index}` });
+    const allActions = useWatch({ control, name: "acoes" });
+    const currentAction = allActions[index];
     const isInitialMount = useRef(true);
 
     // Sincroniza os sliders individuais com o master, ignorando a primeira renderização
@@ -189,7 +190,6 @@ const ActionItem = ({ index, control, getValues, setValue, remove, projectCircui
         }
     }, [currentAction.level]);
 
-
     const getTargetName = (action: Partial<Acao>): string => {
         if (!action.target_guid) return "Selecione...";
         if (action.action_type === 0) { // Circuit
@@ -203,7 +203,17 @@ const ActionItem = ({ index, control, getValues, setValue, remove, projectCircui
             return ambiente ? `Todas as luzes - ${ambiente.nome}` : "Ambiente não encontrado";
         }
         return "Desconhecido";
-      }
+    }
+
+    const availableCircuits = useMemo(() => {
+        const selectedCircuitIds = allActions
+            .filter((act, actIndex) => act.action_type === 0 && actIndex !== index && act.target_guid)
+            .map(act => act.target_guid);
+
+        return projectCircuits.filter(
+            c => c.tipo !== 'hvac' && !selectedCircuitIds.includes(String(c.id))
+        );
+    }, [allActions, projectCircuits, index]);
 
     return (
         <div className="p-4 mb-4 border rounded-lg space-y-4 bg-slate-50">
@@ -215,7 +225,7 @@ const ActionItem = ({ index, control, getValues, setValue, remove, projectCircui
                         render={({ field }) => (
                         <FormItem>
                             <FormLabel>Alvo da Ação</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                                 <SelectTrigger>
                                 <SelectValue placeholder="Selecione o alvo...">
@@ -224,9 +234,7 @@ const ActionItem = ({ index, control, getValues, setValue, remove, projectCircui
                                 </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                                    {currentAction.action_type === 0 && projectCircuits
-                                    .filter(c => c.tipo !== 'hvac')
-                                    .map(c => (
+                                    {currentAction.action_type === 0 && availableCircuits.map(c => (
                                 <SelectItem key={c.id} value={String(c.id)}>
                                     {c.nome} ({c.identificador})
                                 </SelectItem>
