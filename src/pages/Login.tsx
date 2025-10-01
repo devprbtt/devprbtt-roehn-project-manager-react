@@ -44,7 +44,7 @@ export default function Login() {
       if (res.ok && data?.ok) {
         toast({ title: "Bem-vindo!", description: "Login realizado com sucesso." });
         await fetchSession();
-        navigate(from, { replace: true });
+        // A navegação será feita pelo useEffect que observa o 'user'
       } else {
         setError(data?.error || "Credenciais inválidas.");
       }

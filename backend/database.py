@@ -131,6 +131,7 @@ class KeypadButton(db.Model):
     ordem = db.Column(db.Integer, nullable=False)
     guid = db.Column(db.String(36), nullable=False, default=lambda: str(uuid.uuid4()))
     circuito_id = db.Column(db.Integer, db.ForeignKey('circuito.id'), nullable=True)
+    cena_id = db.Column(db.Integer, db.ForeignKey('cena.id'), nullable=True)
     modo = db.Column(db.Integer, nullable=False, default=3)
     command_on = db.Column(db.Integer, nullable=False, default=0)
     command_off = db.Column(db.Integer, nullable=False, default=0)
@@ -141,6 +142,8 @@ class KeypadButton(db.Model):
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+
+    cena = db.relationship('Cena', backref='keypad_buttons', lazy=True)
 
     __table_args__ = (
         db.UniqueConstraint('keypad_id', 'ordem', name='unique_keypad_button_ordem'),

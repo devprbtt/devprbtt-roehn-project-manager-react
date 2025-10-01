@@ -48,10 +48,22 @@ type Circuito = {
   } | null;
 };
 
+type Cena = {
+    id: number;
+    nome: string;
+    ambiente_id: number;
+    ambiente?: {
+        id: number;
+        nome: string;
+        area?: { id: number; nome: string } | null;
+    } | null;
+};
 
 type ButtonBinding = {
   index: number;
-  circuito_id: number | null; // null = limpar
+  type: 'circuito' | 'cena' | 'none';
+  circuito_id: number | null;
+  cena_id: number | null;
 };
 
 const COLORS = [
@@ -91,6 +103,7 @@ export default function Keypads() {
   const [ambientes, setAmbientes] = useState<Ambiente[]>([]);
   const [keypads, setKeypads] = useState<Keypad[]>([]);
   const [circuitos, setCircuitos] = useState<Circuito[]>([]);
+  const [cenas, setCenas] = useState<Cena[]>([]);
 
   // Estados de controle
   const [loading, setLoading] = useState(true);
@@ -203,21 +216,23 @@ export default function Keypads() {
       setProjetoSelecionado(temProjeto);
 
       if (!temProjeto) {
-        setAmbientes([]); setKeypads([]); setCircuitos([]);
+        setAmbientes([]); setKeypads([]); setCircuitos([]); setCenas([]);
         return;
       }
 
-      const [ambRes, kpRes, circRes] = await Promise.all([
+      const [ambRes, kpRes, circRes, cenasRes] = await Promise.all([
         fetch('/api/ambientes', { credentials: 'same-origin' }),
         fetch('/api/keypads',   { credentials: 'same-origin' }),
         fetch('/api/circuitos', { credentials: 'same-origin' }),
+        fetch('/api/cenas', { credentials: 'same-origin' }),
       ]);
 
-      const [amb, kp, circ] = await Promise.all([ambRes.json(), kpRes.json(), circRes.json()]);
+      const [amb, kp, circ, cenasData] = await Promise.all([ambRes.json(), kpRes.json(), circRes.json(), cenasRes.json()]);
 
       setAmbientes(amb?.ambientes || amb || []);
       setKeypads(kp?.keypads || kp || []);
       setCircuitos(circ?.circuitos || circ || []);
+      setCenas(cenasData?.cenas || cenasData || []);
     } catch (err) {
       console.error(err);
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao carregar dados.' });
@@ -234,26 +249,30 @@ export default function Keypads() {
       if (p?.ok && p?.projeto_atual) {
         setProjetoSelecionado(true);
 
-        const [ambRes, kpRes, circRes] = await Promise.all([
+        const [ambRes, kpRes, circRes, cenasRes] = await Promise.all([
           fetch("/api/ambientes", { credentials: "same-origin" }),
           fetch("/api/keypads", { credentials: "same-origin" }),
           fetch("/api/circuitos", { credentials: "same-origin" }),
+          fetch("/api/cenas", { credentials: "same-origin" }),
         ]);
 
-        if (!ambRes.ok || !kpRes.ok || !circRes.ok) throw new Error("Falha ao carregar dados.");
+        if (!ambRes.ok || !kpRes.ok || !circRes.ok || !cenasRes.ok) throw new Error("Falha ao carregar dados.");
 
         const ambData = await ambRes.json();
         const kpData = await kpRes.json();
         const circData = await circRes.json();
+        const cenasData = await cenasRes.json();
 
         setAmbientes(ambData?.ambientes || ambData || []);
         setKeypads(kpData?.keypads || kpData || []);
         setCircuitos(circData?.circuitos || circData || []);
+        setCenas(cenasData?.cenas || cenasData || []);
       } else {
         setProjetoSelecionado(false);
         setAmbientes([]);
         setKeypads([]);
         setCircuitos([]);
+        setCenas([]);
       }
     } catch (e) {
       console.error(e);
@@ -273,10 +292,10 @@ export default function Keypads() {
 
   function computeKeypadStatus(kp: {
     button_count: number;
-    buttons?: { circuito_id?: number | null }[];
+    buttons?: { circuito_id?: number | null, cena_id?: number | null }[];
   }): { status: KeypadStatus; linked: number; total: number } {
     const total = kp.button_count || 0;
-    const linked = (kp.buttons || []).filter(b => !!b?.circuito_id).length;
+    const linked = (kp.buttons || []).filter(b => !!b?.circuito_id || !!b?.cena_id).length;
     if (total === 0) return { status: "vazio", linked: 0, total: 0 };
     if (linked === 0) return { status: "vazio", linked, total };
     if (linked === total) return { status: "completo", linked, total };
@@ -447,7 +466,9 @@ export default function Keypads() {
 
     const base: ButtonBinding[] = Array.from({ length: count }, (_, i) => ({
       index: i,
+      type: 'none',
       circuito_id: null,
+      cena_id: null,
     }));
     setButtonBindings(base);
 
@@ -455,10 +476,16 @@ export default function Keypads() {
       .then((r) => (r.ok ? r.json() : null))
       .then((json) => {
         if (json?.ok && Array.isArray(json.keypad?.buttons)) {
-          const buttons = json.keypad.buttons; // [{ordem, circuito_id}, ...]
+          const buttons = json.keypad.buttons;
           const merged = base.map((b) => {
             const found = buttons.find((x: any) => x.ordem === b.index + 1);
-            return found ? { index: b.index, circuito_id: found.circuito_id ?? null } : b;
+            if (found?.cena_id) {
+                return { index: b.index, type: 'cena' as const, cena_id: found.cena_id, circuito_id: null };
+            }
+            if (found?.circuito_id) {
+                return { index: b.index, type: 'circuito' as const, circuito_id: found.circuito_id, cena_id: null };
+            }
+            return { index: b.index, type: 'none' as const, circuito_id: null, cena_id: null };
           });
           setButtonBindings(merged);
         }
@@ -476,9 +503,30 @@ export default function Keypads() {
     setBindingLoading(false);
   }
 
-  function setBinding(index: number, value: number | "") {
+  function setBinding(index: number, type: 'circuito' | 'cena', value: number | "") {
     setButtonBindings((prev) =>
-      prev.map((b) => (b.index === index ? { ...b, circuito_id: value ? Number(value) : null } : b))
+      prev.map((b) => {
+        if (b.index === index) {
+          const newType = value ? type : 'none';
+          if (type === 'circuito') {
+            return { ...b, type: newType, circuito_id: value ? Number(value) : null, cena_id: null };
+          }
+          if (type === 'cena') {
+            return { ...b, type: newType, cena_id: value ? Number(value) : null, circuito_id: null };
+          }
+        }
+        return b;
+      })
+    );
+  }
+
+  function setBindingType(index: number, type: 'circuito' | 'cena') {
+    setButtonBindings((prev) =>
+      prev.map((b) =>
+        b.index === index
+          ? { ...b, type, circuito_id: null, cena_id: null }
+          : b
+      )
     );
   }
 
@@ -489,14 +537,24 @@ export default function Keypads() {
 
       // 1) Atualiza cada tecla
       await Promise.all(
-        buttonBindings.map((b) =>
-          fetch(`/api/keypads/${bindingKeypad.id}/buttons/${b.index + 1}`, {
+        buttonBindings.map((b) => {
+          const payload: { circuito_id?: number | null, cena_id?: number | null } = {};
+          if (b.type === 'circuito') {
+            payload.circuito_id = b.circuito_id;
+          } else if (b.type === 'cena') {
+            payload.cena_id = b.cena_id;
+          } else {
+            payload.circuito_id = null;
+            payload.cena_id = null;
+          }
+
+          return fetch(`/api/keypads/${bindingKeypad.id}/buttons/${b.index + 1}`, {
             method: "PUT",
             credentials: "same-origin",
             headers: { "Content-Type": "application/json", Accept: "application/json" },
-            body: JSON.stringify({ circuito_id: b.circuito_id }),
-          })
-        )
+            body: JSON.stringify(payload),
+          });
+        })
       );
 
       // 2) Busca esse keypad atualizado
@@ -979,20 +1037,56 @@ export default function Keypads() {
                         </Button>
                       </div>
 
-                      <Label className="text-xs text-slate-600">Circuito</Label>
-                      <select
-                        value={b.circuito_id ?? ''}
-                        onChange={(e) => setBinding(b.index, e.target.value ? Number(e.target.value) : '')}
-                        className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3"
-                      >
-                        <option value="">— Não vinculado —</option>
-                        {circuitos.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.nome || c.identificador} ({c.tipo})
-                            {c.ambiente?.nome ? ` — ${c.ambiente.nome}` : ''}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-4 mb-2">
+                        <Label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name={`binding-type-${b.index}`}
+                            checked={b.type === 'circuito' || b.type === 'none'}
+                            onChange={() => setBindingType(b.index, 'circuito')}
+                          />
+                          Circuito
+                        </Label>
+                        <Label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name={`binding-type-${b.index}`}
+                            checked={b.type === 'cena'}
+                            onChange={() => setBindingType(b.index, 'cena')}
+                          />
+                          Cena
+                        </Label>
+                      </div>
+
+                      {b.type === 'cena' ? (
+                        <select
+                          value={b.cena_id ?? ''}
+                          onChange={(e) => setBinding(b.index, 'cena', e.target.value ? Number(e.target.value) : '')}
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3"
+                        >
+                          <option value="">— Selecione a Cena —</option>
+                          {cenas.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.nome}
+                              {c.ambiente?.nome ? ` — ${c.ambiente.nome}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <select
+                          value={b.circuito_id ?? ''}
+                          onChange={(e) => setBinding(b.index, 'circuito', e.target.value ? Number(e.target.value) : '')}
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3"
+                        >
+                          <option value="">— Não vinculado —</option>
+                          {circuitos.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.nome || c.identificador} ({c.tipo})
+                              {c.ambiente?.nome ? ` — ${c.ambiente.nome}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   ))}
                 </div>
