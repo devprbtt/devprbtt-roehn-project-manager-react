@@ -20,9 +20,12 @@ export interface Cena {
   guid: string;
   nome: string;
   ambiente_id: number;
+  scene_movers: boolean;
   acoes: Acao[];
   ambiente: Ambiente; // Adicionado para incluir os dados do ambiente
 }
 
 // Para criação e edição
-export type CenaFormData = Omit<Cena, "id" | "guid" | "ambiente">;
+export type CenaFormData = Omit<Cena, "id" | "guid" | "ambiente"> & {
+  scene_movers?: boolean;
+};

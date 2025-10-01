@@ -1703,7 +1703,7 @@ class RoehnProjectConverter:
             scene_payload = {
                 "$type": "Scene",
                 "Guid": cena_db.guid,
-                "Operator": 1,
+                "Operator": 6 if cena_db.scene_movers else 1,
                 "ParentSlot": None,
                 "Unit": {
                     "$type": "Unit",
@@ -1718,7 +1718,7 @@ class RoehnProjectConverter:
                 "Name": cena_db.nome,
                 "Delay": 0,
                 "Actions": [],
-                "SceneMovers": False,
+                "SceneMovers": cena_db.scene_movers,
                 "AutoProgrammedID": 0,
                 "AutoProgrammedScene": False,
                 "OnlyShades": 2,

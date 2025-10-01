@@ -32,6 +32,7 @@ const acaoSchema = z.object({
 const cenaSchema = z.object({
   nome: z.string().min(2, { message: "O nome deve ter pelo menos 2 caracteres." }),
   ambiente_id: z.coerce.number({ required_error: "É obrigatório selecionar um ambiente." }).min(1, "É obrigatório selecionar um ambiente."),
+  scene_movers: z.boolean().optional(),
   acoes: z.array(acaoSchema),
 });
 
@@ -299,14 +300,56 @@ export const SceneForm = ({
         nome: "",
         ambiente_id: undefined,
         acoes: [],
+        scene_movers: false,
     },
   });
+
+  const watchedActions = useWatch({
+    control: form.control,
+    name: "acoes",
+  });
+
+  const isPersianaOnly = useMemo(() => {
+    if (!watchedActions || watchedActions.length === 0) {
+        return false;
+    }
+
+    for (const acao of watchedActions) {
+        if (acao.action_type === 0) { // Circuit
+            const circuit = projectCircuits.find(c => String(c.id) === acao.target_guid);
+            if (!circuit || circuit.tipo !== 'persiana') {
+                return false;
+            }
+        } else if (acao.action_type === 7) { // Room
+            const circuitsInRoom = projectCircuits.filter(
+                c => c.ambiente.id === Number(acao.target_guid) && c.tipo !== 'hvac'
+            );
+            if (circuitsInRoom.length === 0) {
+                return false;
+            }
+            if (circuitsInRoom.some(c => c.tipo !== 'persiana')) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+    return true;
+  }, [watchedActions, projectCircuits]);
+
+  useEffect(() => {
+    if (!isPersianaOnly) {
+        form.setValue('scene_movers', false);
+    }
+  }, [isPersianaOnly, form]);
+
 
   useEffect(() => {
     if (scene && isEditing) {
         form.reset({
             nome: scene.nome,
             ambiente_id: scene.ambiente_id,
+            scene_movers: scene.scene_movers || false,
             acoes: scene.acoes.map(a => ({
                 ...a,
                 target_guid: String(a.target_guid),
@@ -318,6 +361,7 @@ export const SceneForm = ({
             nome: "",
             ambiente_id: undefined,
             acoes: [],
+            scene_movers: false,
         });
     }
   }, [scene, isEditing, form]);
@@ -330,6 +374,7 @@ export const SceneForm = ({
   const onSubmit = (data: CenaFormData) => {
     const submissionData = {
       ...data,
+      scene_movers: data.scene_movers || false,
       acoes: data.acoes.map(acao => ({
           ...acao,
           custom_acoes: acao.action_type === 7 ? acao.custom_acoes : []
@@ -342,7 +387,7 @@ export const SceneForm = ({
     mutation.mutate(mutationData as any, {
         onSuccess: () => {
             onSuccess();
-            form.reset({ nome: "", ambiente_id: undefined, acoes: [] });
+            form.reset({ nome: "", ambiente_id: undefined, acoes: [], scene_movers: false });
         }
     });
   };
@@ -415,6 +460,34 @@ export const SceneForm = ({
                 />
             </div>
 
+            {isPersianaOnly && (
+                <div className="pt-2">
+                    <FormField
+                        control={form.control}
+                        name="scene_movers"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-start rounded-lg border p-3 shadow-sm bg-slate-50">
+                                <FormControl>
+                                    <Checkbox
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                        disabled={!isPersianaOnly}
+                                    />
+                                </FormControl>
+                                <div className="space-y-0.5 ml-3">
+                                    <FormLabel>
+                                        Habilitar movimentadores
+                                    </FormLabel>
+                                    <p className="text-[0.8rem] text-muted-foreground">
+                                        Ative esta opção se a cena controla apenas persianas.
+                                    </p>
+                                </div>
+                            </FormItem>
+                        )}
+                    />
+                </div>
+            )}
+
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Ações</h3>
               <ScrollArea className="h-[400px] p-4 border rounded-md">
@@ -442,7 +515,7 @@ export const SceneForm = ({
             </div>
 
             <div className="flex justify-end gap-2">
-                <Button type="button" variant="ghost" onClick={() => form.reset({ nome: "", ambiente_id: undefined, acoes: [] })}>
+                <Button type="button" variant="ghost" onClick={() => form.reset({ nome: "", ambiente_id: undefined, acoes: [], scene_movers: false })}>
                     Cancelar
                 </Button>
                 <Button type="submit" disabled={createCenaMutation.isPending || updateCenaMutation.isPending}>

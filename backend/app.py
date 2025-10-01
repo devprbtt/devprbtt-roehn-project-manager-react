@@ -2940,6 +2940,7 @@ def serialize_cena(cena):
         "guid": cena.guid,
         "nome": cena.nome,
         "ambiente_id": cena.ambiente_id,
+        "scene_movers": cena.scene_movers,
         "acoes": [serialize_acao(a) for a in sorted(cena.acoes, key=lambda x: x.id)],
     }
 
@@ -3019,6 +3020,7 @@ def create_cena():
     nome = (data.get("nome") or "").strip()
     ambiente_id = data.get("ambiente_id")
     acoes_data = data.get("acoes", [])
+    scene_movers = data.get("scene_movers", False)
 
     if not nome or not ambiente_id:
         return jsonify({"ok": False, "error": "Nome e ambiente_id são obrigatórios."}), 400
@@ -3026,6 +3028,36 @@ def create_cena():
     ambiente = db.get_or_404(Ambiente, int(ambiente_id))
     if ambiente.area.projeto_id != projeto_id:
         return jsonify({"ok": False, "error": "Ambiente não pertence ao projeto atual."}), 403
+
+    # Validação para scene_movers
+    if scene_movers:
+        all_circuit_ids = set()
+        all_group_ambiente_ids = set()
+        if not acoes_data:
+            return jsonify({"ok": False, "error": "Movimentadores de cena não podem ser habilitados para uma cena vazia."}), 400
+
+        for acao_data in acoes_data:
+            if acao_data.get("action_type") == 0:
+                try:
+                    all_circuit_ids.add(int(acao_data.get("target_guid")))
+                except (ValueError, TypeError):
+                    pass
+            elif acao_data.get("action_type") == 7:
+                try:
+                    all_group_ambiente_ids.add(int(acao_data.get("target_guid")))
+                except (ValueError, TypeError):
+                    pass
+
+        if all_circuit_ids:
+            circuits = Circuito.query.filter(Circuito.id.in_(list(all_circuit_ids))).all()
+            if any(c.tipo != 'persiana' for c in circuits):
+                return jsonify({"ok": False, "error": "Movimentadores de cena só podem ser habilitados se todos os itens da cena forem persianas."}), 400
+
+        if all_group_ambiente_ids:
+            group_circuits = Circuito.query.filter(Circuito.ambiente_id.in_(list(all_group_ambiente_ids))).all()
+            for c in group_circuits:
+                if c.tipo in ['luz', 'persiana'] and c.tipo != 'persiana':
+                    return jsonify({"ok": False, "error": "Movimentadores de cena só podem ser habilitados se todos os itens da cena forem persianas (encontrado em grupo)."}), 400
 
     # Validação para não permitir circuitos HVAC
     for acao_data in acoes_data:
@@ -3039,7 +3071,11 @@ def create_cena():
                 # Ignora GUIDs inválidos, a validação do form deve pegar
                 pass
 
-    nova_cena = Cena(nome=nome, ambiente_id=ambiente.id)
+    nova_cena = Cena(
+        nome=nome,
+        ambiente_id=ambiente.id,
+        scene_movers=scene_movers
+    )
     db.session.add(nova_cena)
 
     for acao_data in acoes_data:
@@ -3089,8 +3125,42 @@ def update_cena(cena_id):
     if "nome" in data:
         cena.nome = (data["nome"] or "").strip()
 
+    if "scene_movers" in data:
+        cena.scene_movers = data["scene_movers"]
+
     if "acoes" in data:
         acoes_data = data.get("acoes", [])
+
+        # Validação para scene_movers
+        if data.get("scene_movers"):
+            all_circuit_ids = set()
+            all_group_ambiente_ids = set()
+            if not acoes_data:
+                return jsonify({"ok": False, "error": "Movimentadores de cena não podem ser habilitados para uma cena vazia."}), 400
+
+            for acao_data in acoes_data:
+                if acao_data.get("action_type") == 0:
+                    try:
+                        all_circuit_ids.add(int(acao_data.get("target_guid")))
+                    except (ValueError, TypeError):
+                        pass
+                elif acao_data.get("action_type") == 7:
+                    try:
+                        # O target_guid de um grupo é o ID do AMBIENTE
+                        ambiente_id_grupo = int(acao_data.get("target_guid"))
+                        # Pegar todos os circuitos daquele ambiente
+                        circs_no_grupo = Circuito.query.filter_by(ambiente_id=ambiente_id_grupo).all()
+                        for c in circs_no_grupo:
+                            if c.tipo != 'hvac': # Ignorar HVAC na validação
+                                all_circuit_ids.add(c.id)
+                    except (ValueError, TypeError):
+                        pass
+
+            if all_circuit_ids:
+                circuits = Circuito.query.filter(Circuito.id.in_(list(all_circuit_ids))).all()
+                if any(c.tipo != 'persiana' for c in circuits):
+                    return jsonify({"ok": False, "error": "Movimentadores de cena só podem ser habilitados se todos os itens da cena forem persianas."}), 400
+
         # Validação para não permitir circuitos HVAC
         for acao_data in acoes_data:
             if acao_data.get("action_type") == 0:
