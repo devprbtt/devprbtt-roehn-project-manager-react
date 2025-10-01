@@ -1759,44 +1759,57 @@ class RoehnProjectConverter:
                 else: # Other types, assume GUID is direct
                     action_payload["TargetGuid"] = acao_db.target_guid
 
-                # Processar CustomAcoes e forçar a desativação de HVAC em grupos
                 custom_values = { "$type": "CustomActionValueDictionary" }
-                if acao_db.custom_acoes:
+
+                if acao_db.action_type == 7: # Group (All Lights) Action
+                    try:
+                        target_ambiente_id = int(acao_db.target_guid)
+                        all_circuits_in_room = Circuito.query.filter_by(ambiente_id=target_ambiente_id).all()
+
+                        custom_actions_map = {
+                            int(ca.target_guid): ca for ca in acao_db.custom_acoes if ca.target_guid.isdigit()
+                        }
+
+                        for circuit in all_circuits_in_room:
+                            circuit_guid = self._circuit_guid_map.get(circuit.id)
+                            if not circuit_guid:
+                                continue
+
+                            # For "All Lights" groups, only circuits of type 'luz' should be affected.
+                            # All other types (persiana, hvac, etc.) must be explicitly disabled.
+                            if circuit.tipo == 'luz':
+                                if circuit.id in custom_actions_map:
+                                    custom_acao_db = custom_actions_map[circuit.id]
+                                    custom_values[circuit_guid] = {
+                                        "$type": "CustomActionValue",
+                                        "Enable": custom_acao_db.enable,
+                                        "Level": custom_acao_db.level
+                                    }
+                            else:
+                                # Disable non-light circuits
+                                custom_values[circuit_guid] = {
+                                    "$type": "CustomActionValue",
+                                    "Enable": False,
+                                    "Level": 0
+                                }
+                    except (ValueError, TypeError):
+                        pass # Ignore if target_guid is not a valid room ID
+
+                elif acao_db.custom_acoes: # For individual circuit actions
                     for custom_acao_db in acao_db.custom_acoes:
                         try:
                             circuito_id = int(custom_acao_db.target_guid)
                             custom_target_guid = self._circuit_guid_map.get(circuito_id)
-                            if not custom_target_guid:
-                                print(f"⚠️ Aviso: GUID para o circuito ID {circuito_id} (custom_acao) não encontrado.")
-                                continue
-
-                            custom_values[custom_target_guid] = {
-                                "$type": "CustomActionValue",
-                                "Enable": custom_acao_db.enable,
-                                "Level": custom_acao_db.level
-                            }
+                            if custom_target_guid:
+                                custom_values[custom_target_guid] = {
+                                    "$type": "CustomActionValue",
+                                    "Enable": custom_acao_db.enable,
+                                    "Level": custom_acao_db.level
+                                }
                         except (ValueError, TypeError):
-                            print(f"⚠️ Aviso: target_guid inválido para CustomAcao ID {custom_acao_db.id}: {custom_acao_db.target_guid}")
                             continue
 
-                # Se for uma ação de grupo, garantir que circuitos HVAC sejam desativados
-                if acao_db.action_type == 7:
-                    try:
-                        target_ambiente_id = int(acao_db.target_guid)
-                        all_circuits_in_room = Circuito.query.filter_by(ambiente_id=target_ambiente_id).all()
-                        for circuit in all_circuits_in_room:
-                            if circuit.tipo == 'hvac':
-                                circuit_guid = self._circuit_guid_map.get(circuit.id)
-                                if circuit_guid:
-                                    custom_values[circuit_guid] = {
-                                        "$type": "CustomActionValue",
-                                        "Enable": False,
-                                        "Level": 0
-                                    }
-                    except (ValueError, TypeError):
-                        pass # Ignora se o target_guid não for um ID de ambiente válido
-
-                if len(custom_values) > 1: # Se houver algo além do $type
+                if len(custom_values) > 1:
                     action_payload["CustomActionValuesSerialized"] = custom_values
 
                 scene_payload["Actions"].append(action_payload)
