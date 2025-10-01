@@ -2870,11 +2870,16 @@ def api_keypad_button_update(keypad_id, ordem):
                 return jsonify({"ok": False, "error": "Circuito não pertence ao projeto."}), 400
 
             button.circuito = circuito
-            # A lógica de modo/comando será tratada pelo frontend ou em outra chamada
             button.target_object_guid = ZERO_GUID
-            button.modo = 2
-            button.command_on = 1
-            button.command_off = 0
+            button.modo = 2  # Send Command
+
+            # Definir comandos padrão com base no tipo de circuito
+            if circuito.tipo == 'persiana':
+                button.command_on = 3  # Sobe
+                button.command_off = 4  # Desce
+            else:  # Padrão para 'luz', 'hvac', etc.
+                button.command_on = 1  # Ligar/Alternar
+                button.command_off = 0  # Desligar
 
     if "modo" in data:
         try:
