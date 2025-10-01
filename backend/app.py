@@ -1611,7 +1611,7 @@ def api_vinculacoes_auto():
         prioridades = {
             "luz": {
                 "dimerizavel": ["DIM8", "RL12", "RL4"],
-                "nao_dimerizavel": ["RL12", "RL4"]
+                "nao_dimerizavel": ["RL12", "RL4", "DIM8"]
             },
             "persiana": ["LX4"],
             "hvac": ["SA1"]
