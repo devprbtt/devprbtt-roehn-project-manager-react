@@ -2868,13 +2868,13 @@ def api_keypad_button_update(keypad_id, ordem):
             area_circ = ambiente_circ.area if ambiente_circ else None
             if not area_circ or area_circ.projeto_id != projeto_id:
                 return jsonify({"ok": False, "error": "Circuito não pertence ao projeto."}), 400
-            if circuito.tipo != 'luz':
-                return jsonify({"ok": False, "error": "Apenas circuitos de luz podem ser vinculados."}), 400
+
             button.circuito = circuito
-            button.target_object_guid = ZERO_GUID
-            button.modo = 2
-            button.command_on = 1
-            button.command_off = 0
+            # A lógica de modo/comando será tratada pelo frontend ou em outra chamada
+            # button.target_object_guid = ZERO_GUID
+            # button.modo = 2
+            # button.command_on = 1
+            # button.command_off = 0
 
     if "modo" in data:
         try:
