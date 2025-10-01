@@ -1,19 +1,22 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useFieldArray, Controller, useWatch, UseFormGetValues, UseFormSetValue } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCreateCena, useUpdateCena } from "@/hooks/useCenas";
 import type { Cena, Acao, CenaFormData } from "@/types/cena";
 import type { Circuito, Ambiente, Area } from "@/types/project";
-import { PlusCircle, Trash2, FolderPlus } from "lucide-react";
+import { PlusCircle, Trash2, FolderPlus, Lightbulb, Blinds, Check, ChevronsUpDown } from "lucide-react";
 
 // --- Zod Schema for Validation ---
 const customAcaoSchema = z.object({
@@ -171,6 +174,7 @@ const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, 
 const ActionItem = ({ index, control, getValues, setValue, remove, projectCircuits, projectAmbientes }: ActionItemProps) => {
     const allActions = useWatch({ control, name: "acoes" });
     const currentAction = allActions[index];
+    const [open, setOpen] = useState(false);
     const isInitialMount = useRef(true);
 
     // Sincroniza os sliders individuais com o master, ignorando a primeira renderização
@@ -223,29 +227,79 @@ const ActionItem = ({ index, control, getValues, setValue, remove, projectCircui
                         control={control}
                         name={`acoes.${index}.target_guid`}
                         render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex flex-col">
                             <FormLabel>Alvo da Ação</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                                <SelectTrigger>
-                                <SelectValue placeholder="Selecione o alvo...">
-                                    {getTargetName(currentAction)}
-                                </SelectValue>
-                                </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                    {currentAction.action_type === 0 && availableCircuits.map(c => (
-                                <SelectItem key={c.id} value={String(c.id)}>
-                                    {c.nome} ({c.identificador})
-                                </SelectItem>
-                                ))}
-                                {currentAction.action_type === 7 && projectAmbientes.map(a => (
-                                <SelectItem key={a.id} value={String(a.id)}>
-                                    Todas as Luzes - {a.nome} ({a.area.nome})
-                                </SelectItem>
-                                ))}
-                            </SelectContent>
-                            </Select>
+                            {currentAction.action_type === 7 ? (
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Selecione o alvo...">
+                                                {getTargetName(currentAction)}
+                                            </SelectValue>
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {projectAmbientes.map(a => (
+                                        <SelectItem key={a.id} value={String(a.id)}>
+                                            Todas as Luzes - {a.nome} ({a.area.nome})
+                                        </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <Popover open={open} onOpenChange={setOpen}>
+                                    <PopoverTrigger asChild>
+                                        <FormControl>
+                                            <Button
+                                                variant="outline"
+                                                role="combobox"
+                                                className={cn(
+                                                    "w-full justify-between",
+                                                    !field.value && "text-muted-foreground"
+                                                )}
+                                            >
+                                                {getTargetName(currentAction)}
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
+                                        <Command>
+                                            <CommandInput placeholder="Buscar circuito..." />
+                                            <CommandList>
+                                                <CommandEmpty>Nenhum circuito encontrado.</CommandEmpty>
+                                                <CommandGroup>
+                                                    {availableCircuits.map(c => (
+                                                        <CommandItem
+                                                            value={`${c.nome} ${c.identificador} ${c.ambiente.area.nome} ${c.ambiente.nome}`}
+                                                            key={c.id}
+                                                            onSelect={() => {
+                                                                field.onChange(String(c.id));
+                                                                setOpen(false);
+                                                            }}
+                                                        >
+                                                            <Check
+                                                                className={cn(
+                                                                    "mr-2 h-4 w-4",
+                                                                    String(c.id) === field.value ? "opacity-100" : "opacity-0"
+                                                                )}
+                                                            />
+                                                            <div className="flex items-center gap-2">
+                                                                {c.tipo === 'luz' && <Lightbulb className="h-4 w-4 text-amber-500" />}
+                                                                {c.tipo === 'persiana' && <Blinds className="h-4 w-4 text-sky-600" />}
+                                                                <div>
+                                                                    <p className="font-medium">{c.nome} <span className="text-xs text-muted-foreground">({c.identificador})</span></p>
+                                                                    <p className="text-xs text-muted-foreground">{c.ambiente.area.nome} &gt; {c.ambiente.nome}</p>
+                                                                </div>
+                                                            </div>
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                            )}
                             <FormMessage />
                         </FormItem>
                         )}
