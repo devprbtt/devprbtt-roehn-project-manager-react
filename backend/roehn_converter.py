@@ -234,56 +234,61 @@ class RoehnProjectConverter:
                 print(f"Processando modulo (quadro padrão): {modulo.nome} ({modulo.tipo})")
                 self._ensure_module_exists(modulo)
 
-        # Processar circuitos e vinculações
+        # Etapa 1: Processar todos os circuitos e criar seus GUIDs e links físicos
         for area in projeto.areas:
             for ambiente in area.ambientes:
                 for circuito in ambiente.circuitos:
                     print(f"Processando circuito: {circuito.identificador} ({circuito.tipo})")
-                    if circuito.vinculacao:
-                        vinculacao = circuito.vinculacao
-                        modulo = vinculacao.modulo
-                        canal = vinculacao.canal
-                        modulo_nome = modulo.nome if modulo else None
+                    guid = None
+                    try:
+                        # Criar o objeto Roehn para CADA circuito e mapear seu GUID
+                        if circuito.tipo == 'luz':
+                            dimerizavel = getattr(circuito, 'dimerizavel', False)
+                            potencia = getattr(circuito, 'potencia', 0.0)
+                            guid = self._add_load(
+                                area.nome,
+                                ambiente.nome,
+                                circuito.nome or circuito.identificador,
+                                power=potencia,
+                                dimerizavel=dimerizavel
+                            )
+                        elif circuito.tipo == 'persiana':
+                            guid = self._add_shade(area.nome, ambiente.nome, circuito.nome or circuito.identificador)
+                        elif circuito.tipo == 'hvac':
+                            guid = self._add_hvac(area.nome, ambiente.nome, circuito.nome or circuito.identificador)
+                        else:
+                            print(f"Tipo de circuito nao suportado: {circuito.tipo}")
 
-                        if not modulo_nome:
-                            print(f"Circuito {circuito.identificador} sem modulo associado, ignorando.")
-                            continue
+                        if guid:
+                            self._circuit_guid_map[circuito.id] = guid
 
-                        try:
-                            if circuito.tipo == 'luz':
-                                dimerizavel = getattr(circuito, 'dimerizavel', False)
-                                potencia = getattr(circuito, 'potencia', 0.0)
-                                guid = self._add_load(
-                                    area.nome, 
-                                    ambiente.nome, 
-                                    circuito.nome or circuito.identificador,
-                                    power=potencia,
-                                    dimerizavel=dimerizavel
-                                )
-                                self._circuit_guid_map[circuito.id] = guid
-                                self._link_load_to_module(guid, modulo_nome, canal, dimerizavel)
-                                print(f"Circuito de luz adicionado: {guid}")
+                        # Se o circuito estiver vinculado, fazer o link físico
+                        if circuito.vinculacao:
+                            vinculacao = circuito.vinculacao
+                            modulo = vinculacao.modulo
+                            canal = vinculacao.canal
+                            modulo_nome = modulo.nome if modulo else None
 
-                            elif circuito.tipo == 'persiana':
-                                guid = self._add_shade(area.nome, ambiente.nome, circuito.nome or circuito.identificador)
-                                self._circuit_guid_map[circuito.id] = guid
-                                self._link_shade_to_module(guid, modulo_nome, canal)
-                                print(f"Circuito de persiana adicionado: {guid}")
-                            elif circuito.tipo == 'hvac':
-                                guid = self._add_hvac(area.nome, ambiente.nome, circuito.nome or circuito.identificador)
-                                self._circuit_guid_map[circuito.id] = guid
-                                self._link_hvac_to_module(guid, modulo_nome, canal)
-                                print(f"Circuito HVAC adicionado: {guid}")
-                            else:
-                                print(f"Tipo de circuito nao suportado: {circuito.tipo}")
-                        except Exception as exc:
-                            print(f"Erro ao processar circuito {circuito.id}: {exc}")
-                            import traceback
-                            traceback.print_exc()
-                            continue
-                    else:
-                        print(f"Circuito {circuito.id} nao vinculado, ignorando.")
+                            if modulo_nome and guid:
+                                if circuito.tipo == 'luz':
+                                    dimerizavel = getattr(circuito, 'dimerizavel', False)
+                                    self._link_load_to_module(guid, modulo_nome, canal, dimerizavel)
+                                elif circuito.tipo == 'persiana':
+                                    self._link_shade_to_module(guid, modulo_nome, canal)
+                                elif circuito.tipo == 'hvac':
+                                    self._link_hvac_to_module(guid, modulo_nome, canal)
+                            elif not modulo_nome:
+                                print(f"Circuito {circuito.identificador} com vinculação, mas sem módulo associado.")
 
+                    except Exception as exc:
+                        print(f"Erro ao processar circuito {circuito.id}: {exc}")
+                        import traceback
+                        traceback.print_exc()
+                        continue
+
+        # Etapa 2: Processar Keypads e Cenas, agora com o mapa de GUIDs completo
+        for area in projeto.areas:
+            for ambiente in area.ambientes:
                 self._add_keypads_for_room(area.nome, ambiente)
                 self._add_scenes_for_room(area.nome, ambiente)
 
@@ -1205,6 +1210,8 @@ class RoehnProjectConverter:
         if not keypads:
             return
 
+        print(f"Processing keypads for room: {ambiente.nome} (ID: {ambiente.id})")
+
         try:
             area_idx = next(i for i, area in enumerate(self.project_data["Areas"]) if area.get("Name") == area_name)
         except StopIteration:
@@ -1219,6 +1226,7 @@ class RoehnProjectConverter:
         room = subitems[room_idx]
         user_interfaces = room.setdefault("UserInterfaces", [])
         for keypad in keypads:
+            print(f"  - Building payload for keypad: {keypad.nome} (ID: {keypad.id})")
             payload = self._build_keypad_payload(area_idx, room_idx, keypad)
             user_interfaces.append(payload)
             self._register_user_interface_guid(payload["Guid"])
@@ -1226,6 +1234,8 @@ class RoehnProjectConverter:
     def _build_keypad_payload(self, area_idx, room_idx, keypad):
         zero_guid = self.zero_guid
         keypad_guid = str(uuid.uuid4())
+
+        print(f"    - Building keypad payload for: {keypad.nome}")
 
         base_unit_id = self._find_max_unit_id() + 1
 
@@ -1326,6 +1336,12 @@ class RoehnProjectConverter:
             circuito = button.circuito
             if circuito and circuito.id in self._circuit_guid_map:
                 target_guid = self._circuit_guid_map[circuito.id]
+                print(f"      - Button {button.ordem}: Linked to circuit '{circuito.nome}' (ID: {circuito.id}) -> GUID: {target_guid}")
+            else:
+                if circuito:
+                    print(f"      - Button {button.ordem}: WARNING - Circuit '{circuito.nome}' (ID: {circuito.id}) found but its GUID is not in the map.")
+                else:
+                    print(f"      - Button {button.ordem}: Not linked to any circuit.")
 
             style_properties = None
             if target_guid != zero_guid:
