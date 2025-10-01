@@ -2871,10 +2871,10 @@ def api_keypad_button_update(keypad_id, ordem):
 
             button.circuito = circuito
             # A lógica de modo/comando será tratada pelo frontend ou em outra chamada
-            # button.target_object_guid = ZERO_GUID
-            # button.modo = 2
-            # button.command_on = 1
-            # button.command_off = 0
+            button.target_object_guid = ZERO_GUID
+            button.modo = 2
+            button.command_on = 1
+            button.command_off = 0
 
     if "modo" in data:
         try:
