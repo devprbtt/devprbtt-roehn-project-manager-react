@@ -83,6 +83,10 @@ export const useAuth = create<AuthState>()(
       // Útil se você quiser setar manualmente o user após alguma ação
       setUser: (u) => set({ user: u }),
     }),
-    { name: "auth" }
+    {
+      name: "auth",
+      // Salva apenas o usuário no localStorage, ignorando o `loading`
+      partialize: (state) => ({ user: state.user }),
+    }
   )
 );
