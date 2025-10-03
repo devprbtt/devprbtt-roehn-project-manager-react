@@ -38,9 +38,6 @@ const createPageUrl = (page: string) => "/" + page.toLowerCase();
 
 interface LayoutProps {
   children: React.ReactNode;
-  user?: { username?: string; role?: string };
-  projectSelected?: boolean;
-  projectId?: number;
 }
 
 type NavItem = {
@@ -63,24 +60,14 @@ const baseItems: NavItem[] = [
   { title: "Visualizar Projeto", url: createPageUrl("projeto"), icon: Eye, requiresProject: true },
 ];
 
-const Layout: React.FC<LayoutProps> = ({
-  children,
-  projectSelected: projectSelectedProp,
-}) => {
+const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { projeto } = useProject();
+  const { projeto, loading: projectLoading } = useProject();
   const { user: sessionUser, loading: sessionLoading, logout } = useAuth();
 
-  const lsProjectId = (() => {
-    try { return Number(localStorage.getItem("projectId") || 0) || 0; } catch { return 0; }
-  })();
-
-  const projectSelected =
-    projectSelectedProp ??
-    Boolean(projeto?.id) ??
-    Boolean(lsProjectId);
+  const projectSelected = !!projeto?.id;
 
   const isAdmin = sessionUser?.role === "admin";
 
@@ -136,7 +123,9 @@ const Layout: React.FC<LayoutProps> = ({
                       location.pathname === item.url ||
                       location.pathname.startsWith(item.url + "/");
 
-                    const disableByProject = item.requiresProject && !projectSelected;
+                    const isLoading = projectLoading || sessionLoading;
+                    const disableByProject =
+                      item.requiresProject && (isLoading || !projectSelected);
                     const classNames = [
                       "transition-all duration-200 rounded-xl h-11",
                       "hover:bg-slate-50 hover:text-slate-900",

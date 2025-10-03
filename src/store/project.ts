@@ -6,6 +6,7 @@ export type ProjetoSlim = { id: number; nome: string };
 
 type ProjectState = {
   projeto: ProjetoSlim | null;
+  loading: boolean;
   setProjeto: (p: ProjetoSlim | null) => void;
   clearProjeto: () => void;
 
@@ -17,10 +18,12 @@ export const useProject = create<ProjectState>()(
   persist(
     (set, get) => ({
       projeto: null,
-      setProjeto: (p) => set({ projeto: p }),
-      clearProjeto: () => set({ projeto: null }),
+      loading: true,
+      setProjeto: (p) => set({ projeto: p, loading: false }),
+      clearProjeto: () => set({ projeto: null, loading: false }),
 
       fetchProjeto: async () => {
+        set({ loading: true });
         try {
           const res = await fetch("/api/projeto_atual", {
             credentials: "same-origin",
@@ -46,9 +49,14 @@ export const useProject = create<ProjectState>()(
           // se deu 4xx/5xx (exceto 401), não sobrescreva o estado atual
         } catch {
           // erro de rede? mantenha o estado atual
+        } finally {
+          set({ loading: false });
         }
       },
     }),
-    { name: "project" }
+    {
+      name: "project",
+      partialize: (state) => ({ projeto: state.projeto }),
+    }
   )
 );

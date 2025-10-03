@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react"; // Adicione useMemo
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/store/auth";
+import { useProject } from "@/store/project";
 import Layout from "../components/Layout";
 import CreateProjectForm from "@/components/dashboard/CreateProjectForm";
 import ProjectGrid from "@/components/dashboard/ProjectGrid";
@@ -16,7 +17,8 @@ import { Download, Plus, Search, Filter } from "lucide-react"; // Adicione Searc
 const Dashboard: React.FC = () => {
 
   const location = useLocation();
-  const { user, loading: authLoading, fetchSession } = useAuth();  
+  const { user, loading: authLoading, fetchSession } = useAuth();
+  const { setProjeto, clearProjeto } = useProject();
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | undefined>();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -139,23 +141,26 @@ const Dashboard: React.FC = () => {
       });
       const data = await res.json();
       if (data.ok) {
-        // Seleciona automaticamente o projeto criado
+        // Seleciona automaticamente o projeto criado no backend
         await fetch("/api/projeto_atual", {
           method: "PUT",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ projeto_id: data.id }),
         });
+
+        const newProject = { id: data.id, nome: data.nome };
+        setProjeto(newProject); // Sincroniza com o store global
         
         // Atualiza localmente sem recarregar tudo
-        const newProject: Project = {
+        const newProjectState: Project = {
           id: data.id,
           nome: formData.name,
           status: 'ATIVO',
           selected: true,
         };
-        setProjects(prev => [...prev, newProject]);
-        setCurrentProject(newProject);
+        setProjects(prev => [...prev, newProjectState]);
+        setCurrentProject(newProjectState);
       }
     } catch (error) {}
     setShowCreateForm(false);
@@ -172,6 +177,7 @@ const Dashboard: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projeto_id: project.id }),
       });
+      setProjeto(project); // Sincroniza com o store global
       
       // Atualiza localmente sem recarregar tudo
       // depois do fetch PUT, ao atualizar localmente
@@ -202,13 +208,14 @@ const Dashboard: React.FC = () => {
         credentials: "include",
       });
       
-      // Atualiza localmente sem recarregar tudo
-      setProjects(prev => prev.filter(p => p.id !== projectId));
-      
       // Se era o projeto atual, limpa a seleção
       if (currentProject?.id === projectId) {
+        clearProjeto(); // Sincroniza com o store global
         setCurrentProject(undefined);
       }
+
+      // Atualiza localmente sem recarregar tudo
+      setProjects(prev => prev.filter(p => p.id !== projectId));
     } catch (error) {}
     setIsLoading(false);
   };
@@ -271,7 +278,7 @@ const Dashboard: React.FC = () => {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }  
   return (
-    <Layout projectSelected={!!currentProject} projectId={currentProject?.id}>
+    <Layout>
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
