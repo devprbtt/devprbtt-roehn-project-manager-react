@@ -26,8 +26,15 @@ import os
 from datetime import datetime
 from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao, Keypad, KeypadButton, QuadroEletrico, Cena, Acao, CustomAcao
 
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///projetos.db'
+app = Flask(__name__, instance_relative_config=True)
+
+# Garante que a pasta da instância exista
+try:
+    os.makedirs(app.instance_path, exist_ok=True)
+except OSError:
+    pass
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.instance_path, 'projetos.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'sua-chave-secreta-muito-longa-aqui-altere-para-uma-chave-segura'
 
@@ -689,20 +696,31 @@ def api_projetos_update(projeto_id):
 @login_required
 def api_projetos_create():
     data = request.get_json(silent=True) or request.form or {}
+    app.logger.info(f"Received data for project creation: {data}")  # Debug log
+
     nome = (data.get("nome") or "").strip()
     if not nome:
+        app.logger.error("Project creation failed: 'nome' is missing.")
         return jsonify({"ok": False, "error": "Nome é obrigatório."}), 400
+
+    # Adicionando validação para projetos duplicados
+    if Projeto.query.filter_by(nome=nome, user_id=current_user.id).first():
+        app.logger.error(f"Project creation failed: Project with name '{nome}' already exists.")
+        return jsonify({"ok": False, "error": "Já existe um projeto com esse nome."}), 409
 
     status = (data.get("status") or "ATIVO").strip().upper()
     if status not in {"ATIVO", "INATIVO", "CONCLUIDO"}:
+        app.logger.error(f"Project creation failed: Invalid status '{status}'.")
         return jsonify({"ok": False, "error": "Status inválido (use ATIVO, INATIVO ou CONCLUIDO)."}), 400
 
     p = Projeto(nome=nome, user_id=current_user.id, status=status)
     db.session.add(p)
     try:
         db.session.commit()
+        app.logger.info(f"Project '{nome}' created with ID {p.id}.")
     except IntegrityError:
         db.session.rollback()
+        app.logger.error("Project creation failed due to an integrity error.")
         return jsonify({"ok": False, "error": "Não foi possível salvar o projeto."}), 400
 
     session["projeto_atual_id"] = p.id
