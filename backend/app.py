@@ -2467,18 +2467,14 @@ def change_password():
 @login_required
 def exportar_pdf(projeto_id):
     projeto = Projeto.query.get_or_404(projeto_id)
-    
-    # Verificar se o usuário tem acesso ao projeto
+
     if projeto.user_id != current_user.id and current_user.role != 'admin':
         flash('Acesso negado a este projeto', 'danger')
         return redirect(url_for('index'))
-    
-    # Criar buffer para o PDF
+
     buffer = io.BytesIO()
-    
-    # Criar o documento PDF
     doc = SimpleDocTemplate(
-        buffer, 
+        buffer,
         pagesize=A4,
         rightMargin=30,
         leftMargin=30,
@@ -2486,77 +2482,39 @@ def exportar_pdf(projeto_id):
         bottomMargin=30,
         title=f"Projeto {projeto.nome}"
     )
-    
-    # Estilos - usando nomes únicos para evitar conflitos
+
     styles = getSampleStyleSheet()
-    
-    # Verificar se os estilos já existem antes de adicionar
     if 'RoehnTitle' not in styles:
-        styles.add(ParagraphStyle(
-            name='RoehnTitle',
-            parent=styles['Heading1'],
-            fontSize=16,
-            spaceAfter=30,
-            alignment=TA_CENTER
-        ))
-    
+        styles.add(ParagraphStyle(name='RoehnTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=30, alignment=TA_CENTER))
     if 'RoehnSubtitle' not in styles:
-        styles.add(ParagraphStyle(
-            name='RoehnSubtitle',
-            parent=styles['Heading2'],
-            fontSize=12,
-            spaceAfter=12,
-            spaceBefore=12
-        ))
-    
+        styles.add(ParagraphStyle(name='RoehnSubtitle', parent=styles['Heading2'], fontSize=12, spaceAfter=12, spaceBefore=12))
     if 'RoehnCenter' not in styles:
-        styles.add(ParagraphStyle(
-            name='RoehnCenter',
-            parent=styles['Normal'],
-            alignment=TA_CENTER
-        ))
-    
-    # Elementos do PDF
+        styles.add(ParagraphStyle(name='RoehnCenter', parent=styles['Normal'], alignment=TA_CENTER))
+    if 'LeftNormal' not in styles:
+        styles.add(ParagraphStyle(name='LeftNormal', parent=styles['Normal'], alignment=TA_LEFT))
+
     elements = []
-    
-    # Caminho para sua imagem
     zafirologopath = "static/images/zafirologo.png"
     zafirologo = Image(zafirologopath, width=2*inch, height=2*inch)
-    # Cabeçalho
     elements.append(zafirologo)
-    #elements.append(Paragraph("ZAFIRO - LUXURY TECHNOLOGY", styles['RoehnTitle']))
     elements.append(Paragraph("RELATÓRIO DE PROJETO", styles['RoehnCenter']))
     elements.append(Spacer(1, 0.2*inch))
-    
-    # No método exportar_pdf, substitua a seção de informações do projeto:
-
-    # Adicione este estilo personalizado antes de criar os elementos
-    if 'LeftNormal' not in styles:
-        styles.add(ParagraphStyle(
-            name='LeftNormal',
-            parent=styles['Normal'],
-            alignment=TA_LEFT
-        ))
-
-    # E use este novo estilo:
     elements.append(Paragraph(f"<b>Projeto:</b> {projeto.nome}", styles['LeftNormal']))
     elements.append(Spacer(1, 0.1*inch))
     elements.append(Paragraph(f"<b>Data de emissão:</b> {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['LeftNormal']))
     elements.append(Spacer(1, 0.1*inch))
     elements.append(Paragraph(f"<b>Emitido por:</b> {current_user.username}", styles['LeftNormal']))
     elements.append(Spacer(1, 0.3*inch))
-    
-    # Para cada área
+
+    # Resumo por Área
     for area in projeto.areas:
         elements.append(Paragraph(f"ÁREA: {area.nome}", styles['Heading2']))
         elements.append(Spacer(1, 0.1*inch))
         
-        # Para cada ambiente na área
         for ambiente in area.ambientes:
             elements.append(Paragraph(f"Ambiente: {ambiente.nome}", styles['Heading3']))
             
-            # Preparar dados da tabela de circuitos
-            circuito_data = [["Circuito", "Nome", "Tipo", "SAKs", "Módulo", "Canal"]]
+            circuito_data = [["Circuito", "Nome", "Tipo", "SAKs", "Módulo", "Canal", "Verificado"]]
             
             for circuito in ambiente.circuitos:
                 modulo_nome = "Não vinculado"
@@ -2565,55 +2523,20 @@ def exportar_pdf(projeto_id):
                     modulo_nome = circuito.vinculacao.modulo.nome
                     canal = str(circuito.vinculacao.canal)
                 
-                # Para circuitos HVAC, mostrar vazio no campo SAK
+                sak_value = ""
                 if circuito.tipo == 'hvac':
-                    sak_value = ""
-                    circuito_data.append([
-                        circuito.identificador,
-                        circuito.nome,
-                        circuito.tipo.upper(),
-                        sak_value,
-                        modulo_nome,
-                        canal
-                    ])
+                    pass
                 elif circuito.tipo == 'persiana':
-                    # Para persianas, adicionar duas linhas: uma para subir e outra para descer
-                    circuito_data.append([
-                        circuito.identificador,
-                        circuito.nome + " (sobe)",
-                        circuito.tipo.upper(),
-                        str(circuito.sak),  # SAK de subida
-                        modulo_nome,
-                        canal + "s"  # Indicar que é o canal de subida
-                    ])
-                    circuito_data.append([
-                        circuito.identificador,
-                        circuito.nome + " (desce)",
-                        circuito.tipo.upper(),
-                        str(circuito.sak + 1),  # SAK de descida
-                        modulo_nome,
-                        canal + "d"  # Indicar que é o canal de descida
-                    ])
+                    circuito_data.append([circuito.identificador, f"{circuito.nome} (sobe)", circuito.tipo.upper(), str(circuito.sak), modulo_nome, f"{canal}s", ""])
+                    circuito_data.append([circuito.identificador, f"{circuito.nome} (desce)", circuito.tipo.upper(), str(circuito.sak + 1), modulo_nome, f"{canal}d", ""])
+                    continue
                 else:
-                    # Para outros circuitos
-                    circuito_data.append([
-                        circuito.identificador,
-                        circuito.nome,
-                        circuito.tipo.upper(),
-                        str(circuito.sak),
-                        modulo_nome,
-                        canal
-                    ])
+                    sak_value = str(circuito.sak)
+
+                circuito_data.append([circuito.identificador, circuito.nome, circuito.tipo.upper(), sak_value, modulo_nome, canal, ""])
             
-            # Criar tabela de circuitos
             if len(circuito_data) > 1:
-                circuito_table = Table(
-                    circuito_data, 
-                    colWidths=[0.7*inch, 1.5*inch, 0.8*inch, 0.6*inch, 1.2*inch, 0.6*inch],
-                    repeatRows=1
-                )
-                
-                # Estilo da tabela
+                circuito_table = Table(circuito_data, colWidths=[0.7*inch, 1.5*inch, 0.8*inch, 0.6*inch, 1.2*inch, 0.6*inch, 0.8*inch], repeatRows=1)
                 estilo_tabela = TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -2621,152 +2544,98 @@ def exportar_pdf(projeto_id):
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, 0), 9),
                     ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor("#f8f9fa")),
-                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                    ('FONTSIZE', (0, 1), (-1, -1), 8),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#4d4f52")),
                     ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#f1f3f5")])
                 ])
-                
-                # Adicionar cores diferentes por tipo de circuito
-                for i, row in enumerate(circuito_data[1:], 1):
-                    if row[2] == "LUZ":
-                        estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#fff3cd"))
-                    elif row[2] == "PERSIANA":
-                        # Colorir as linhas de persiana de forma diferente
-                        if "(sobe)" in row[1]:
-                            estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d1ecf1"))
-                        elif "(desce)" in row[1]:
-                            estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#e8f4f8"))
-                    elif row[2] == "HVAC":
-                        estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d4edda"))
-                
                 circuito_table.setStyle(estilo_tabela)
                 elements.append(circuito_table)
             else:
-                elements.append(Paragraph("Nenhum circuito neste ambiente.", styles['Italic']))
+                elements.append(Paragraph("Nenhum circuito neste ambiente.", styles['Normal']))
             
             elements.append(Spacer(1, 0.2*inch))
         
-        # Quebra de página após cada área
         if area != projeto.areas[-1]:
             elements.append(PageBreak())
-    
-    # Resumo de módulos - MODIFICAÇÃO AQUI
+
+    # Resumo de Módulos
     elements.append(PageBreak())
     elements.append(Paragraph("RESUMO DE MÓDULOS", styles['Heading2']))
     elements.append(Spacer(1, 0.2*inch))
     
-    # Coletar todos os módulos do projeto
     modulos_projeto = Modulo.query.filter_by(projeto_id=projeto_id).all()
     
     if modulos_projeto:
         for modulo in modulos_projeto:
             elements.append(Paragraph(f"Módulo: {modulo.nome} ({modulo.tipo})", styles['Heading3']))
             
-            # Preparar dados da tabela de canais - ADICIONANDO SEPARAÇÃO PARA PERSIANAS
-            canal_data = [["Canal", "Circuito", "Nome do Circuito", "Tipo", "SAK"]]
+            canal_data = [["Canal", "Circuito", "Nome", "Amperagem Registrada", "Amperagem Medida"]]
             
-            # Preencher com as vinculações deste módulo
             canais_ocupados = {v.canal: v for v in modulo.vinculacoes}
             
             for canal_num in range(1, modulo.quantidade_canais + 1):
                 if canal_num in canais_ocupados:
                     vinculacao = canais_ocupados[canal_num]
                     circuito = vinculacao.circuito
-                    
-                    if circuito.tipo == 'persiana':
-                        # Para persianas, adicionar duas linhas
-                        canal_data.append([
-                            str(canal_num) + "s",  # Canal de subida
-                            circuito.identificador,
-                            circuito.nome + " (sobe)",
-                            circuito.tipo.upper(),
-                            str(circuito.sak)  # SAK de subida
-                        ])
-                        canal_data.append([
-                            str(canal_num) + "d",  # Canal de descida
-                            circuito.identificador,
-                            circuito.nome + " (desce)",
-                            circuito.tipo.upper(),
-                            str(circuito.sak + 1)  # SAK de descida
-                        ])
-                    else:
-                        # Para outros circuitos
-                        if circuito.tipo == 'hvac':
-                            sak_value = ""
-                        else:
-                            sak_value = str(circuito.sak)
-                        
-                        canal_data.append([
-                            str(canal_num),
-                            circuito.identificador,
-                            circuito.nome,
-                            circuito.tipo.upper(),
-                            sak_value
-                        ])
+                    amperagem = f"{(circuito.potencia or 0) / 120:.2f}A" if circuito.potencia else "0.00A"
+                    canal_data.append([str(canal_num), circuito.identificador, circuito.nome, amperagem, ""])
                 else:
-                    canal_data.append([
-                        str(canal_num),
-                        "Livre",
-                        "-",
-                        "-",
-                        "-"
-                    ])
+                    canal_data.append([str(canal_num), "Livre", "-", "-", ""])
             
-            # Criar tabela de canais - AJUSTANDO LARGURAS DAS COLUNAS
-            canal_table = Table(
-                canal_data, 
-                colWidths=[0.7*inch, 1.0*inch, 1.5*inch, 0.8*inch, 0.8*inch],
-                repeatRows=1
-            )
-            
-            # Estilo da tabela
+            canal_table = Table(canal_data, colWidths=[0.6*inch, 1.0*inch, 2.0*inch, 1.2*inch, 1.2*inch], repeatRows=1)
             estilo_canal = TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, 0), 9),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor("#f8f9fa")),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 8),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#4d4f52")),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#f1f3f5")])
             ])
-            
-            # Adicionar cores diferentes por tipo de circuito
-            for i, row in enumerate(canal_data[1:], 1):
-                if row[3] == "LUZ":
-                    estilo_canal.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#fff3cd"))
-                elif row[3] == "PERSIANA":
-                    # Colorir as linhas de persiana de forma diferente
-                    if "(sobe)" in row[2]:
-                        estilo_canal.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d1ecf1"))
-                    elif "(desce)" in row[2]:
-                        estilo_canal.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#e8f4f8"))
-                elif row[3] == "HVAC":
-                    estilo_canal.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d4edda"))
-            
             canal_table.setStyle(estilo_canal)
             elements.append(canal_table)
             elements.append(Spacer(1, 0.3*inch))
     else:
-        elements.append(Paragraph("Nenhum módulo configurado neste projeto.", styles['Italic']))
+        elements.append(Paragraph("Nenhum módulo configurado neste projeto.", styles['Normal']))
+
+    # Seção de Assinaturas
+    elements.append(PageBreak())
+    elements.append(Paragraph("REGISTRO DE VISITAS TÉCNICAS", styles['Heading2']))
+    elements.append(Spacer(1, 0.2*inch))
+
+    assinatura_data = [["Data", "Técnico Responsável", "Assinatura"]]
+    for i in range(10):
+        assinatura_data.append(["____/____/______", "", ""])
     
-    # Rodapé com informações da empresa
-    elements.append(Spacer(1, 0.5*inch))
-    elements.append(Paragraph("Zafiro - Luxury Technology", 
-                             styles['RoehnCenter']))
-    elements.append(Paragraph(f"Relatório gerado em: {datetime.now().strftime('%d/%m/%Y às %H:%M')}", 
-                             styles['RoehnCenter']))
+    assinatura_table = Table(assinatura_data, colWidths=[1.5*inch, 3*inch, 2.5*inch], rowHeights=0.5*inch)
+    assinatura_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elements.append(assinatura_table)
+
+    # Página de Observações
+    elements.append(PageBreak())
+    elements.append(Paragraph("OBSERVAÇÕES GERAIS", styles['Heading2']))
+    elements.append(Spacer(1, 0.2*inch))
+
+    obs_data = []
+    for i in range(1, 11):
+        obs_data.append([f"Dia {i}:", ""])
     
-    # Construir o PDF
+    obs_table = Table(obs_data, colWidths=[0.8*inch, 6.2*inch], rowHeights=1.5*inch)
+    obs_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP')
+    ]))
+    elements.append(obs_table)
+
     doc.build(elements)
-    
     buffer.seek(0)
     
-    # Nome do arquivo
     nome_arquivo = f"projeto_{projeto.nome}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     
     return send_file(
