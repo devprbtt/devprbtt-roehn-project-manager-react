@@ -31,7 +31,7 @@ const ImportProjectSection: React.FC<Props> = ({ onProjectImported }) => {
       const formData = new FormData();
       formData.append("file", importFile);
 
-      const response = await fetch("/import_roehn", {
+      const response = await fetch("/api/importar-projeto", {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -39,10 +39,10 @@ const ImportProjectSection: React.FC<Props> = ({ onProjectImported }) => {
 
       const data = await response.json();
 
-      if (response.ok && data.success) {
+      if (response.ok && data.ok) {
         toast({
           title: "Sucesso!",
-          description: "Projeto importado com sucesso.",
+          description: data.message || "Projeto importado com sucesso.",
         });
         onProjectImported();
       } else {
