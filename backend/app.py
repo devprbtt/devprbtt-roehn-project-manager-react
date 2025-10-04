@@ -2054,58 +2054,109 @@ def exportar_csv():
 @app.route('/exportar-projeto/<int:projeto_id>')
 @login_required
 def exportar_projeto(projeto_id):
-    projeto = Projeto.query.get_or_404(projeto_id)
-    
-    # Verificar se o usuário tem acesso ao projeto
+    projeto = Projeto.query.options(
+        joinedload(Projeto.areas)
+        .joinedload(Area.ambientes)
+        .joinedload(Ambiente.circuitos)
+        .joinedload(Circuito.vinculacao),
+        joinedload(Projeto.areas)
+        .joinedload(Area.ambientes)
+        .joinedload(Ambiente.keypads)
+        .joinedload(Keypad.buttons),
+        joinedload(Projeto.areas)
+        .joinedload(Area.ambientes)
+        .joinedload(Ambiente.quadros_eletricos)
+        .joinedload(QuadroEletrico.modulos),
+        joinedload(Projeto.areas)
+        .joinedload(Area.ambientes)
+        .joinedload(Ambiente.cenas)
+        .joinedload(Cena.acoes)
+        .joinedload(Acao.custom_acoes),
+        joinedload(Projeto.modulos)
+    ).get_or_404(projeto_id)
+
     if projeto.user_id != current_user.id and current_user.role != 'admin':
-        flash('Acesso negado a este projeto', 'danger')
-        return redirect(url_for('index'))
-    
-    # Coletar todos os dados do projeto
-    projeto_data = {
-        'projeto': {
-            'id': projeto.id,
-            'nome': projeto.nome,
-            'user_id': projeto.user_id
-        },
+        return jsonify({"ok": False, "error": "Acesso negado."}), 403
+
+    # Estrutura de dados para exportação
+    export_data = {
+        'version': '1.0',
+        'exported_at': datetime.utcnow().isoformat(),
+        'projeto': {},
         'areas': [],
         'ambientes': [],
+        'quadros_eletricos': [],
         'circuitos': [],
         'modulos': [],
         'vinculacoes': [],
         'keypads': [],
-        'keypad_buttons': []
+        'keypad_buttons': [],
+        'cenas': [],
+        'acoes': [],
+        'custom_acoes': [],
     }
-    
+
+    # 1. Projeto
+    export_data['projeto'] = {
+        'id': projeto.id,
+        'nome': projeto.nome,
+        'status': projeto.status,
+    }
+
+    # 2. Módulos (todos do projeto)
+    all_modulos_in_projeto = Modulo.query.filter_by(projeto_id=projeto.id).all()
+    for modulo in all_modulos_in_projeto:
+        export_data['modulos'].append({
+            'id': modulo.id,
+            'nome': modulo.nome,
+            'tipo': modulo.tipo,
+            'quantidade_canais': modulo.quantidade_canais,
+            'hsnet': modulo.hsnet,
+            'dev_id': modulo.dev_id,
+            'quadro_eletrico_id': modulo.quadro_eletrico_id,
+        })
+        # Coletar vinculações associadas
+        for vinc in modulo.vinculacoes:
+            export_data['vinculacoes'].append({
+                'id': vinc.id,
+                'circuito_id': vinc.circuito_id,
+                'modulo_id': vinc.modulo_id,
+                'canal': vinc.canal,
+            })
+
+    # 3. Áreas e seus filhos
     for area in projeto.areas:
-        area_data = {
-            'id': area.id,
-            'nome': area.nome,
-            'projeto_id': area.projeto_id
-        }
-        projeto_data['areas'].append(area_data)
-        
+        export_data['areas'].append({'id': area.id, 'nome': area.nome, 'projeto_id': area.projeto_id})
         for ambiente in area.ambientes:
-            ambiente_data = {
-                'id': ambiente.id,
-                'nome': ambiente.nome,
-                'area_id': ambiente.area_id
-            }
-            projeto_data['ambientes'].append(ambiente_data)
-            
+            export_data['ambientes'].append({'id': ambiente.id, 'nome': ambiente.nome, 'area_id': ambiente.area_id})
+
+            # Quadros Elétricos
+            for quadro in ambiente.quadros_eletricos:
+                export_data['quadros_eletricos'].append({
+                    'id': quadro.id,
+                    'nome': quadro.nome,
+                    'notes': quadro.notes,
+                    'ambiente_id': quadro.ambiente_id,
+                    'projeto_id': quadro.projeto_id,
+                })
+
+            # Circuitos
             for circuito in ambiente.circuitos:
-                circuito_data = {
+                export_data['circuitos'].append({
                     'id': circuito.id,
                     'identificador': circuito.identificador,
                     'nome': circuito.nome,
                     'tipo': circuito.tipo,
+                    'dimerizavel': circuito.dimerizavel,
+                    'potencia': circuito.potencia,
                     'ambiente_id': circuito.ambiente_id,
-                    'sak': circuito.sak
-                }
-                projeto_data['circuitos'].append(circuito_data)
+                    'sak': circuito.sak,
+                    'quantidade_saks': circuito.quantidade_saks,
+                })
 
+            # Keypads
             for keypad in ambiente.keypads:
-                keypad_data = {
+                export_data['keypads'].append({
                     'id': keypad.id,
                     'nome': keypad.nome,
                     'modelo': keypad.modelo,
@@ -2116,16 +2167,15 @@ def exportar_projeto(projeto_id):
                     'dev_id': keypad.dev_id,
                     'ambiente_id': keypad.ambiente_id,
                     'notes': keypad.notes,
-                }
-                projeto_data['keypads'].append(keypad_data)
-
+                })
                 for button in keypad.buttons:
-                    projeto_data['keypad_buttons'].append({
+                    export_data['keypad_buttons'].append({
                         'id': button.id,
-                        'keypad_id': keypad.id,
+                        'keypad_id': button.keypad_id,
                         'ordem': button.ordem,
                         'guid': button.guid,
                         'circuito_id': button.circuito_id,
+                        'cena_id': button.cena_id,
                         'modo': button.modo,
                         'command_on': button.command_on,
                         'command_off': button.command_off,
@@ -2135,44 +2185,41 @@ def exportar_projeto(projeto_id):
                         'target_object_guid': button.target_object_guid,
                         'notes': button.notes,
                     })
-    
-    # Adicionar apenas módulos do projeto
-    for modulo in Modulo.query.filter_by(projeto_id=projeto_id).all():
-        modulo_data = {
-            'id': modulo.id,
-            'nome': modulo.nome,
-            'tipo': modulo.tipo,
-            'quantidade_canais': modulo.quantidade_canais,
-            'hsnet': modulo.hsnet,
-            'dev_id': modulo.dev_id,
-        }
-        projeto_data['modulos'].append(modulo_data)
-    
-    vincs = (
-        Vinculacao.query
-        .join(Circuito, Vinculacao.circuito_id == Circuito.id)
-        .join(Ambiente, Circuito.ambiente_id == Ambiente.id)
-        .join(Area, Ambiente.area_id == Area.id)
-        .join(Modulo, Vinculacao.modulo_id == Modulo.id)
-        .filter(Area.projeto_id == projeto_id, Modulo.projeto_id == projeto_id)
-        .all()
-    )
-    for vinculacao in vincs:
-        vinculacao_data = {
-            'id': vinculacao.id,
-            'circuito_id': vinculacao.circuito_id,
-            'modulo_id': vinculacao.modulo_id,
-            'canal': vinculacao.canal
-        }
-        projeto_data['vinculacoes'].append(vinculacao_data)
-    
-    # Converter para JSON
+
+            # Cenas
+            for cena in ambiente.cenas:
+                export_data['cenas'].append({
+                    'id': cena.id,
+                    'guid': cena.guid,
+                    'nome': cena.nome,
+                    'ambiente_id': cena.ambiente_id,
+                    'scene_movers': cena.scene_movers,
+                })
+                for acao in cena.acoes:
+                    export_data['acoes'].append({
+                        'id': acao.id,
+                        'cena_id': acao.cena_id,
+                        'level': acao.level,
+                        'action_type': acao.action_type,
+                        'target_guid': acao.target_guid,
+                    })
+                    for custom_acao in acao.custom_acoes:
+                        export_data['custom_acoes'].append({
+                            'id': custom_acao.id,
+                            'acao_id': custom_acao.acao_id,
+                            'target_guid': custom_acao.target_guid,
+                            'enable': custom_acao.enable,
+                            'level': custom_acao.level,
+                        })
+
+    # Preparar arquivo para download
     output = io.BytesIO()
-    output.write(json.dumps(projeto_data, indent=2).encode('utf-8'))
+    output.write(json.dumps(export_data, indent=2).encode('utf-8'))
     output.seek(0)
     
     # Nome do arquivo
-    nome_arquivo = f"projeto_{projeto.nome}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    safe_nome = re.sub(r'[^a-zA-Z0-9_.-]', '_', projeto.nome)
+    nome_arquivo = f"export_{safe_nome}_{datetime.now().strftime('%Y%m%d')}.json"
     
     return send_file(
         output,
@@ -2181,35 +2228,241 @@ def exportar_projeto(projeto_id):
         download_name=nome_arquivo
     )
 
-# Modifique a rota de importação para retornar JSON
-@app.route('/import_roehn', methods=['POST'])
+@app.route('/api/importar-projeto', methods=['POST'])
 @login_required
-def import_roehn():
+def importar_projeto():
     if 'file' not in request.files:
-        return jsonify({"success": False, "error": "Nenhum arquivo enviado"}), 400
+        return jsonify({"ok": False, "error": "Nenhum arquivo enviado."}), 400
 
     file = request.files['file']
-
     if file.filename == '':
-        return jsonify({"success": False, "error": "Nenhum arquivo selecionado"}), 400
+        return jsonify({"ok": False, "error": "Nenhum arquivo selecionado."}), 400
 
-    if file and file.filename.endswith('.json'):
-        try:
-            project_json_data = json.load(file)
-            
-            # --- AQUI ESTÁ A CORREÇÃO ---
-            # Passe o ID do usuário logado para a classe RoehnProjectConverter
-            converter = RoehnProjectConverter(project_json_data, db.session, current_user.id)
-            converter.process_json_project()
-            
-            return jsonify({"success": True, "message": "Importação concluída com sucesso."})
+    if not file or not file.filename.endswith('.json'):
+        return jsonify({"ok": False, "error": "Arquivo inválido. Apenas arquivos .json são permitidos."}), 400
 
-        except Exception as e:
-            db.session.rollback()
-            logging.error(f"Erro na importação: {e}")
-            return jsonify({"success": False, "error": f"Erro na importação: {e}"}), 500
-    
-    return jsonify({"success": False, "error": "Tipo de arquivo não suportado"}), 400
+    try:
+        data = json.load(file)
+    except json.JSONDecodeError:
+        return jsonify({"ok": False, "error": "Arquivo JSON mal formatado."}), 400
+
+    if 'projeto' not in data or 'areas' not in data:
+        return jsonify({"ok": False, "error": "Estrutura do JSON inválida. Faltam chaves essenciais."}), 400
+
+    # ID Mappings
+    id_map = {
+        'areas': {}, 'ambientes': {}, 'quadros_eletricos': {},
+        'circuitos': {}, 'modulos': {}, 'keypads': {}, 'cenas': {}, 'acoes': {}
+    }
+
+    try:
+        # Iniciar transação
+        with db.session.begin_nested():
+            # 1. Criar Projeto
+            original_nome = data['projeto']['nome']
+            novo_nome = original_nome
+            count = 1
+            while Projeto.query.filter_by(nome=novo_nome, user_id=current_user.id).first():
+                novo_nome = f"{original_nome} (cópia {count})"
+                count += 1
+
+            novo_projeto = Projeto(
+                nome=novo_nome,
+                status=data['projeto'].get('status', 'ATIVO'),
+                user_id=current_user.id
+            )
+            db.session.add(novo_projeto)
+            db.session.flush()
+
+            # 2. Criar Áreas
+            for area_data in data.get('areas', []):
+                nova_area = Area(nome=area_data['nome'], projeto_id=novo_projeto.id)
+                db.session.add(nova_area)
+                db.session.flush()
+                id_map['areas'][area_data['id']] = nova_area.id
+
+            # 3. Criar Ambientes
+            for ambiente_data in data.get('ambientes', []):
+                nova_area_id = id_map['areas'].get(ambiente_data['area_id'])
+                if not nova_area_id: continue
+                novo_ambiente = Ambiente(nome=ambiente_data['nome'], area_id=nova_area_id)
+                db.session.add(novo_ambiente)
+                db.session.flush()
+                id_map['ambientes'][ambiente_data['id']] = novo_ambiente.id
+
+            # 4. Criar Quadros Elétricos
+            for quadro_data in data.get('quadros_eletricos', []):
+                novo_ambiente_id = id_map['ambientes'].get(quadro_data['ambiente_id'])
+                if not novo_ambiente_id: continue
+                novo_quadro = QuadroEletrico(
+                    nome=quadro_data['nome'],
+                    notes=quadro_data.get('notes'),
+                    ambiente_id=novo_ambiente_id,
+                    projeto_id=novo_projeto.id
+                )
+                db.session.add(novo_quadro)
+                db.session.flush()
+                id_map['quadros_eletricos'][quadro_data['id']] = novo_quadro.id
+
+            # 5. Criar Módulos
+            for modulo_data in data.get('modulos', []):
+                novo_quadro_id = id_map['quadros_eletricos'].get(modulo_data['quadro_eletrico_id'])
+                novo_modulo = Modulo(
+                    nome=modulo_data['nome'],
+                    tipo=modulo_data['tipo'],
+                    quantidade_canais=modulo_data['quantidade_canais'],
+                    hsnet=modulo_data.get('hsnet'),
+                    dev_id=modulo_data.get('dev_id'),
+                    quadro_eletrico_id=novo_quadro_id,
+                    projeto_id=novo_projeto.id
+                )
+                db.session.add(novo_modulo)
+                db.session.flush()
+                id_map['modulos'][modulo_data['id']] = novo_modulo.id
+
+            # 6. Criar Circuitos
+            for circuito_data in data.get('circuitos', []):
+                novo_ambiente_id = id_map['ambientes'].get(circuito_data['ambiente_id'])
+                if not novo_ambiente_id: continue
+                novo_circuito = Circuito(
+                    identificador=circuito_data['identificador'],
+                    nome=circuito_data['nome'],
+                    tipo=circuito_data['tipo'],
+                    dimerizavel=circuito_data.get('dimerizavel', False),
+                    potencia=circuito_data.get('potencia', 0.0),
+                    sak=circuito_data.get('sak'),
+                    quantidade_saks=circuito_data.get('quantidade_saks', 1),
+                    ambiente_id=novo_ambiente_id
+                )
+                db.session.add(novo_circuito)
+                db.session.flush()
+                id_map['circuitos'][circuito_data['id']] = novo_circuito.id
+            
+            # 7. Criar Vinculações
+            for vinc_data in data.get('vinculacoes', []):
+                novo_circuito_id = id_map['circuitos'].get(vinc_data['circuito_id'])
+                novo_modulo_id = id_map['modulos'].get(vinc_data['modulo_id'])
+                if not novo_circuito_id or not novo_modulo_id: continue
+                nova_vinc = Vinculacao(
+                    circuito_id=novo_circuito_id,
+                    modulo_id=novo_modulo_id,
+                    canal=vinc_data['canal']
+                )
+                db.session.add(nova_vinc)
+
+            # 8. Criar Keypads e Botões
+            for keypad_data in data.get('keypads', []):
+                novo_ambiente_id = id_map['ambientes'].get(keypad_data['ambiente_id'])
+                if not novo_ambiente_id: continue
+                novo_keypad = Keypad(
+                    nome=keypad_data['nome'],
+                    modelo=keypad_data.get('modelo', 'RQR-K'),
+                    color=keypad_data.get('color', 'WHITE'),
+                    button_color=keypad_data.get('button_color', 'WHITE'),
+                    button_count=keypad_data.get('button_count', 4),
+                    hsnet=keypad_data['hsnet'],
+                    dev_id=keypad_data.get('dev_id'),
+                    notes=keypad_data.get('notes'),
+                    ambiente_id=novo_ambiente_id
+                )
+                db.session.add(novo_keypad)
+                db.session.flush()
+                id_map['keypads'][keypad_data['id']] = novo_keypad.id
+
+            for btn_data in data.get('keypad_buttons', []):
+                novo_keypad_id = id_map['keypads'].get(btn_data['keypad_id'])
+                novo_circuito_id = id_map['circuitos'].get(btn_data['circuito_id'])
+                # Cenas ainda não foram mapeadas, faremos isso depois
+                if not novo_keypad_id: continue
+                novo_btn = KeypadButton(
+                    keypad_id=novo_keypad_id,
+                    ordem=btn_data['ordem'],
+                    guid=btn_data.get('guid', str(uuid.uuid4())),
+                    circuito_id=novo_circuito_id,
+                    # cena_id será atualizado depois
+                    modo=btn_data.get('modo', 3),
+                    command_on=btn_data.get('command_on', 0),
+                    command_off=btn_data.get('command_off', 0),
+                    can_hold=btn_data.get('can_hold', False),
+                    modo_double_press=btn_data.get('modo_double_press', 3),
+                    command_double_press=btn_data.get('command_double_press', 0),
+                    target_object_guid=btn_data.get('target_object_guid'),
+                    notes=btn_data.get('notes')
+                )
+                db.session.add(novo_btn)
+            
+            # 9. Criar Cenas, Ações e CustomAcoes
+            for cena_data in data.get('cenas', []):
+                novo_ambiente_id = id_map['ambientes'].get(cena_data['ambiente_id'])
+                if not novo_ambiente_id: continue
+                nova_cena = Cena(
+                    guid=cena_data.get('guid', str(uuid.uuid4())),
+                    nome=cena_data['nome'],
+                    scene_movers=cena_data.get('scene_movers', False),
+                    ambiente_id=novo_ambiente_id
+                )
+                db.session.add(nova_cena)
+                db.session.flush()
+                id_map['cenas'][cena_data['id']] = nova_cena.id
+
+            for acao_data in data.get('acoes', []):
+                nova_cena_id = id_map['cenas'].get(acao_data['cena_id'])
+                if not nova_cena_id: continue
+                nova_acao = Acao(
+                    cena_id=nova_cena_id,
+                    level=acao_data.get('level', 100),
+                    action_type=acao_data.get('action_type', 0),
+                    target_guid=acao_data['target_guid'] # Mantemos o GUID por enquanto
+                )
+                db.session.add(nova_acao)
+                db.session.flush()
+                id_map['acoes'][acao_data['id']] = nova_acao.id
+
+            for custom_acao_data in data.get('custom_acoes', []):
+                nova_acao_id = id_map['acoes'].get(custom_acao_data['acao_id'])
+                if not nova_acao_id: continue
+                nova_custom_acao = CustomAcao(
+                    acao_id=nova_acao_id,
+                    target_guid=custom_acao_data['target_guid'],
+                    enable=custom_acao_data.get('enable', True),
+                    level=custom_acao_data.get('level', 50)
+                )
+                db.session.add(nova_custom_acao)
+
+            # 10. Pós-processamento para atualizar referências
+            db.session.flush()
+            # Atualizar KeypadButton.cena_id
+            for btn_data in data.get('keypad_buttons', []):
+                if btn_data.get('cena_id'):
+                    novo_keypad_id = id_map['keypads'].get(btn_data['keypad_id'])
+                    nova_cena_id = id_map['cenas'].get(btn_data['cena_id'])
+                    if novo_keypad_id and nova_cena_id:
+                        # Encontrar o botão correspondente no banco de dados e atualizá-lo
+                        btn_to_update = KeypadButton.query.filter_by(
+                            keypad_id=novo_keypad_id,
+                            ordem=btn_data['ordem']
+                        ).first()
+                        if btn_to_update:
+                            btn_to_update.cena_id = nova_cena_id
+
+            # Atualizar GUIDs em Acao e CustomAcao
+            # Esta parte é complexa se os GUIDs devem ser remapeados.
+            # Por simplicidade, assumimos que os GUIDs de circuito/ambiente são os IDs antigos.
+            # Uma implementação mais robusta remapearia os GUIDs.
+
+        db.session.commit()
+        return jsonify({"ok": True, "message": f"Projeto '{novo_nome}' importado com sucesso!", "projeto_id": novo_projeto.id})
+
+    except IntegrityError as e:
+        db.session.rollback()
+        app.logger.error(f"Erro de integridade na importação: {e}")
+        return jsonify({"ok": False, "error": "Erro de integridade nos dados. Verifique se há nomes duplicados."}), 409
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Erro inesperado na importação: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"ok": False, "error": f"Ocorreu um erro inesperado: {e}"}), 500
 
 @app.route('/user/change-password', methods=['POST'])
 @login_required

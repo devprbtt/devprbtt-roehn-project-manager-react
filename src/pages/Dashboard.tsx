@@ -141,30 +141,18 @@ const Dashboard: React.FC = () => {
       });
       const data = await res.json();
       if (data.ok) {
-        // Seleciona automaticamente o projeto criado no backend
-        await fetch("/api/projeto_atual", {
-          method: "PUT",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projeto_id: data.id }),
-        });
-
-        const newProject = { id: data.id, nome: data.nome };
-        setProjeto(newProject); // Sincroniza com o store global
-        
-        // Atualiza localmente sem recarregar tudo
-        const newProjectState: Project = {
-          id: data.id,
-          nome: formData.name,
-          status: 'ATIVO',
-          selected: true,
-        };
-        setProjects(prev => [...prev, newProjectState]);
-        setCurrentProject(newProjectState);
+        // Em vez de atualizar o estado manualmente, recarregamos tudo do servidor.
+        // Isso é mais simples e confiável, e garante que o projeto recém-criado
+        // (que o backend já define como atual) seja refletido corretamente na UI.
+        await loadProjects();
       }
-    } catch (error) {}
-    setShowCreateForm(false);
-    setIsLoading(false);
+    } catch (error) {
+      console.error("Erro ao criar projeto:", error);
+      // Adicionar feedback para o usuário, ex: toast
+    } finally {
+      setShowCreateForm(false);
+      setIsLoading(false);
+    }
   };
 
   // Selecionar projeto
