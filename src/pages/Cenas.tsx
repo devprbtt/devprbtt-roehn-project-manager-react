@@ -11,7 +11,9 @@ import { Trash2, Clapperboard, Edit, Search, Filter, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import type { Cena } from "@/types/cena";
 import type { Circuito, Ambiente, Area } from "@/types/project";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 
 const Cenas = () => {
   // State for data
@@ -112,31 +114,80 @@ const Cenas = () => {
             {/* Coluna da Lista de Cenas */}
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
                 <Card>
-                <CardHeader>
-                    <CardTitle>Cenas Cadastradas</CardTitle>
-                    <div className="mt-4 space-y-4">
+                <CardHeader className="pb-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                <Clapperboard className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-2xl font-bold text-slate-900">Cenas Cadastradas</CardTitle>
+                                <p className="text-slate-600 mt-1">Lista de todas as cenas</p>
+                            </div>
+                        </div>
+                        <Badge className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-medium px-3 py-1">
+                            {filteredCenas.length} de {cenas?.length || 0} {cenas?.length === 1 ? "cena" : "cenas"}
+                        </Badge>
+                    </div>
+
+                    {/* Barra de Filtros */}
+                    <div className="mt-6 space-y-4">
+                        {/* Filtro de Busca por Texto */}
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                             <Input
                                 placeholder="Buscar por nome..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10 pr-10 h-10"
+                                className="pl-10 pr-10 h-10 rounded-xl border-slate-200 focus:border-blue-500"
                             />
-                            {searchTerm && <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8" onClick={() => setSearchTerm("")}><X className="w-4 h-4" /></Button>}
+                            {searchTerm && (
+                                <button
+                                    onClick={() => setSearchTerm("")}
+                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Filter className="h-4 w-4 text-slate-500" />
+
+                        {/* Filtro por Ambiente */}
+                        <div className="space-y-1">
+                            <Label htmlFor="filtro-ambiente" className="text-xs font-medium text-slate-600">
+                                Ambiente
+                            </Label>
                             <Select value={String(ambienteFilter)} onValueChange={(v) => setAmbienteFilter(v === "todos" ? "todos" : Number(v))}>
-                                <SelectTrigger>
+                                <SelectTrigger id="filtro-ambiente" className="h-9 text-sm rounded-xl">
                                     <SelectValue placeholder="Filtrar por ambiente..." />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="rounded-xl">
                                     <SelectItem value="todos">Todos os Ambientes</SelectItem>
-                                    {ambientes.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.nome}</SelectItem>)}
+                                    {ambientes.map(a => (
+                                        <SelectItem key={a.id} value={String(a.id)}>
+                                            {a.nome} ({a.area.nome})
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {/* Botão para limpar todos os filtros */}
+                        {(searchTerm || ambienteFilter !== "todos") && (
+                            <div className="flex justify-end">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        setSearchTerm("");
+                                        setAmbienteFilter("todos");
+                                    }}
+                                    className="h-8 text-xs rounded-lg gap-1"
+                                >
+                                    <X className="w-3 h-3" />
+                                    Limpar filtros
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -144,23 +195,43 @@ const Cenas = () => {
                     <p>Carregando cenas...</p>
                     ) : filteredCenas && filteredCenas.length > 0 ? (
                     <ScrollArea className="h-[500px] pr-4">
-                        <div className="space-y-4">
-                        {filteredCenas.map((cena) => (
-                            <div key={cena.id} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div>
-                                <p className="font-semibold">{cena.nome}</p>
-                                <p className="text-sm text-muted-foreground">{cena.ambiente.nome} ({cena.ambiente.area.nome})</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button variant="outline" size="icon" onClick={() => handleEdit(cena)}>
-                                <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="destructive" size="icon" onClick={() => handleDelete(cena.id)}>
-                                <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </div>
-                            </div>
-                        ))}
+                        <div className="space-y-3">
+                            <AnimatePresence>
+                                {filteredCenas.map((cena, index) => (
+                                    <motion.div
+                                        key={cena.id}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -20 }}
+                                        transition={{ delay: index * 0.05 }}
+                                        className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
+                                    >
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex-1 mr-4">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <Badge className="text-xs font-medium px-2 py-1 bg-indigo-100 text-indigo-800">
+                                                        {cena.acoes.length} {cena.acoes.length === 1 ? 'Ação' : 'Ações'}
+                                                    </Badge>
+                                                </div>
+                                                <h4 className="font-bold text-slate-900 text-lg">{cena.nome}</h4>
+                                                <p className="text-sm text-slate-600">
+                                                    {cena.ambiente.nome}
+                                                    {cena.ambiente.area && ` (${cena.ambiente.area.nome})`}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button variant="outline" size="sm" onClick={() => handleEdit(cena)} className="rounded-xl shadow hover:shadow-md">
+                                                    <Edit className="h-4 w-4 mr-2" />
+                                                    Editar
+                                                </Button>
+                                                <Button variant="destructive" size="sm" onClick={() => handleDelete(cena.id)} className="rounded-xl shadow-lg hover:shadow-xl">
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
                         </div>
                     </ScrollArea>
                     ) : (

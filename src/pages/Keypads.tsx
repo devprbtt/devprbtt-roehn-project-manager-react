@@ -17,8 +17,10 @@ import {
   DoorOpen,
   Link2,
   X,
+  Search,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // ---------- Tipos ----------
 type AreaLite = { id: number; nome: string };
@@ -126,63 +128,32 @@ export default function Keypads() {
   const [buttonBindings, setButtonBindings] = useState<ButtonBinding[]>([]);
 
   // Filtros
-  const [q, setQ] = useState("");
-  const [areaIdFilter, setAreaIdFilter] = useState<number | "">("");
-  const [ambIdFilter, setAmbIdFilter] = useState<number | "">("");
-  const [btnCountFilter, setBtnCountFilter] = useState<1 | 2 | 4 | "">("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [ambienteFilter, setAmbienteFilter] = useState<number | "todos">("todos");
+  const [teclasFilter, setTeclasFilter] = useState<1 | 2 | 4 | "todos">("todos");
 
   // options
 
-  // Opções únicas de Área/Ambiente a partir dos keypads
-  const areaOptions = useMemo(() => {
-    const map = new Map<number, string>();
-    keypads.forEach(k => {
-      const a = k.ambiente?.area;
-      if (a?.id) map.set(a.id, a.nome);
-    });
-    return Array.from(map, ([id, nome]) => ({ id, nome })).sort((a,b)=>a.nome.localeCompare(b.nome));
-  }, [keypads]);
-
-  const ambienteOptions = useMemo(() => {
-    const list: { id:number; nome:string; areaId:number }[] = [];
-    const seen = new Set<number>();
-    keypads.forEach(k => {
-      const amb = k.ambiente;
-      if (amb?.id && !seen.has(amb.id)) {
-        list.push({ id: amb.id, nome: amb.nome, areaId: amb.area?.id ?? 0 });
-        seen.add(amb.id);
-      }
-    });
-    // Se filtrar por área, restringe ambientes dela
-    return list
-      .filter(x => (areaIdFilter ? x.areaId === areaIdFilter : true))
-      .sort((a,b)=>a.nome.localeCompare(b.nome));
-  }, [keypads, areaIdFilter]);
 
     // Aplicação de filtros/busca
     const filteredKeypads = useMemo(() => {
-      const term = q.trim().toLowerCase();
-      return keypads.filter(k => {
-        // Busca livre
-        const matchesQ = !term || [
-          k.nome,
-          k.ambiente?.nome,
-          k.ambiente?.area?.nome,
-          String(k.hsnet ?? "")
-        ].some(v => String(v ?? "").toLowerCase().includes(term));
+      return keypads.filter(keypad => {
+        // Filtro por texto (nome, hsnet, ambiente, area)
+        const matchesSearch = searchTerm === "" ||
+          keypad.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          String(keypad.hsnet).includes(searchTerm.toLowerCase()) ||
+          (keypad.ambiente && keypad.ambiente.nome.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (keypad.ambiente?.area && keypad.ambiente.area.nome.toLowerCase().includes(searchTerm.toLowerCase()));
 
-        // Área
-        const matchesArea = !areaIdFilter || k.ambiente?.area?.id === areaIdFilter;
+        // Filtro por ambiente
+        const matchesAmbiente = ambienteFilter === "todos" || keypad.ambiente?.id === ambienteFilter;
 
-        // Ambiente
-        const matchesAmb = !ambIdFilter || k.ambiente?.id === ambIdFilter;
+        // Filtro por número de teclas
+        const matchesTeclas = teclasFilter === "todos" || keypad.button_count === teclasFilter;
 
-        // Nº teclas
-        const matchesCount = !btnCountFilter || k.button_count === btnCountFilter;
-
-        return matchesQ && matchesArea && matchesAmb && matchesCount;
+        return matchesSearch && matchesAmbiente && matchesTeclas;
       });
-    }, [keypads, q, areaIdFilter, ambIdFilter, btnCountFilter]);
+    }, [keypads, searchTerm, ambienteFilter, teclasFilter]);
 
   useEffect(() => {
     // supondo que você tenha `keypads` no estado
@@ -803,70 +774,96 @@ export default function Keypads() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* Filtros */}
-                  <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div className="col-span-1">
+                  {/* Barra de Filtros */}
+                  <div className="mt-6 space-y-4">
+                    {/* Filtro de Busca por Texto */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                       <Input
-                        placeholder="Buscar"
-                        value={q}
-                        onChange={(e) => setQ(e.target.value)}
-                        className="h-10"
+                        placeholder="Buscar por nome, HSNET, etc..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 pr-10 h-10 rounded-xl border-slate-200 focus:border-blue-500"
                       />
+                      {searchTerm && (
+                        <button
+                          onClick={() => setSearchTerm("")}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
 
-                    <div>
-                      <select
-                        className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                        value={areaIdFilter === "" ? "" : String(areaIdFilter)}
-                        onChange={(e) => {
-                          const v = e.target.value ? Number(e.target.value) : "";
-                          setAreaIdFilter(v as any);
-                          setAmbIdFilter(""); // reset ambiente quando muda área
-                        }}
-                      >
-                        <option value="">Áreas</option>
-                        {areaOptions.map(a => (
-                          <option key={a.id} value={a.id}>{a.nome}</option>
-                        ))}
-                      </select>
+                    {/* Filtros de Ambiente e Teclas */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Filtro por Ambiente */}
+                      <div className="space-y-1">
+                        <Label htmlFor="filtro-ambiente" className="text-xs font-medium text-slate-600">
+                          Ambiente
+                        </Label>
+                        <Select
+                          value={ambienteFilter === "todos" ? "todos" : String(ambienteFilter)}
+                          onValueChange={(v) => setAmbienteFilter(v === "todos" ? "todos" : Number(v))}
+                        >
+                          <SelectTrigger id="filtro-ambiente" className="h-9 text-sm rounded-xl">
+                            <SelectValue placeholder="Todos os ambientes" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            <SelectItem value="todos">Todos os ambientes</SelectItem>
+                            {ambientes
+                              .sort((a,b) => a.nome.localeCompare(b.nome))
+                              .map(ambiente => (
+                                <SelectItem key={ambiente.id} value={String(ambiente.id)}>
+                                  {ambiente.nome}
+                                  {ambiente.area && ` (${ambiente.area.nome})`}
+                                </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Filtro por Quantidade de Teclas */}
+                      <div className="space-y-1">
+                        <Label htmlFor="filtro-teclas" className="text-xs font-medium text-slate-600">
+                          Nº de Teclas
+                        </Label>
+                        <Select
+                          value={teclasFilter === "todos" ? "todos" : String(teclasFilter)}
+                          onValueChange={(v) => setTeclasFilter(v === "todos" ? "todos" : Number(v) as 1 | 2 | 4)}
+                        >
+                          <SelectTrigger id="filtro-teclas" className="h-9 text-sm rounded-xl">
+                            <SelectValue placeholder="Todas" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl">
+                            <SelectItem value="todos">Todas as teclas</SelectItem>
+                            <SelectItem value="1">1 Tecla</SelectItem>
+                            <SelectItem value="2">2 Teclas</SelectItem>
+                            <SelectItem value="4">4 Teclas</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
 
-                    <div>
-                      <select
-                        className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                        value={ambIdFilter === "" ? "" : String(ambIdFilter)}
-                        onChange={(e) => setAmbIdFilter(e.target.value ? Number(e.target.value) as any : "")}
-                        disabled={areaIdFilter === ""}
-                        title={areaIdFilter === "" ? "Selecione uma área para filtrar ambientes" : undefined}
-                      >
-                        <option value="">Ambientes</option>
-                        {ambienteOptions.map(amb => (
-                          <option key={amb.id} value={amb.id}>{amb.nome}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <select
-                        className="h-10 w-full px-3 rounded-xl border border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
-                        value={btnCountFilter === "" ? "" : String(btnCountFilter)}
-                        onChange={(e) => {
-                          const v = e.target.value ? Number(e.target.value) as 1|2|4 : "";
-                          setBtnCountFilter(v as any);
-                        }}
-                      >
-                        <option value="">Teclas</option>
-                        <option value="1">1 tecla</option>
-                        <option value="2">2 teclas</option>
-                        <option value="4">4 teclas</option>
-                      </select>
-                    </div>
+                    {/* Botão para limpar todos os filtros */}
+                    {(searchTerm || ambienteFilter !== "todos" || teclasFilter !== "todos") && (
+                      <div className="flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSearchTerm("");
+                            setAmbienteFilter("todos");
+                            setTeclasFilter("todos");
+                          }}
+                          className="h-8 text-xs rounded-lg gap-1"
+                        >
+                          <X className="w-3 h-3" />
+                          Limpar filtros
+                        </Button>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Contagem de resultados */}
-                  <p className="text-sm text-slate-600 mb-2">
-                    Mostrando <span className="font-semibold">{filteredKeypads.length}</span> de {keypads.length}
-                  </p>
 
                   {loading ? (
                     <div className="flex flex-col justify-center items-center py-12">
