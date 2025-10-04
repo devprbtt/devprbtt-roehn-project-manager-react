@@ -2466,7 +2466,13 @@ def change_password():
 @app.route('/exportar-pdf/<int:projeto_id>')
 @login_required
 def exportar_pdf(projeto_id):
-    projeto = Projeto.query.get_or_404(projeto_id)
+    projeto = Projeto.query.options(
+        joinedload(Projeto.areas).
+        joinedload(Area.ambientes).
+        joinedload(Ambiente.circuitos).
+        joinedload(Circuito.vinculacao).
+        joinedload(Vinculacao.modulo)
+    ).get_or_404(projeto_id)
 
     if projeto.user_id != current_user.id and current_user.role != 'admin':
         flash('Acesso negado a este projeto', 'danger')
@@ -2553,17 +2559,15 @@ def exportar_pdf(projeto_id):
                     if row[2] == "LUZ":
                         estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#fff3cd"))
                     elif row[2] == "PERSIANA":
-                        if "(sobe)" in row[1]:
+                        if "(sobe)" in row[1] or "(desce)" in row[1]:
                             estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d1ecf1"))
-                        elif "(desce)" in row[1]:
-                            estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#e8f4f8"))
                     elif row[2] == "HVAC":
                         estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d4edda"))
 
                 circuito_table.setStyle(estilo_tabela)
                 elements.append(circuito_table)
             else:
-                elements.append(Paragraph("Nenhum circuito neste ambiente.", styles['Normal']))
+                elements.append(Paragraph("Nenhum circuito neste ambiente.", styles['Italic']))
             
             elements.append(Spacer(1, 0.2*inch))
         
@@ -2575,27 +2579,42 @@ def exportar_pdf(projeto_id):
     elements.append(Paragraph("RESUMO DE MÓDULOS", styles['Heading2']))
     elements.append(Spacer(1, 0.2*inch))
     
-    modulos_projeto = Modulo.query.filter_by(projeto_id=projeto_id).all()
+    # Criar um mapa de todos os circuitos do projeto para busca eficiente
+    todos_circuitos = {c.id: c for area in projeto.areas for ambiente in area.ambientes for c in ambiente.circuitos}
+
+    modulos_projeto = Modulo.query.filter(Modulo.projeto_id == projeto_id).options(joinedload(Modulo.vinculacoes)).all()
     
     if modulos_projeto:
         for modulo in modulos_projeto:
             elements.append(Paragraph(f"Módulo: {modulo.nome} ({modulo.tipo})", styles['Heading3']))
             
             canal_data = [["Canal", "Circuito", "Nome", "A. Registrada", "A. Medida"]]
-            
+            estilo_canal_cmds = []
+
             canais_ocupados = {v.canal: v for v in modulo.vinculacoes}
             
-            for canal_num in range(1, modulo.quantidade_canais + 1):
+            for i, canal_num in enumerate(range(1, modulo.quantidade_canais + 1), 1):
                 if canal_num in canais_ocupados:
                     vinculacao = canais_ocupados[canal_num]
-                    circuito = vinculacao.circuito
-                    amperagem = f"{(circuito.potencia or 0) / 120:.2f}A" if circuito.potencia else "0.00A"
-                    canal_data.append([str(canal_num), circuito.identificador, circuito.nome, amperagem, ""])
+                    circuito = todos_circuitos.get(vinculacao.circuito_id)
+                    if circuito:
+                        amperagem = f"{(circuito.potencia or 0) / 120:.2f}A" if circuito.potencia else "0.00A"
+                        canal_data.append([str(canal_num), circuito.identificador, circuito.nome, amperagem, ""])
+
+                        if circuito.tipo == "luz":
+                            estilo_canal_cmds.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#fff3cd")))
+                        elif circuito.tipo == "persiana":
+                            estilo_canal_cmds.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d1ecf1")))
+                        elif circuito.tipo == "hvac":
+                            estilo_canal_cmds.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d4edda")))
+                    else: # Fallback se o circuito não for encontrado
+                        canal_data.append([str(canal_num), "ID Desconhecido", "Circuito não encontrado", "-", ""])
                 else:
                     canal_data.append([str(canal_num), "Livre", "-", "-", ""])
             
             canal_table = Table(canal_data, colWidths=[0.6*inch, 1.0*inch, 2.0*inch, 1.2*inch, 1.2*inch], repeatRows=1)
-            estilo_canal = TableStyle([
+
+            base_style = [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -2603,26 +2622,14 @@ def exportar_pdf(projeto_id):
                 ('FONTSIZE', (0, 0), (-1, 0), 9),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#4d4f52")),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#f1f3f5")])
-            ])
+            ]
 
-            # Adicionar cores diferentes por tipo de circuito
-            for i, row in enumerate(canal_data[1:], 1):
-                # Encontrar o circuito correspondente para obter o tipo
-                circuito_identificador = row[1]
-                circuito_obj = next((c for c in projeto.areas[0].ambientes[0].circuitos if c.identificador == circuito_identificador), None)
-                if circuito_obj:
-                    if circuito_obj.tipo == "luz":
-                        estilo_canal.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#fff3cd"))
-                    elif circuito_obj.tipo == "persiana":
-                        estilo_canal.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d1ecf1"))
-                    elif circuito_obj.tipo == "hvac":
-                        estilo_canal.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d4edda"))
-
+            estilo_canal = TableStyle(base_style + estilo_canal_cmds)
             canal_table.setStyle(estilo_canal)
             elements.append(canal_table)
             elements.append(Spacer(1, 0.3*inch))
     else:
-        elements.append(Paragraph("Nenhum módulo configurado neste projeto.", styles['Normal']))
+        elements.append(Paragraph("Nenhum módulo configurado neste projeto.", styles['Italic']))
 
     # Seção de Assinaturas
     elements.append(PageBreak())
