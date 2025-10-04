@@ -29,6 +29,7 @@ class Projeto(db.Model):
     status = db.Column(db.String(20), nullable=False, default='ATIVO')  # <--- NOVO
     areas = db.relationship('Area', backref='projeto', lazy=True, cascade='all, delete-orphan')
     modulos = db.relationship('Modulo', backref='projeto', lazy=True, cascade='all, delete-orphan')
+    keypads = db.relationship('Keypad', backref='projeto', lazy=True, cascade='all, delete-orphan')
 
 
 
@@ -113,6 +114,7 @@ class Keypad(db.Model):
     hsnet = db.Column(db.Integer, nullable=False)
     dev_id = db.Column(db.Integer, nullable=True)
     ambiente_id = db.Column(db.Integer, db.ForeignKey('ambiente.id'), nullable=False)
+    projeto_id = db.Column(db.Integer, db.ForeignKey('projeto.id'), nullable=False)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
@@ -121,7 +123,7 @@ class Keypad(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('ambiente_id', 'nome', name='unique_keypad_nome_por_ambiente'),
-        db.UniqueConstraint('hsnet', name='unique_keypad_hsnet'),
+        db.UniqueConstraint('hsnet', 'projeto_id', name='unique_keypad_hsnet_por_projeto'),
     )
 
 
@@ -130,8 +132,8 @@ class KeypadButton(db.Model):
     keypad_id = db.Column(db.Integer, db.ForeignKey('keypad.id'), nullable=False)
     ordem = db.Column(db.Integer, nullable=False)
     guid = db.Column(db.String(36), nullable=False, default=lambda: str(uuid.uuid4()))
-    circuito_id = db.Column(db.Integer, db.ForeignKey('circuito.id'), nullable=True)
-    cena_id = db.Column(db.Integer, db.ForeignKey('cena.id'), nullable=True)
+    circuito_id = db.Column(db.Integer, db.ForeignKey('circuito.id', ondelete='SET NULL'), nullable=True)
+    cena_id = db.Column(db.Integer, db.ForeignKey('cena.id', ondelete='SET NULL'), nullable=True)
     modo = db.Column(db.Integer, nullable=False, default=3)
     command_on = db.Column(db.Integer, nullable=False, default=0)
     command_off = db.Column(db.Integer, nullable=False, default=0)
