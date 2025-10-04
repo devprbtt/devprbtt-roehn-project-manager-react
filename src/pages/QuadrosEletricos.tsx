@@ -200,7 +200,7 @@ export default function QuadrosEletricos() {
   };
 
   return (
-    <Layout projectSelected={projetoSelecionado}>
+    <Layout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
