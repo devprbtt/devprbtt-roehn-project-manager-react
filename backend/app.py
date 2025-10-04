@@ -2547,6 +2547,19 @@ def exportar_pdf(projeto_id):
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#4d4f52")),
                     ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#f1f3f5")])
                 ])
+
+                # Adicionar cores diferentes por tipo de circuito
+                for i, row in enumerate(circuito_data[1:], 1):
+                    if row[2] == "LUZ":
+                        estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#fff3cd"))
+                    elif row[2] == "PERSIANA":
+                        if "(sobe)" in row[1]:
+                            estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d1ecf1"))
+                        elif "(desce)" in row[1]:
+                            estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#e8f4f8"))
+                    elif row[2] == "HVAC":
+                        estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d4edda"))
+
                 circuito_table.setStyle(estilo_tabela)
                 elements.append(circuito_table)
             else:
@@ -2568,7 +2581,7 @@ def exportar_pdf(projeto_id):
         for modulo in modulos_projeto:
             elements.append(Paragraph(f"Módulo: {modulo.nome} ({modulo.tipo})", styles['Heading3']))
             
-            canal_data = [["Canal", "Circuito", "Nome", "Amperagem Registrada", "Amperagem Medida"]]
+            canal_data = [["Canal", "Circuito", "Nome", "A. Registrada", "A. Medida"]]
             
             canais_ocupados = {v.canal: v for v in modulo.vinculacoes}
             
@@ -2591,6 +2604,20 @@ def exportar_pdf(projeto_id):
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#4d4f52")),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#f1f3f5")])
             ])
+
+            # Adicionar cores diferentes por tipo de circuito
+            for i, row in enumerate(canal_data[1:], 1):
+                # Encontrar o circuito correspondente para obter o tipo
+                circuito_identificador = row[1]
+                circuito_obj = next((c for c in projeto.areas[0].ambientes[0].circuitos if c.identificador == circuito_identificador), None)
+                if circuito_obj:
+                    if circuito_obj.tipo == "luz":
+                        estilo_canal.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#fff3cd"))
+                    elif circuito_obj.tipo == "persiana":
+                        estilo_canal.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d1ecf1"))
+                    elif circuito_obj.tipo == "hvac":
+                        estilo_canal.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d4edda"))
+
             canal_table.setStyle(estilo_canal)
             elements.append(canal_table)
             elements.append(Spacer(1, 0.3*inch))
