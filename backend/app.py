@@ -205,14 +205,17 @@ def ensure_keypad_button_slots(keypad, count: int):
     keypad.button_count = count
 
 
-def is_hsnet_in_use(hsnet, exclude_keypad_id=None, exclude_modulo_id=None):
-    keypad_query = Keypad.query.filter(Keypad.hsnet == hsnet)
+def is_hsnet_in_use(hsnet, projeto_id, exclude_keypad_id=None, exclude_modulo_id=None):
+    """Verifica se um HSNET está em uso dentro de um projeto, tanto em Keypads quanto em Módulos."""
+    # Keypads são checados dentro do projeto
+    keypad_query = Keypad.query.filter_by(hsnet=hsnet, projeto_id=projeto_id)
     if exclude_keypad_id is not None:
         keypad_query = keypad_query.filter(Keypad.id != exclude_keypad_id)
     if keypad_query.first() is not None:
         return True
 
-    modulo_query = Modulo.query.filter(Modulo.hsnet == hsnet)
+    # Módulos também são checados dentro do projeto
+    modulo_query = Modulo.query.filter_by(hsnet=hsnet, projeto_id=projeto_id)
     if exclude_modulo_id is not None:
         modulo_query = modulo_query.filter(Modulo.id != exclude_modulo_id)
     return modulo_query.first() is not None
@@ -636,27 +639,8 @@ from sqlalchemy import or_
 def api_projetos_delete(projeto_id):
     p = db.get_or_404(Projeto, projeto_id)
 
-    # --- subqueries para os IDs relacionados ao projeto ---
-    area_ids = db.session.query(Area.id).filter(Area.projeto_id == p.id).subquery()
-    ambiente_ids = db.session.query(Ambiente.id).filter(Ambiente.area_id.in_(area_ids)).subquery()
-    circuito_ids = db.session.query(Circuito.id).filter(Circuito.ambiente_id.in_(ambiente_ids)).subquery()
-    modulo_ids = db.session.query(Modulo.id).filter(Modulo.projeto_id == p.id).subquery()
-
-    # --- 1) Vinculações que tocam módulos OU circuitos do projeto ---
-    Vinculacao.query.filter(
-        or_(
-            Vinculacao.modulo_id.in_(modulo_ids),
-            Vinculacao.circuito_id.in_(circuito_ids),
-        )
-    ).delete(synchronize_session=False)
-
-    # --- 2) Apagar filhos em ordem segura (sem join) ---
-    Modulo.query.filter(Modulo.id.in_(modulo_ids)).delete(synchronize_session=False)
-    Circuito.query.filter(Circuito.id.in_(circuito_ids)).delete(synchronize_session=False)
-    Ambiente.query.filter(Ambiente.id.in_(ambiente_ids)).delete(synchronize_session=False)
-    Area.query.filter(Area.id.in_(area_ids)).delete(synchronize_session=False)
-
-    # --- 3) Por fim, o projeto ---
+    # Graças ao `cascade="all, delete-orphan"` e `ondelete='SET NULL'`,
+    # o SQLAlchemy e o DB cuidarão da exclusão em cascata e da anulação de FKs.
     db.session.delete(p)
     db.session.commit()
 
@@ -1406,7 +1390,7 @@ def api_modulos_create():
             return jsonify({"ok": False, "error": "hsnet invalido."}), 400
         if hsnet <= 0:
             return jsonify({"ok": False, "error": "hsnet deve ser positivo."}), 400
-        if is_hsnet_in_use(hsnet):
+        if is_hsnet_in_use(hsnet, projeto_id):
             return jsonify({"ok": False, "error": "HSNET ja esta em uso."}), 409
     else:
         hsnet = None
@@ -2363,7 +2347,8 @@ def importar_projeto():
                     hsnet=keypad_data['hsnet'],
                     dev_id=keypad_data.get('dev_id'),
                     notes=keypad_data.get('notes'),
-                    ambiente_id=novo_ambiente_id
+                    ambiente_id=novo_ambiente_id,
+                    projeto_id=novo_projeto.id
                 )
                 db.session.add(novo_keypad)
                 db.session.flush()
@@ -2811,10 +2796,13 @@ def api_keypads_next_hsnet():
     if not projeto_id:
         return jsonify({"ok": False, "error": "Projeto não selecionado."}), 400
 
-    usados = {k.hsnet for k in Keypad.query
-              .join(Ambiente, Keypad.ambiente_id == Ambiente.id)
-              .join(Area, Ambiente.area_id == Area.id)
-              .filter(Area.projeto_id == projeto_id).all()}
+    # HSNETs usados por Keypads no projeto
+    keypad_hsnets = {k.hsnet for k in Keypad.query.filter_by(projeto_id=projeto_id).all() if k.hsnet}
+
+    # HSNETs usados por Módulos no projeto
+    modulo_hsnets = {m.hsnet for m in Modulo.query.filter_by(projeto_id=projeto_id).all() if m.hsnet}
+
+    usados = keypad_hsnets.union(modulo_hsnets)
 
     hs = 110
     while hs in usados:
@@ -2931,7 +2919,7 @@ def api_keypads_create():
     if not area or area.projeto_id != projeto_id:
         return jsonify({"ok": False, "error": "Ambiente não pertence ao projeto selecionado."}), 400
 
-    if is_hsnet_in_use(hsnet):
+    if is_hsnet_in_use(hsnet, projeto_id):
         return jsonify({"ok": False, "error": "HSNET já está em uso."}), 409
 
     keypad = Keypad(
@@ -2943,6 +2931,7 @@ def api_keypads_create():
         hsnet=hsnet,
         dev_id=dev_id,
         ambiente_id=ambiente.id,
+        projeto_id=projeto_id,
         notes=notes,
     )
     db.session.add(keypad)
@@ -3008,7 +2997,7 @@ def api_keypads_update(keypad_id):
             return jsonify({"ok": False, "error": "hsnet inválido."}), 400
         if new_hsnet <= 0:
             return jsonify({"ok": False, "error": "hsnet deve ser positivo."}), 400
-        if new_hsnet != keypad.hsnet and is_hsnet_in_use(new_hsnet, exclude_keypad_id=keypad.id):
+        if new_hsnet != keypad.hsnet and is_hsnet_in_use(new_hsnet, projeto_id, exclude_keypad_id=keypad.id):
             return jsonify({"ok": False, "error": "HSNET já está em uso."}), 409
         keypad.hsnet = new_hsnet
 
