@@ -2085,6 +2085,48 @@ def exportar_csv():
         download_name=f'{nome_arquivo}_roehn.csv'
     )
 
+class NumberedCanvas(canvas.Canvas):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        total_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_page_number(total_pages)
+            super().showPage()
+        super().save()
+
+    def draw_page_number(self, page_count):
+        self.setFont("Helvetica", 8)
+        # Centralizado no rodapé: "Página X de Y"
+        self.drawCentredString(A4[0] / 2, 12 * mm, f"Página {self._pageNumber} de {page_count}")
+
+
+def footer(canvas, doc):
+    canvas.saveState()
+    width, height = A4
+    margin = 30  # mesmo conceito dos seus margins em pontos (aprox. 10.5 mm)
+
+    # Linha separadora acima do rodapé
+    y_line = 18 * mm
+    canvas.setLineWidth(0.5)
+    canvas.line(margin, y_line, width - margin, y_line)
+
+    # Texto à esquerda (personalize)
+    canvas.setFont("Helvetica", 8)
+    canvas.drawRightString(width - margin, 12 * mm, "Zafiro - Luxury Technology • " f"{current_user.username} • {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+
+    # (Não precisa desenhar a numeração aqui — o NumberedCanvas já faz)
+    canvas.restoreState()
+
+
 @app.route('/exportar-projeto/<int:projeto_id>')
 @login_required
 def exportar_projeto(projeto_id):
@@ -2619,10 +2661,10 @@ def exportar_pdf(projeto_id):
                     # First row for persiana (up)
                     row_styled_up = [
                         Paragraph(circuito.identificador, styles['TableBodyCenter']),
-                        Paragraph(f"{circuito.nome} (sobe)", styles['TableBody']),
+                        Paragraph(f"{circuito.nome} (sobe)", styles['TableBodyCenter']),  # <-- antes: TableBody
                         Paragraph(circuito.tipo.upper(), styles['TableBodyCenter']),
                         Paragraph(str(circuito.sak), styles['TableBodyCenter']),
-                        Paragraph(modulo_nome, styles['TableBody']),
+                        Paragraph(modulo_nome, styles['TableBodyCenter']),                # <-- antes: TableBody
                         Paragraph(f"{canal}s", styles['TableBodyCenter']),
                         Paragraph("", styles['TableBodyCenter'])
                     ]
@@ -2632,10 +2674,10 @@ def exportar_pdf(projeto_id):
                     # Second row for persiana (down)
                     row_styled_down = [
                         Paragraph(circuito.identificador, styles['TableBodyCenter']),
-                        Paragraph(f"{circuito.nome} (desce)", styles['TableBody']),
+                        Paragraph(f"{circuito.nome} (desce)", styles['TableBodyCenter']), # <-- antes: TableBody
                         Paragraph(circuito.tipo.upper(), styles['TableBodyCenter']),
                         Paragraph(str(circuito.sak + 1), styles['TableBodyCenter']),
-                        Paragraph(modulo_nome, styles['TableBody']),
+                        Paragraph(modulo_nome, styles['TableBodyCenter']),                # <-- antes: TableBody
                         Paragraph(f"{canal}d", styles['TableBodyCenter']),
                         Paragraph("", styles['TableBodyCenter'])
                     ]
@@ -2648,10 +2690,10 @@ def exportar_pdf(projeto_id):
                 # Row for other circuit types
                 row_styled = [
                     Paragraph(circuito.identificador, styles['TableBodyCenter']),
-                    Paragraph(circuito.nome, styles['TableBody']),
+                    Paragraph(circuito.nome, styles['TableBodyCenter']),
                     Paragraph(circuito.tipo.upper(), styles['TableBodyCenter']),
                     Paragraph(sak_value, styles['TableBodyCenter']),
-                    Paragraph(modulo_nome, styles['TableBody']),
+                    Paragraph(modulo_nome, styles['TableBodyCenter']),
                     Paragraph(canal, styles['TableBodyCenter']),
                     Paragraph("", styles['TableBodyCenter'])
                 ]
@@ -2722,7 +2764,7 @@ def exportar_pdf(projeto_id):
                         row_styled = [
                             Paragraph(str(canal_num), styles['TableBodyCenter']),
                             Paragraph(circuito.identificador, styles['TableBodyCenter']),
-                            Paragraph(circuito.nome, styles['TableBody']),
+                            Paragraph(circuito.nome, styles['TableBodyCenter']),
                             Paragraph(amperagem, styles['TableBodyCenter']),
                             Paragraph("", styles['TableBodyCenter'])
                         ]
@@ -2801,7 +2843,13 @@ def exportar_pdf(projeto_id):
     ]))
     elements.append(obs_table)
 
-    doc.build(elements)
+    doc.build(
+        elements,
+        onFirstPage=footer,
+        onLaterPages=footer,
+        canvasmaker=NumberedCanvas
+    )
+
     buffer.seek(0)
     
     nome_arquivo = f"projeto_{projeto.nome}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
