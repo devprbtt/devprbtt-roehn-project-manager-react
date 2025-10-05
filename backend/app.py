@@ -2560,6 +2560,7 @@ def exportar_pdf(projeto_id):
     )
 
     styles = getSampleStyleSheet()
+    # Base Styles
     if 'RoehnTitle' not in styles:
         styles.add(ParagraphStyle(name='RoehnTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=30, alignment=TA_CENTER))
     if 'RoehnSubtitle' not in styles:
@@ -2568,6 +2569,14 @@ def exportar_pdf(projeto_id):
         styles.add(ParagraphStyle(name='RoehnCenter', parent=styles['Normal'], alignment=TA_CENTER))
     if 'LeftNormal' not in styles:
         styles.add(ParagraphStyle(name='LeftNormal', parent=styles['Normal'], alignment=TA_LEFT))
+
+    # Styles for tables with word wrapping
+    if 'TableHeader' not in styles:
+        styles.add(ParagraphStyle(name='TableHeader', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9, textColor=colors.whitesmoke, fontName='Helvetica-Bold'))
+    if 'TableBody' not in styles:
+        styles.add(ParagraphStyle(name='TableBody', parent=styles['Normal'], alignment=TA_LEFT, fontSize=8))
+    if 'TableBodyCenter' not in styles:
+        styles.add(ParagraphStyle(name='TableBodyCenter', parent=styles['TableBody'], alignment=TA_CENTER))
 
     elements = []
     zafirologopath = "static/images/zafirologo.png"
@@ -2590,8 +2599,12 @@ def exportar_pdf(projeto_id):
         for ambiente in area.ambientes:
             elements.append(Paragraph(f"Ambiente: {ambiente.nome}", styles['Heading3']))
             
-            circuito_data = [["Circuito", "Nome", "Tipo", "SAKs", "Módulo", "Canal", "Verificado"]]
-            
+            # Prepare data for styling and for the table
+            header_row = [Paragraph(h, styles['TableHeader']) for h in ["Circuito", "Nome", "Tipo", "SAKs", "Módulo", "Canal", "Verificado"]]
+            table_data_styled = [header_row]
+            color_commands = []
+            raw_data_for_coloring = [] # Keep track of raw types for coloring logic
+
             for circuito in ambiente.circuitos:
                 modulo_nome = "Não vinculado"
                 canal = "-"
@@ -2603,37 +2616,74 @@ def exportar_pdf(projeto_id):
                 if circuito.tipo == 'hvac':
                     pass
                 elif circuito.tipo == 'persiana':
-                    circuito_data.append([circuito.identificador, f"{circuito.nome} (sobe)", circuito.tipo.upper(), str(circuito.sak), modulo_nome, f"{canal}s", ""])
-                    circuito_data.append([circuito.identificador, f"{circuito.nome} (desce)", circuito.tipo.upper(), str(circuito.sak + 1), modulo_nome, f"{canal}d", ""])
+                    # First row for persiana (up)
+                    row_styled_up = [
+                        Paragraph(circuito.identificador, styles['TableBodyCenter']),
+                        Paragraph(f"{circuito.nome} (sobe)", styles['TableBody']),
+                        Paragraph(circuito.tipo.upper(), styles['TableBodyCenter']),
+                        Paragraph(str(circuito.sak), styles['TableBodyCenter']),
+                        Paragraph(modulo_nome, styles['TableBody']),
+                        Paragraph(f"{canal}s", styles['TableBodyCenter']),
+                        Paragraph("", styles['TableBodyCenter'])
+                    ]
+                    table_data_styled.append(row_styled_up)
+                    raw_data_for_coloring.append({'tipo': circuito.tipo, 'nome': f"{circuito.nome} (sobe)"})
+
+                    # Second row for persiana (down)
+                    row_styled_down = [
+                        Paragraph(circuito.identificador, styles['TableBodyCenter']),
+                        Paragraph(f"{circuito.nome} (desce)", styles['TableBody']),
+                        Paragraph(circuito.tipo.upper(), styles['TableBodyCenter']),
+                        Paragraph(str(circuito.sak + 1), styles['TableBodyCenter']),
+                        Paragraph(modulo_nome, styles['TableBody']),
+                        Paragraph(f"{canal}d", styles['TableBodyCenter']),
+                        Paragraph("", styles['TableBodyCenter'])
+                    ]
+                    table_data_styled.append(row_styled_down)
+                    raw_data_for_coloring.append({'tipo': circuito.tipo, 'nome': f"{circuito.nome} (desce)"})
                     continue
                 else:
                     sak_value = str(circuito.sak)
 
-                circuito_data.append([circuito.identificador, circuito.nome, circuito.tipo.upper(), sak_value, modulo_nome, canal, ""])
+                # Row for other circuit types
+                row_styled = [
+                    Paragraph(circuito.identificador, styles['TableBodyCenter']),
+                    Paragraph(circuito.nome, styles['TableBody']),
+                    Paragraph(circuito.tipo.upper(), styles['TableBodyCenter']),
+                    Paragraph(sak_value, styles['TableBodyCenter']),
+                    Paragraph(modulo_nome, styles['TableBody']),
+                    Paragraph(canal, styles['TableBodyCenter']),
+                    Paragraph("", styles['TableBodyCenter'])
+                ]
+                table_data_styled.append(row_styled)
+                raw_data_for_coloring.append({'tipo': circuito.tipo, 'nome': circuito.nome})
             
-            if len(circuito_data) > 1:
-                circuito_table = Table(circuito_data, colWidths=[0.7*inch, 1.5*inch, 0.8*inch, 0.6*inch, 1.2*inch, 0.6*inch, 0.8*inch], repeatRows=1)
-                estilo_tabela = TableStyle([
+            if len(table_data_styled) > 1:
+                # Apply coloring based on raw data
+                for i, row in enumerate(raw_data_for_coloring, 1):
+                    if row['tipo'] == "luz":
+                        color_commands.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#fff3cd")))
+                    elif row['tipo'] == "persiana":
+                        if "(sobe)" in row['nome'] or "(desce)" in row['nome']:
+                            color_commands.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d1ecf1")))
+                    elif row['tipo'] == "hvac":
+                        color_commands.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d4edda")))
+
+                circuito_table = Table(table_data_styled, colWidths=[0.7*inch, 1.5*inch, 0.8*inch, 0.6*inch, 1.2*inch, 0.6*inch, 0.8*inch], repeatRows=1)
+
+                base_style = [
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), # Vertical alignment
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, 0), 9),
                     ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#4d4f52")),
                     ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#f1f3f5")])
-                ])
+                ]
 
-                # Adicionar cores diferentes por tipo de circuito
-                for i, row in enumerate(circuito_data[1:], 1):
-                    if row[2] == "LUZ":
-                        estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#fff3cd"))
-                    elif row[2] == "PERSIANA":
-                        if "(sobe)" in row[1] or "(desce)" in row[1]:
-                            estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d1ecf1"))
-                    elif row[2] == "HVAC":
-                        estilo_tabela.add('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d4edda"))
-
+                estilo_tabela = TableStyle(base_style + color_commands)
                 circuito_table.setStyle(estilo_tabela)
                 elements.append(circuito_table)
             else:
@@ -2649,17 +2699,17 @@ def exportar_pdf(projeto_id):
     elements.append(Paragraph("RESUMO DE MÓDULOS", styles['Heading2']))
     elements.append(Spacer(1, 0.2*inch))
     
-    # Criar um mapa de todos os circuitos do projeto para busca eficiente
     todos_circuitos = {c.id: c for area in projeto.areas for ambiente in area.ambientes for c in ambiente.circuitos}
-
     modulos_projeto = Modulo.query.filter(Modulo.projeto_id == projeto_id).options(joinedload(Modulo.vinculacoes)).all()
     
     if modulos_projeto:
         for modulo in modulos_projeto:
             elements.append(Paragraph(f"Módulo: {modulo.nome} ({modulo.tipo})", styles['Heading3']))
             
-            canal_data = [["Canal", "Circuito", "Nome", "A. Registrada", "A. Medida"]]
-            estilo_canal_cmds = []
+            header_row_mod = [Paragraph(h, styles['TableHeader']) for h in ["Canal", "Circuito", "Nome", "A. Registrada", "A. Medida"]]
+            canal_data_styled = [header_row_mod]
+            color_commands_mod = []
+            raw_data_for_coloring_mod = []
 
             canais_ocupados = {v.canal: v for v in modulo.vinculacoes}
             
@@ -2669,32 +2719,46 @@ def exportar_pdf(projeto_id):
                     circuito = todos_circuitos.get(vinculacao.circuito_id)
                     if circuito:
                         amperagem = f"{(circuito.potencia or 0) / 120:.2f}A" if circuito.potencia else "0.00A"
-                        canal_data.append([str(canal_num), circuito.identificador, circuito.nome, amperagem, ""])
-
-                        if circuito.tipo == "luz":
-                            estilo_canal_cmds.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#fff3cd")))
-                        elif circuito.tipo == "persiana":
-                            estilo_canal_cmds.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d1ecf1")))
-                        elif circuito.tipo == "hvac":
-                            estilo_canal_cmds.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d4edda")))
-                    else: # Fallback se o circuito não for encontrado
-                        canal_data.append([str(canal_num), "ID Desconhecido", "Circuito não encontrado", "-", ""])
+                        row_styled = [
+                            Paragraph(str(canal_num), styles['TableBodyCenter']),
+                            Paragraph(circuito.identificador, styles['TableBodyCenter']),
+                            Paragraph(circuito.nome, styles['TableBody']),
+                            Paragraph(amperagem, styles['TableBodyCenter']),
+                            Paragraph("", styles['TableBodyCenter'])
+                        ]
+                        canal_data_styled.append(row_styled)
+                        raw_data_for_coloring_mod.append({'tipo': circuito.tipo})
+                    else:
+                        canal_data_styled.append([Paragraph(str(canal_num), styles['TableBodyCenter']), Paragraph("ID Desconhecido", styles['TableBodyCenter']), Paragraph("Circuito não encontrado", styles['TableBody']), Paragraph("-", styles['TableBodyCenter']), Paragraph("", styles['TableBodyCenter'])])
+                        raw_data_for_coloring_mod.append({'tipo': 'unknown'})
                 else:
-                    canal_data.append([str(canal_num), "Livre", "-", "-", ""])
+                    canal_data_styled.append([Paragraph(str(canal_num), styles['TableBodyCenter']), Paragraph("Livre", styles['TableBodyCenter']), Paragraph("-", styles['TableBody']), Paragraph("-", styles['TableBodyCenter']), Paragraph("", styles['TableBodyCenter'])])
+                    raw_data_for_coloring_mod.append({'tipo': 'free'})
             
-            canal_table = Table(canal_data, colWidths=[0.6*inch, 1.0*inch, 2.0*inch, 1.2*inch, 1.2*inch], repeatRows=1)
+            # Apply coloring
+            for i, row in enumerate(raw_data_for_coloring_mod, 1):
+                tipo = row.get('tipo')
+                if tipo == "luz":
+                    color_commands_mod.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#fff3cd")))
+                elif tipo == "persiana":
+                    color_commands_mod.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d1ecf1")))
+                elif tipo == "hvac":
+                    color_commands_mod.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor("#d4edda")))
+
+            canal_table = Table(canal_data_styled, colWidths=[0.6*inch, 1.0*inch, 2.0*inch, 1.2*inch, 1.2*inch], repeatRows=1)
 
             base_style = [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, 0), 9),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#4d4f52")),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#f1f3f5")])
             ]
 
-            estilo_canal = TableStyle(base_style + estilo_canal_cmds)
+            estilo_canal = TableStyle(base_style + color_commands_mod)
             canal_table.setStyle(estilo_canal)
             elements.append(canal_table)
             elements.append(Spacer(1, 0.3*inch))
