@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, FileUp, Info } from "lucide-react";
+import { Upload, FileUp, Info, X, FileJson } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -14,13 +13,38 @@ type Props = {
 const ImportProjectSection: React.FC<Props> = ({ onProjectImported }) => {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setImportFile(e.target.files[0]);
+  const handleFileChange = (files: FileList | null) => {
+    if (files && files[0]) {
+      if (files[0].type === "application/json") {
+        setImportFile(files[0]);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Arquivo inválido",
+          description: "Por favor, selecione um arquivo .json.",
+        });
+      }
     }
   };
+
+  const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const onDragLeave = useCallback(() => {
+    setIsDragOver(false);
+  }, []);
+
+  const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    handleFileChange(e.dataTransfer.files);
+  }, []);
 
   const handleImport = async () => {
     if (!importFile) return;
@@ -91,31 +115,68 @@ const ImportProjectSection: React.FC<Props> = ({ onProjectImported }) => {
               Arquivos CSV são para documentação e não podem ser importados.
             </AlertDescription>
           </Alert>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Input
+
+          <div 
+            className={`
+              p-4 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all duration-300
+              ${isDragOver ? 'border-purple-500 bg-purple-50' : 'border-slate-300 hover:border-purple-400'}
+            `}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+          >
+            <input
+              ref={fileInputRef}
               type="file"
               accept=".json"
-              onChange={handleFileChange}
-              className="flex-1 h-11 rounded-xl border-slate-200 focus:border-purple-500 focus:ring-purple-500/20"
+              onChange={(e) => handleFileChange(e.target.files)}
+              className="hidden"
             />
-            <Button
-              onClick={handleImport}
-              disabled={!importFile || isImporting}
-              className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl px-6 h-11 flex items-center gap-2 whitespace-nowrap"
-            >
-              {isImporting ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Importando...
-                </>
-              ) : (
-                <>
-                  <FileUp className="w-4 h-4" />
-                  Importar JSON
-                </>
-              )}
-            </Button>
+            {importFile ? (
+              <div className="flex items-center justify-between text-left">
+                <div className="flex items-center gap-3">
+                  <FileJson className="w-8 h-8 text-purple-600" />
+                  <div>
+                    <p className="font-semibold text-slate-800">{importFile.name}</p>
+                    <p className="text-xs text-slate-500">{(importFile.size / 1024).toFixed(2)} KB</p>
+                  </div>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={(e) => { e.stopPropagation(); setImportFile(null); }}
+                  className="rounded-full h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-slate-600">
+                <Upload className="w-8 h-8" />
+                <p className="font-semibold">Clique para selecionar ou arraste o arquivo</p>
+                <p className="text-sm text-slate-500">Apenas arquivos .json são permitidos</p>
+              </div>
+            )}
           </div>
+
+          <Button
+            onClick={handleImport}
+            disabled={!importFile || isImporting}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl px-6 h-12 flex items-center gap-2 whitespace-nowrap"
+          >
+            {isImporting ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Importando...
+              </>
+            ) : (
+              <>
+                <FileUp className="w-5 h-5" />
+                Importar e Restaurar Projeto
+              </>
+            )}
+          </Button>
         </CardContent>
       </Card>
     </motion.div>

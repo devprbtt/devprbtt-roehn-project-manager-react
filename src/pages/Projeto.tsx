@@ -158,6 +158,12 @@ export default function Projeto() {
 
   const handlePrint = () => { window.print(); };
 
+  const circuitTypeConfig: { [key: string]: { icon: React.ElementType; label: string; color: string } } = {
+    luz: { icon: Lightbulb, label: "Luz", color: "text-yellow-500" },
+    persiana: { icon: Blinds, label: "Persianas", color: "text-blue-500" },
+    hvac: { icon: Snowflake, label: "Climatização", color: "text-green-500" },
+  };
+
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
@@ -303,50 +309,69 @@ export default function Projeto() {
                               {area.nome}
                             </h3>
                             <div className="ml-4 mt-2 space-y-4">
-                              {area.ambientes.map((ambiente, ambIndex) => (
+                              {area.ambientes.map((ambiente) => {
+                                const groupedCircuits = ambiente.circuitos.reduce((acc, circuito) => {
+                                  const type = circuito.tipo || 'outros';
+                                  if (!acc[type]) {
+                                    acc[type] = [];
+                                  }
+                                  acc[type].push(circuito);
+                                  return acc;
+                                }, {} as Record<string, typeof ambiente.circuitos>);
+
+                                return (
                                 <div key={ambiente.id} className="border-l-2 border-slate-200 pl-4 relative before:content-[''] before:absolute before:left-0 before:top-3 before:w-4 before:h-px before:bg-slate-200">
                                   <h4 className="font-semibold text-slate-700 flex items-center gap-2">
                                     {ambiente.nome}
                                   </h4>
-                                  <div className="mt-2 space-y-2">
+                                  <div className="mt-3 space-y-4">
                                     {ambiente.circuitos.length === 0 ? (
                                       <p className="text-sm text-slate-500 italic">Nenhum circuito neste ambiente.</p>
                                     ) : (
-                                      <ul className="space-y-2">
-                                        {ambiente.circuitos.map((circuito) => (
-                                          <li key={circuito.id} className="text-sm text-slate-600 flex items-center gap-2">
-                                            <span className="h-2 w-2 rounded-full bg-slate-400"></span>
-                                            {circuito.identificador} - {circuito.nome}
-                                            {circuito.vinculacao ? (
-                                              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                                                Vinc. em {circuito.vinculacao.modulo_nome} (Canal {circuito.vinculacao.canal})
-                                              </span>
-                                            ) : (
-                                              <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                                                Não Vinculado
-                                              </span>
-                                            )}
-                                          </li>
-                                        ))}
-                                      </ul>
+                                      Object.entries(groupedCircuits).map(([type, circuits]) => {
+                                        const config = circuitTypeConfig[type] || { icon: LayoutList, label: type.charAt(0).toUpperCase() + type.slice(1), color: "text-slate-500" };
+                                        const Icon = config.icon;
+                                        return (
+                                          <div key={type}>
+                                            <h5 className={`font-semibold text-slate-800 flex items-center gap-2 text-sm`}>
+                                              <Icon className={`h-4 w-4 ${config.color}`} />
+                                              {config.label}
+                                            </h5>
+                                            <ul className="space-y-2 mt-2 pl-6">
+                                              {circuits.map((circuito) => (
+                                                <li key={circuito.id} className="text-sm text-slate-600 flex items-center gap-2">
+                                                  <span className="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+                                                  <span className="font-medium">{circuito.identificador}</span>
+                                                  <span>-</span>
+                                                  <span>{circuito.nome}</span>
+                                                  {circuito.vinculacao ? (
+                                                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                                                      Vinc. em {circuito.vinculacao.modulo_nome} (Canal {circuito.vinculacao.canal})
+                                                    </span>
+                                                  ) : (
+                                                    <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                                                      Não Vinculado
+                                                    </span>
+                                                  )}
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        );
+                                      })
                                     )}
                                     {/* Keypads do ambiente */}
                                     {(() => {
                                       const kps = keypads.filter(k => k.ambiente?.id === ambiente.id);
-                                      if (kps.length === 0) {
-                                        return (
-                                          <p className="text-sm text-slate-500 mt-3">
-                                            Nenhum keypad neste ambiente.
-                                          </p>
-                                        );
-                                      }
+                                      if (kps.length === 0) return null;
+                                      
                                       return (
                                         <div className="mt-4">
-                                          <h5 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                          <h5 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2">
                                             <KeySquare className="h-4 w-4 text-violet-600" />
                                             Keypads
                                           </h5>
-                                          <ul className="space-y-2">
+                                          <ul className="space-y-2 pl-6">
                                             {kps.map((k) => {
                                               const linked = k.buttons.filter(b => b.circuito_id != null || b.cena_id != null).length;
                                               const total = k.button_count || k.buttons.length || 0;
@@ -383,7 +408,7 @@ export default function Projeto() {
 
                                   </div>
                                 </div>
-                              ))}
+                              )})}
                             </div>
                           </motion.div>
                         ))}
