@@ -53,6 +53,7 @@ export interface KeypadButton {
     id: number;
     ordem: number;
     circuito_id: number | null;
+    cena_id: number | null;
 }
 
 export interface Keypad {
