@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import NavigationButtons from "@/components/NavigationButtons";
 
 // ---------- Tipos ----------
 type AreaLite = { id: number; nome: string };
@@ -982,6 +983,8 @@ export default function Keypads() {
               </Card>
             </motion.div>
           </div>
+
+          <NavigationButtons previousPath="/modulos" nextPath="/cenas" />
         </div>
 
         {/* Modal de Vinculação */}

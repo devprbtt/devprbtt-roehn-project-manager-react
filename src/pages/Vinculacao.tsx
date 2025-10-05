@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
+import NavigationButtons from "@/components/NavigationButtons";
 
 // Adicione estas interfaces e constantes no início do arquivo, após as importações
 
@@ -1078,6 +1079,8 @@ export default function Vinculacao() {
               </Card>
             </motion.div>
           </div>
+
+          <NavigationButtons previousPath="/cenas" nextPath="/projeto" />
         </div>
       </div>
 

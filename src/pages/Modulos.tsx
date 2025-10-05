@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useProject } from "@/store/project";
 import { PlusCircle, Trash2, Boxes, Server, Sparkles, CircuitBoard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import NavigationButtons from "@/components/NavigationButtons";
 
 type MetaModulo = {
   nome_completo: string;
@@ -412,6 +413,8 @@ export default function Modulos() {
               </Card>
             </motion.div>
           </div>
+
+          <NavigationButtons previousPath="/circuitos" nextPath="/keypads" />
         </div>
       </div>
     </Layout>

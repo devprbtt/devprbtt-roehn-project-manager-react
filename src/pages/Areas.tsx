@@ -17,6 +17,7 @@ import {
   MapPin, 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import NavigationButtons from "@/components/NavigationButtons";
 
 type Area = {
   id: number;
@@ -302,6 +303,8 @@ export default function Areas() {
               </Card>
             </motion.div>
           </div>
+
+          <NavigationButtons nextPath="/ambientes" />
         </div>
       </div>
     </Layout>

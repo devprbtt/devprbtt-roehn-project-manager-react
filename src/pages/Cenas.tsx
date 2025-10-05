@@ -10,6 +10,7 @@ import { SceneForm } from "@/components/cenas/SceneForm";
 import { Trash2, Clapperboard, Edit, Search, Filter, X } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import type { Cena } from "@/types/cena";
+import NavigationButtons from "@/components/NavigationButtons";
 import type { Circuito, Ambiente, Area } from "@/types/project";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -241,6 +242,8 @@ const Cenas = () => {
                 </Card>
             </motion.div>
         </div>
+
+        <NavigationButtons previousPath="/keypads" nextPath="/vinculacao" />
       </div>
     </Layout>
   );
