@@ -27,6 +27,13 @@ class Projeto(db.Model):
     nome = db.Column(db.String(100), nullable=False, unique=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     status = db.Column(db.String(20), nullable=False, default='ATIVO')  # <--- NOVO
+
+    # Novas colunas de data
+    data_criacao = db.Column(db.DateTime, nullable=False, default=db.func.now())
+    data_ativo = db.Column(db.DateTime, nullable=True)
+    data_inativo = db.Column(db.DateTime, nullable=True)
+    data_concluido = db.Column(db.DateTime, nullable=True)
+
     areas = db.relationship('Area', backref='projeto', lazy=True, cascade='all, delete-orphan')
     modulos = db.relationship('Modulo', backref='projeto', lazy=True, cascade='all, delete-orphan')
     keypads = db.relationship('Keypad', backref='projeto', lazy=True, cascade='all, delete-orphan')

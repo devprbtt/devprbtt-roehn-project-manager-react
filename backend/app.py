@@ -625,7 +625,11 @@ def api_projetos_list():
         "id": p.id,
         "nome": p.nome,
         "status": (p.status or "ATIVO"),
-        "selected": (p.id == selected_id)
+        "selected": (p.id == selected_id),
+        "data_criacao": p.data_criacao.isoformat() if p.data_criacao else None,
+        "data_ativo": p.data_ativo.isoformat() if p.data_ativo else None,
+        "data_inativo": p.data_inativo.isoformat() if p.data_inativo else None,
+        "data_concluido": p.data_concluido.isoformat() if p.data_concluido else None,
     } for p in projetos]
     return jsonify({"ok": True, "projetos": out})
 
@@ -667,6 +671,15 @@ def api_projetos_update(projeto_id):
         status = (data.get("status") or "").strip().upper()
         if status not in {"ATIVO", "INATIVO", "CONCLUIDO"}:
             return jsonify({"ok": False, "error": "Status inválido (use ATIVO, INATIVO ou CONCLUIDO)."}), 400
+
+        if p.status != status:
+            now = datetime.utcnow()
+            if status == 'ATIVO':
+                p.data_ativo = now
+            elif status == 'INATIVO':
+                p.data_inativo = now
+            elif status == 'CONCLUIDO':
+                p.data_concluido = now
         p.status = status
 
     db.session.commit()
@@ -674,20 +687,30 @@ def api_projetos_update(projeto_id):
     if session.get("projeto_atual_id") == p.id and "nome" in data:
         session["projeto_atual_nome"] = p.nome
 
-    return jsonify({"ok": True, "projeto": {"id": p.id, "nome": p.nome, "status": p.status}})
+    return jsonify({
+        "ok": True,
+        "projeto": {
+            "id": p.id,
+            "nome": p.nome,
+            "status": p.status,
+            "data_criacao": p.data_criacao.isoformat(),
+            "data_ativo": p.data_ativo.isoformat() if p.data_ativo else None,
+            "data_inativo": p.data_inativo.isoformat() if p.data_inativo else None,
+            "data_concluido": p.data_concluido.isoformat() if p.data_concluido else None,
+        }
+    })
 
 @app.post("/api/projetos")
 @login_required
 def api_projetos_create():
     data = request.get_json(silent=True) or request.form or {}
-    app.logger.info(f"Received data for project creation: {data}")  # Debug log
+    app.logger.info(f"Received data for project creation: {data}")
 
     nome = (data.get("nome") or "").strip()
     if not nome:
         app.logger.error("Project creation failed: 'nome' is missing.")
         return jsonify({"ok": False, "error": "Nome é obrigatório."}), 400
 
-    # Adicionando validação para projetos duplicados
     if Projeto.query.filter_by(nome=nome, user_id=current_user.id).first():
         app.logger.error(f"Project creation failed: Project with name '{nome}' already exists.")
         return jsonify({"ok": False, "error": "Já existe um projeto com esse nome."}), 409
@@ -697,7 +720,16 @@ def api_projetos_create():
         app.logger.error(f"Project creation failed: Invalid status '{status}'.")
         return jsonify({"ok": False, "error": "Status inválido (use ATIVO, INATIVO ou CONCLUIDO)."}), 400
 
-    p = Projeto(nome=nome, user_id=current_user.id, status=status)
+    now = datetime.utcnow()
+    p = Projeto(
+        nome=nome,
+        user_id=current_user.id,
+        status=status,
+        data_criacao=now,
+        data_ativo=now if status == 'ATIVO' else None,
+        data_inativo=now if status == 'INATIVO' else None,
+        data_concluido=now if status == 'CONCLUIDO' else None,
+    )
     db.session.add(p)
     try:
         db.session.commit()
@@ -709,7 +741,17 @@ def api_projetos_create():
 
     session["projeto_atual_id"] = p.id
     session["projeto_atual_nome"] = p.nome
-    return jsonify({"ok": True, "id": p.id, "nome": p.nome, "status": p.status})
+
+    return jsonify({
+        "ok": True,
+        "id": p.id,
+        "nome": p.nome,
+        "status": p.status,
+        "data_criacao": p.data_criacao.isoformat(),
+        "data_ativo": p.data_ativo.isoformat() if p.data_ativo else None,
+        "data_inativo": p.data_inativo.isoformat() if p.data_inativo else None,
+        "data_concluido": p.data_concluido.isoformat() if p.data_concluido else None,
+    })
 
 @app.get("/<path:prefix>/static/images/favicon-roehn.png")
 def favicon_nested(prefix):
@@ -726,7 +768,15 @@ def api_projeto_atual():
         if not pid:
             return jsonify({"ok": True, "projeto_atual": None})
         p = db.get_or_404(Projeto, int(pid))
-        return jsonify({"ok": True, "projeto_atual": {"id": p.id, "nome": p.nome, "status": p.status}})
+        return jsonify({"ok": True, "projeto_atual": {
+            "id": p.id,
+            "nome": p.nome,
+            "status": p.status,
+            "data_criacao": p.data_criacao.isoformat() if p.data_criacao else None,
+            "data_ativo": p.data_ativo.isoformat() if p.data_ativo else None,
+            "data_inativo": p.data_inativo.isoformat() if p.data_inativo else None,
+            "data_concluido": p.data_concluido.isoformat() if p.data_concluido else None,
+        }})
 
     # PUT/POST: seleciona um projeto
     data = request.get_json(silent=True) or request.form or {}
@@ -2085,6 +2135,10 @@ def exportar_projeto(projeto_id):
         'id': projeto.id,
         'nome': projeto.nome,
         'status': projeto.status,
+        'data_criacao': projeto.data_criacao.isoformat() if projeto.data_criacao else None,
+        'data_ativo': projeto.data_ativo.isoformat() if projeto.data_ativo else None,
+        'data_inativo': projeto.data_inativo.isoformat() if projeto.data_inativo else None,
+        'data_concluido': projeto.data_concluido.isoformat() if projeto.data_concluido else None,
     }
 
     # 2. Módulos (todos do projeto)
@@ -2250,10 +2304,26 @@ def importar_projeto():
                 novo_nome = f"{original_nome} (cópia {count})"
                 count += 1
 
+            def parse_iso_date(date_string):
+                if not date_string:
+                    return None
+                try:
+                    # Handle both Z and +00:00 timezones
+                    if date_string.endswith('Z'):
+                        return datetime.fromisoformat(date_string[:-1] + '+00:00')
+                    return datetime.fromisoformat(date_string)
+                except (ValueError, TypeError):
+                    return None
+
+            projeto_data = data['projeto']
             novo_projeto = Projeto(
                 nome=novo_nome,
-                status=data['projeto'].get('status', 'ATIVO'),
-                user_id=current_user.id
+                status=projeto_data.get('status', 'ATIVO'),
+                user_id=current_user.id,
+                data_criacao=parse_iso_date(projeto_data.get('data_criacao')) or datetime.utcnow(),
+                data_ativo=parse_iso_date(projeto_data.get('data_ativo')),
+                data_inativo=parse_iso_date(projeto_data.get('data_inativo')),
+                data_concluido=parse_iso_date(projeto_data.get('data_concluido')),
             )
             db.session.add(novo_projeto)
             db.session.flush()
