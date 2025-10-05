@@ -64,7 +64,7 @@ const Dashboard: React.FC = () => {
       const currentData = await currentRes.json();
       if (currentData.ok && currentData.projeto_atual) {
         const p = currentData.projeto_atual;
-        setCurrentProject({
+        const currentProjectData = {
           id: p.id,
           nome: p.nome,
           status: (p.status ?? 'ATIVO') as ProjectStatus,
@@ -73,9 +73,12 @@ const Dashboard: React.FC = () => {
           data_ativo: p.data_ativo,
           data_inativo: p.data_inativo,
           data_concluido: p.data_concluido,
-        });
+        };
+        setCurrentProject(currentProjectData);
+        setProjeto(currentProjectData);
       } else {
         setCurrentProject(undefined);
+        clearProjeto();
       }
     } catch (error) {
       // Trate o erro se necessário

@@ -348,7 +348,7 @@ export default function Projeto() {
                                           </h5>
                                           <ul className="space-y-2">
                                             {kps.map((k) => {
-                                              const linked = k.buttons.filter(b => b.circuito_id != null).length;
+                                              const linked = k.buttons.filter(b => b.circuito_id != null || b.cena_id != null).length;
                                               const total = k.button_count || k.buttons.length || 0;
                                               let statusLabel = "Vazio";
                                               let statusClass = "bg-red-100 text-red-700";
