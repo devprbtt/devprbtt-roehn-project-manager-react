@@ -108,8 +108,25 @@ const ProjectCard: React.FC<Props> = ({
             </div>
           </CardHeader>
 
-          <CardContent className="pt-0">
-            <div className="flex gap-2">
+          <CardContent className="pt-4">
+            <div className="border-t border-slate-200 pt-4">
+              <div className="text-xs text-slate-500 space-y-2">
+                {project.data_criacao && (
+                  <p><b>Criação:</b> {new Date(project.data_criacao).toLocaleDateString()}</p>
+                )}
+                {project.status === 'ATIVO' && project.data_ativo && (
+                  <p><b>Ativo desde:</b> {new Date(project.data_ativo).toLocaleDateString()}</p>
+                )}
+                {project.status === 'INATIVO' && project.data_inativo && (
+                  <p><b>Inativo desde:</b> {new Date(project.data_inativo).toLocaleDateString()}</p>
+                )}
+                {project.status === 'CONCLUIDO' && project.data_concluido && (
+                  <p><b>Concluído em:</b> {new Date(project.data_concluido).toLocaleDateString()}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-4">
               {!isCurrentProject ? (
                 <Button
                   onClick={onSelect}

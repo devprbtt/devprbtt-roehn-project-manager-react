@@ -51,6 +51,10 @@ const Dashboard: React.FC = () => {
             nome: p.nome,
             status: (p.status ?? 'ATIVO') as ProjectStatus,
             selected: !!p.selected,
+            data_criacao: p.data_criacao,
+            data_ativo: p.data_ativo,
+            data_inativo: p.data_inativo,
+            data_concluido: p.data_concluido,
           }))
         );
       }
@@ -64,7 +68,11 @@ const Dashboard: React.FC = () => {
           id: p.id,
           nome: p.nome,
           status: (p.status ?? 'ATIVO') as ProjectStatus,
-          selected: !!p.selected,
+          selected: true, // Se existe um projeto atual, ele está selecionado
+          data_criacao: p.data_criacao,
+          data_ativo: p.data_ativo,
+          data_inativo: p.data_inativo,
+          data_concluido: p.data_concluido,
         });
       } else {
         setCurrentProject(undefined);
@@ -175,13 +183,11 @@ const Dashboard: React.FC = () => {
           selected: p.id === project.id,
         }))
       );
-      // e garantir currentProject com status:
-      setCurrentProject(prev => ({
-        id: project.id,
-        nome: project.nome,
-        status: (project as any).status ?? 'ATIVO',
+      // e garantir currentProject com status e datas:
+      setCurrentProject({
+        ...project,
         selected: true,
-      }));
+      });
 
     } catch (error) {}
     setIsLoading(false);
@@ -210,42 +216,35 @@ const Dashboard: React.FC = () => {
 
   // Atualizar projeto (nome e/ou status)
   const handleUpdateProject = async (projectId: number, data: Partial<Project>) => {
-    await fetch(`/api/projetos/${projectId}`, {
+    const response = await fetch(`/api/projetos/${projectId}`, {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         nome: data.nome,
-        status: data.status, // <— enviar status também
+        status: data.status,
       }),
     });
 
-    // Atualiza a lista
-    setProjects(prev =>
-      prev.map(p =>
-        p.id === projectId
-          ? {
-              ...p,
-              nome: data.nome ?? p.nome,
-              status: (data.status as ProjectStatus | undefined) ?? p.status,
-            }
-          : p
-      )
-    );
+    const result = await response.json();
 
-    // Atualiza o projeto atual se for ele
-    if (currentProject?.id === projectId) {
-      setCurrentProject(prev =>
-        prev
-          ? {
-              ...prev,
-              nome: data.nome ?? prev.nome,
-              status: (data.status as ProjectStatus | undefined) ?? prev.status,
-            }
-          : prev
+    if (result.ok && result.projeto) {
+      const updatedProject = {
+        ...result.projeto,
+        selected: currentProject?.id === projectId,
+      };
+
+      // Atualiza a lista
+      setProjects(prev =>
+        prev.map(p => (p.id === projectId ? updatedProject : p))
       );
+
+      // Atualiza o projeto atual se for ele
+      if (currentProject?.id === projectId) {
+        setCurrentProject(updatedProject);
+      }
     }
-  }; // <— ESSA CHAVE FALTAVA
+  };
 
 
 

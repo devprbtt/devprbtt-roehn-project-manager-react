@@ -6,6 +6,10 @@ export type Project = {
   nome: string;
   status: ProjectStatus;
   selected?: boolean;
+  data_criacao: string | null;
+  data_ativo: string | null;
+  data_inativo: string | null;
+  data_concluido: string | null;
 };
 
 import { Cena } from './cena';
