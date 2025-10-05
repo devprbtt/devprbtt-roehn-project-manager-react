@@ -1080,7 +1080,7 @@ export default function Vinculacao() {
             </motion.div>
           </div>
 
-          <NavigationButtons previousPath="/cenas" nextPath="/projeto" />
+          <NavigationButtons previousPath="/modulos" nextPath="/keypads" />
         </div>
       </div>
 

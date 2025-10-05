@@ -421,7 +421,7 @@ export default function Projeto() {
             </div>
           )}
 
-          <NavigationButtons previousPath="/vinculacao" />
+          <NavigationButtons previousPath="/cenas" />
 
           {/* Modal do Gerador de RWP */}
           <AnimatePresence>

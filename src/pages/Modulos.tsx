@@ -414,7 +414,7 @@ export default function Modulos() {
             </motion.div>
           </div>
 
-          <NavigationButtons previousPath="/circuitos" nextPath="/keypads" />
+          <NavigationButtons previousPath="/circuitos" nextPath="/vinculacao" />
         </div>
       </div>
     </Layout>

@@ -984,7 +984,7 @@ export default function Keypads() {
             </motion.div>
           </div>
 
-          <NavigationButtons previousPath="/modulos" nextPath="/cenas" />
+          <NavigationButtons previousPath="/vinculacao" nextPath="/cenas" />
         </div>
 
         {/* Modal de Vinculação */}

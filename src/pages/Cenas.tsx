@@ -243,7 +243,7 @@ const Cenas = () => {
             </motion.div>
         </div>
 
-        <NavigationButtons previousPath="/keypads" nextPath="/vinculacao" />
+        <NavigationButtons previousPath="/keypads" nextPath="/projeto" />
       </div>
     </Layout>
   );
