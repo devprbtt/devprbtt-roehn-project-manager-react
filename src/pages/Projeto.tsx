@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ProjetoTree, Keypad, Area } from "@/types/project";
+import NavigationButtons from "@/components/NavigationButtons";
 
 export default function Projeto() {
   const { projeto } = useProject();
@@ -419,6 +420,8 @@ export default function Projeto() {
               </motion.div>
             </div>
           )}
+
+          <NavigationButtons previousPath="/vinculacao" />
 
           {/* Modal do Gerador de RWP */}
           <AnimatePresence>

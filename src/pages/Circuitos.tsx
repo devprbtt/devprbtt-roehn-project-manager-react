@@ -11,6 +11,7 @@ import { Trash2, PlusCircle, Zap, DoorOpen, Sparkles, Lightbulb, Blinds, Snowfla
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProject } from "@/store/project";
 import { motion, AnimatePresence } from "framer-motion";
+import NavigationButtons from "@/components/NavigationButtons";
 
 
 type Ambiente = { id: number; nome: string; area?: { id: number; nome: string } };
@@ -675,6 +676,8 @@ export default function Circuitos() {
               </Card>
             </motion.div>
           </div>
+
+          <NavigationButtons previousPath="/quadros" nextPath="/modulos" />
         </div>
       </div>
     </Layout>

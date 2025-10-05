@@ -19,6 +19,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import NavigationButtons from "@/components/NavigationButtons";
 
 type Area = { id: number; nome: string };
 type Ambiente = { id: number; nome: string; area?: Area; area_id?: number };
@@ -431,6 +432,8 @@ export default function QuadrosEletricos() {
               </Card>
             </motion.div>
           </div>
+
+          <NavigationButtons previousPath="/ambientes" nextPath="/circuitos" />
         </div>
       </div>
     </Layout>

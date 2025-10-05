@@ -552,7 +552,7 @@ export const SceneForm = ({
 
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Ações</h3>
-              <ScrollArea className="h-[400px] p-4 border rounded-md">
+              <ScrollArea className="h-[280px] p-4 border rounded-md">
                 {fields.map((field, index) => (
                     <ActionItem
                         key={field.id}
@@ -566,12 +566,20 @@ export const SceneForm = ({
                     />
                 ))}
               </ScrollArea>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => addAction('circuit')}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Circuito
+              <div className="flex gap-4">
+                <Button
+                  type="button"
+                  onClick={() => addAction('circuit')}
+                  className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  <PlusCircle className="h-5 w-5" /> Adicionar Circuito
                 </Button>
-                <Button type="button" variant="outline" onClick={() => addAction('room')}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Grupo de Luzes
+                <Button
+                  type="button"
+                  onClick={() => addAction('room')}
+                  className="flex-1 h-11 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  <PlusCircle className="h-5 w-5" /> Adicionar Grupo de Luzes
                 </Button>
               </div>
             </div>
