@@ -10,7 +10,7 @@ from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from roehn_converter import RoehnProjectConverter
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import select, event, or_
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import joinedload
@@ -313,13 +313,6 @@ with app.app_context():
         db.session.add(admin_user)
         db.session.commit()
 
-@app.route("/", defaults={"path": ""})
-@app.route("/<path:path>")
-def spa_catch_all(path):
-    # Não intercepta APIs ou arquivos estáticos
-    if path.startswith("api/") or path.startswith("static/"):
-        abort(404)
-    return send_from_directory(app.static_folder, "index.html")
 
 @app.route('/roehn/import', methods=['POST'])
 @login_required
@@ -2111,19 +2104,29 @@ class NumberedCanvas(canvas.Canvas):
 def footer(canvas, doc):
     canvas.saveState()
     width, height = A4
-    margin = 30  # mesmo conceito dos seus margins em pontos (aprox. 10.5 mm)
+    margin = 30
 
-    # Linha separadora acima do rodapé
     y_line = 18 * mm
     canvas.setLineWidth(0.5)
     canvas.line(margin, y_line, width - margin, y_line)
 
-    # Texto à esquerda (personalize)
+    timestamp_str = getattr(doc, 'client_timestamp', None)
+    tz_offset_str = getattr(doc, 'tz_offset', None)
+
+    if timestamp_str and tz_offset_str is not None:
+        try:
+            utc_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            offset_minutes = int(tz_offset_str)
+            local_time = utc_time - timedelta(minutes=offset_minutes)
+            formatted_time = local_time.strftime('%d/%m/%Y %H:%M')
+        except (ValueError, TypeError):
+            formatted_time = datetime.now().strftime('%d/%m/%Y %H:%M')
+    else:
+        formatted_time = datetime.now().strftime('%d/%m/%Y %H:%M')
+
     canvas.setFont("Helvetica", 8)
-    canvas.drawRightString(width - margin, 12 * mm, "Zafiro - Luxury Technology • " f"{current_user.username} • {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    canvas.drawRightString(width - margin, 12 * mm, f"Zafiro - Luxury Technology • {current_user.username} • {formatted_time}")
 
-
-    # (Não precisa desenhar a numeração aqui — o NumberedCanvas já faz)
     canvas.restoreState()
 
 
@@ -2601,6 +2604,22 @@ def exportar_pdf(projeto_id):
         title=f"Projeto {projeto.nome}"
     )
 
+    client_timestamp_str = request.args.get('client_timestamp')
+    tz_offset_str = request.args.get('tz_offset')
+    doc.client_timestamp = client_timestamp_str
+    doc.tz_offset = tz_offset_str
+
+    if client_timestamp_str and tz_offset_str is not None:
+        try:
+            utc_time = datetime.fromisoformat(client_timestamp_str.replace('Z', '+00:00'))
+            offset_minutes = int(tz_offset_str)
+            local_time = utc_time - timedelta(minutes=offset_minutes)
+            formatted_time = local_time.strftime('%d/%m/%Y %H:%M')
+        except (ValueError, TypeError):
+            formatted_time = datetime.now().strftime('%d/%m/%Y %H:%M')
+    else:
+        formatted_time = datetime.now().strftime('%d/%m/%Y %H:%M')
+
     styles = getSampleStyleSheet()
     # Base Styles
     if 'RoehnTitle' not in styles:
@@ -2628,7 +2647,7 @@ def exportar_pdf(projeto_id):
     elements.append(Spacer(1, 0.2*inch))
     elements.append(Paragraph(f"<b>Projeto:</b> {projeto.nome}", styles['LeftNormal']))
     elements.append(Spacer(1, 0.1*inch))
-    elements.append(Paragraph(f"<b>Data de emissão:</b> {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['LeftNormal']))
+    elements.append(Paragraph(f"<b>Data de emissão:</b> {formatted_time}", styles['LeftNormal']))
     elements.append(Spacer(1, 0.1*inch))
     elements.append(Paragraph(f"<b>Emitido por:</b> {current_user.username}", styles['LeftNormal']))
     elements.append(Spacer(1, 0.3*inch))
@@ -3625,6 +3644,15 @@ def delete_cena(cena_id):
     db.session.commit()
 
     return jsonify({"ok": True})
+
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def spa_catch_all(path):
+    # Não intercepta APIs ou arquivos estáticos
+    if path.startswith("api/") or path.startswith("static/") or path.startswith("exportar-pdf/"):
+        abort(404)
+    return send_from_directory(app.static_folder, "index.html")
 
 
 if __name__ == '__main__':

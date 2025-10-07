@@ -154,7 +154,15 @@ export default function Projeto() {
   const openPdf = () => {
     const id = data.projeto?.id;
     if (!id) return;
-    window.open(`/exportar-pdf/${id}`, "_blank");
+
+    const now = new Date();
+    const clientTimestamp = now.toISOString(); // Timestamp em UTC
+    const timezoneOffset = now.getTimezoneOffset(); // Offset em minutos
+
+    // Adicionar timestamp e offset como parâmetros de consulta
+    const url = `/exportar-pdf/${id}?client_timestamp=${encodeURIComponent(clientTimestamp)}&tz_offset=${timezoneOffset}`;
+    
+    window.open(url, "_blank");
   };
 
   const handlePrint = () => { window.print(); };

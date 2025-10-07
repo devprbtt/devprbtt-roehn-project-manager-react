@@ -552,7 +552,7 @@ export const SceneForm = ({
 
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Ações</h3>
-              <ScrollArea className="h-[280px] p-4 border rounded-md">
+              <ScrollArea className="space-y-3 max-h-96 overflow-y-auto pr-2">
                 {fields.map((field, index) => (
                     <ActionItem
                         key={field.id}
