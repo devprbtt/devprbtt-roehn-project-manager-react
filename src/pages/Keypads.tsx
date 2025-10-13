@@ -37,6 +37,7 @@ type Keypad = {
   // layout opcional, só como fallback (se vc ainda devolver do back):
   layout?: "ONE" | "TWO" | "FOUR";
   ambiente?: { id: number; nome: string; area?: AreaLite };
+  buttons?: ButtonBinding[];
 };
 // 1) Tipos (ou ajuste o tipo atual para este shape)
 type Circuito = {
@@ -67,6 +68,7 @@ type ButtonBinding = {
   type: 'circuito' | 'cena' | 'none';
   circuito_id: number | null;
   cena_id: number | null;
+  engraver_text: string | null;
 };
 
 const COLORS = [
@@ -441,6 +443,7 @@ export default function Keypads() {
       type: 'none',
       circuito_id: null,
       cena_id: null,
+      engraver_text: null,
     }));
     setButtonBindings(base);
 
@@ -452,12 +455,12 @@ export default function Keypads() {
           const merged = base.map((b) => {
             const found = buttons.find((x: any) => x.ordem === b.index + 1);
             if (found?.cena_id) {
-                return { index: b.index, type: 'cena' as const, cena_id: found.cena_id, circuito_id: null };
+                return { index: b.index, type: 'cena' as const, cena_id: found.cena_id, circuito_id: null, engraver_text: found.engraver_text };
             }
             if (found?.circuito_id) {
-                return { index: b.index, type: 'circuito' as const, circuito_id: found.circuito_id, cena_id: null };
+                return { index: b.index, type: 'circuito' as const, circuito_id: found.circuito_id, cena_id: null, engraver_text: found.engraver_text };
             }
-            return { index: b.index, type: 'none' as const, circuito_id: null, cena_id: null };
+            return { index: b.index, type: 'none' as const, circuito_id: null, cena_id: null, engraver_text: null };
           });
           setButtonBindings(merged);
         }
@@ -510,7 +513,7 @@ export default function Keypads() {
       // 1) Atualiza cada tecla
       await Promise.all(
         buttonBindings.map((b) => {
-          const payload: { circuito_id?: number | null, cena_id?: number | null } = {};
+          const payload: { circuito_id?: number | null, cena_id?: number | null, engraver_text?: string | null } = {};
           if (b.type === 'circuito') {
             payload.circuito_id = b.circuito_id;
           } else if (b.type === 'cena') {
@@ -519,6 +522,7 @@ export default function Keypads() {
             payload.circuito_id = null;
             payload.cena_id = null;
           }
+          payload.engraver_text = b.engraver_text;
 
           return fetch(`/api/keypads/${bindingKeypad.id}/buttons/${b.index + 1}`, {
             method: "PUT",
@@ -1087,6 +1091,27 @@ export default function Keypads() {
                           ))}
                         </select>
                       )}
+
+                      <div className="mt-2">
+                        <Label htmlFor={`engraver-text-${b.index}`} className="text-sm font-medium text-slate-600">
+                          Texto do Botão
+                        </Label>
+                        <Input
+                          id={`engraver-text-${b.index}`}
+                          value={b.engraver_text ?? ''}
+                          onChange={(e) => {
+                            const text = e.target.value.slice(0, 7);
+                            setButtonBindings((prev) =>
+                              prev.map((binding) =>
+                                binding.index === b.index ? { ...binding, engraver_text: text } : binding
+                              )
+                            );
+                          }}
+                          maxLength={7}
+                          placeholder="Max 7 chars"
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
