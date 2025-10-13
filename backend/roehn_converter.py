@@ -1348,13 +1348,11 @@ class RoehnProjectConverter:
                 else:
                     print(f"      - Button {button.ordem}: Not linked.")
 
-            style_properties = None
-            if target_guid != zero_guid:
-                style_properties = {
-                    "$type": "Dictionary`2",
-                    "STYLE_PROP_ICON": None,
-                    "STYLE_PROP_ROCKER_ICON": self.keypad_rocker_icon_guid,
-                }
+            style_properties = {
+                "$type": "Dictionary`2",
+                "STYLE_PROP_ICON": None,
+                "STYLE_PROP_ROCKER_ICON": self.keypad_rocker_icon_guid if target_guid != zero_guid else None,
+            }
 
             button_payload = {
                 "$type": "RockerKeypadButton",
@@ -1380,7 +1378,7 @@ class RoehnProjectConverter:
                 "UnitSecondaryKey": unit_secondary_key,
                 "UnitSecondaryLed": unit_secondary_led,
                 "ButtonStyleGuid": zero_guid,
-                "EngraverText": button.notes,
+                "EngraverText": button.engraver_text,
                 "Automode": True,
             }
             payload["ListKeypadButtons"].append(button_payload)
