@@ -139,6 +139,7 @@ class KeypadButton(db.Model):
     keypad_id = db.Column(db.Integer, db.ForeignKey('keypad.id'), nullable=False)
     ordem = db.Column(db.Integer, nullable=False)
     engraver_text = db.Column(db.String(7), nullable=True)
+    rocker_style = db.Column(db.String(50), nullable=True, default='up-down')
     guid = db.Column(db.String(36), nullable=False, default=lambda: str(uuid.uuid4()))
     circuito_id = db.Column(db.Integer, db.ForeignKey('circuito.id', ondelete='SET NULL'), nullable=True)
     cena_id = db.Column(db.Integer, db.ForeignKey('cena.id', ondelete='SET NULL'), nullable=True)
