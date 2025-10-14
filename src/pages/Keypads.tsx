@@ -18,10 +18,12 @@ import {
   Link2,
   X,
   Search,
+  Pencil,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import NavigationButtons from "@/components/NavigationButtons";
+import KeypadEditModal from "@/components/KeypadEditModal";
 
 // ---------- Tipos ----------
 type AreaLite = { id: number; nome: string };
@@ -132,6 +134,9 @@ export default function Keypads() {
   const [bindingLoading, setBindingLoading] = useState(false);
   const [bindingKeypad, setBindingKeypad] = useState<Keypad | null>(null);
   const [buttonBindings, setButtonBindings] = useState<ButtonBinding[]>([]);
+
+  // Modal de edição
+  const [editingKeypad, setEditingKeypad] = useState<Keypad | null>(null);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -421,6 +426,22 @@ export default function Keypads() {
       console.error(err);
       toast({ variant: "destructive", title: "Erro", description: String(err?.message || err) });
     }
+  }
+
+  // --------- Edição (modal) ----------
+  function openEditModal(kp: Keypad) {
+    setEditingKeypad(kp);
+  }
+
+  function closeEditModal() {
+    setEditingKeypad(null);
+  }
+
+  function handleUpdateKeypad(updatedKeypad: Keypad) {
+    setKeypads((prev) =>
+      prev.map((k) => (k.id === updatedKeypad.id ? { ...k, ...updatedKeypad } : k))
+    );
+    closeEditModal();
   }
 
   // --------- Vinculação (modal) ----------
@@ -1010,6 +1031,16 @@ export default function Keypads() {
                                   Vincular Teclas
                                 </Button>
                                 <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => openEditModal(k)}
+                                  disabled={!projetoSelecionado}
+                                  className="rounded-xl shadow hover:shadow-md"
+                                  title="Editar keypad"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
                                   variant="destructive"
                                   size="sm"
                                   onClick={() => handleDelete(k.id)}
@@ -1032,6 +1063,15 @@ export default function Keypads() {
 
           <NavigationButtons previousPath="/vinculacao" nextPath="/cenas" />
         </div>
+
+        {/* Modal de Edição */}
+        <KeypadEditModal
+          isOpen={!!editingKeypad}
+          onClose={closeEditModal}
+          onSave={handleUpdateKeypad}
+          keypad={editingKeypad}
+          ambientes={ambientes}
+        />
 
         {/* Modal de Vinculação */}
         <AnimatePresence>
