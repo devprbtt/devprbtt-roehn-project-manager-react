@@ -25,8 +25,15 @@ export default function Login() {
 
   const from = (location.state as any)?.from || "/";
 
-  useEffect(() => { fetchSession(); }, [fetchSession]);
-  useEffect(() => { if (user) navigate(from, { replace: true }); }, [user, from, navigate]);
+  useEffect(() => {
+    fetchSession();
+  }, [fetchSession]);
+
+  useEffect(() => {
+    if (user) {
+      navigate(from, { replace: true });
+    }
+  }, [user, from, navigate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,9 +49,8 @@ export default function Login() {
       });
       const data = await res.json();
       if (res.ok && data?.ok) {
-        toast({ title: "Bem-vindo!", description: "Login realizado com sucesso." });
         await fetchSession();
-        // A navegação será feita pelo useEffect que observa o 'user'
+        toast({ title: "Bem-vindo!", description: "Login realizado com sucesso." });
       } else {
         setError(data?.error || "Credenciais inválidas.");
       }
