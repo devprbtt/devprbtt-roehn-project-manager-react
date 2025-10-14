@@ -135,6 +135,7 @@ def serialize_keypad_button(button):
         "command_off": button.command_off,
         "can_hold": button.can_hold,
         "is_rocker": button.is_rocker,
+        "rocker_style": button.rocker_style,
         "modo_double_press": button.modo_double_press,
         "command_double_press": button.command_double_press,
         "target_object_guid": button.target_object_guid,
@@ -614,9 +615,7 @@ def delete_projeto(projeto_id):
 @app.get("/api/projetos")
 @login_required
 def api_projetos_list():
-    app.logger.info("Fetching all projects")
     projetos = Projeto.query.order_by(Projeto.id.asc()).all()
-    app.logger.info("Found %d projects", len(projetos))
     selected_id = session.get("projeto_atual_id")
     out = [{
         "id": p.id,
@@ -628,7 +627,6 @@ def api_projetos_list():
         "data_inativo": p.data_inativo.isoformat() if p.data_inativo else None,
         "data_concluido": p.data_concluido.isoformat() if p.data_concluido else None,
     } for p in projetos]
-    app.logger.info("Serialized projects: %s", out)
     return jsonify({"ok": True, "projetos": out})
 
 
@@ -3300,6 +3298,12 @@ def api_keypad_button_update(keypad_id, ordem):
 
     if "is_rocker" in data:
         button.is_rocker = bool(data.get("is_rocker"))
+
+    if "rocker_style" in data:
+        style = (data.get("rocker_style") or "up-down").strip()
+        if style not in ('up-down', 'left-right', 'previous-next'):
+            return jsonify({"ok": False, "error": "Estilo de rocker inválido."}), 400
+        button.rocker_style = style
 
     if "modo_double_press" in data:
         try:

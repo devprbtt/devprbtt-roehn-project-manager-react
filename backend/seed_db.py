@@ -30,7 +30,6 @@ def seed_database():
             )
             admin_user.set_password('admin123')
             db.session.add(admin_user)
-            db.session.commit()
             print("✓ Usuário admin criado")
         else:
             print("✓ Usuário admin já existe")
@@ -46,7 +45,6 @@ def seed_database():
                 data_ativo=datetime.utcnow()
             )
             db.session.add(projeto_exemplo)
-            db.session.commit()
             db.session.flush()  # Para obter o ID
             print("✓ Projeto exemplo criado")
         else:

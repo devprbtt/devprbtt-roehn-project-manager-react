@@ -70,6 +70,7 @@ type ButtonBinding = {
   cena_id: number | null;
   engraver_text: string | null;
   is_rocker: boolean;
+  rocker_style: 'up-down' | 'left-right' | 'previous-next';
 };
 
 const COLORS = [
@@ -446,6 +447,7 @@ export default function Keypads() {
       cena_id: null,
       engraver_text: null,
       is_rocker: false,
+      rocker_style: 'up-down',
     }));
     setButtonBindings(base);
 
@@ -457,12 +459,12 @@ export default function Keypads() {
           const merged = base.map((b) => {
             const found = buttons.find((x: any) => x.ordem === b.index + 1);
             if (found?.cena_id) {
-                return { index: b.index, type: 'cena' as const, cena_id: found.cena_id, circuito_id: null, engraver_text: found.engraver_text, is_rocker: found.is_rocker };
+                return { ...base[0], index: b.index, type: 'cena' as const, cena_id: found.cena_id, circuito_id: null, engraver_text: found.engraver_text, is_rocker: found.is_rocker, rocker_style: found.rocker_style || 'up-down' };
             }
             if (found?.circuito_id) {
-                return { index: b.index, type: 'circuito' as const, circuito_id: found.circuito_id, cena_id: null, engraver_text: found.engraver_text, is_rocker: found.is_rocker };
+                return { ...base[0], index: b.index, type: 'circuito' as const, circuito_id: found.circuito_id, cena_id: null, engraver_text: found.engraver_text, is_rocker: found.is_rocker, rocker_style: found.rocker_style || 'up-down' };
             }
-            return { index: b.index, type: 'none' as const, circuito_id: null, cena_id: null, engraver_text: null, is_rocker: false };
+            return { ...base[0], index: b.index, type: 'none' as const, circuito_id: null, cena_id: null, engraver_text: null, is_rocker: false, rocker_style: 'up-down' };
           });
           setButtonBindings(merged);
         }
@@ -515,7 +517,7 @@ export default function Keypads() {
       // 1) Atualiza cada tecla
       await Promise.all(
         buttonBindings.map((b) => {
-          const payload: { circuito_id?: number | null, cena_id?: number | null, engraver_text?: string | null, is_rocker?: boolean } = {};
+          const payload: { circuito_id?: number | null, cena_id?: number | null, engraver_text?: string | null, is_rocker?: boolean, rocker_style?: 'up-down' | 'left-right' | 'previous-next' } = {};
           if (b.type === 'circuito') {
             payload.circuito_id = b.circuito_id;
           } else if (b.type === 'cena') {
@@ -526,6 +528,7 @@ export default function Keypads() {
           }
           payload.engraver_text = b.engraver_text;
           payload.is_rocker = b.is_rocker;
+          payload.rocker_style = b.rocker_style;
 
           return fetch(`/api/keypads/${bindingKeypad.id}/buttons/${b.index + 1}`, {
             method: "PUT",
@@ -1116,23 +1119,49 @@ export default function Keypads() {
                         />
                       </div>
 
-                      <div className="mt-2 flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id={`is-rocker-${b.index}`}
-                          checked={b.is_rocker}
-                          onChange={(e) => {
-                            const is_rocker = e.target.checked;
-                            setButtonBindings((prev) =>
-                              prev.map((binding) =>
-                                binding.index === b.index ? { ...binding, is_rocker } : binding
-                              )
-                            );
-                          }}
-                        />
-                        <Label htmlFor={`is-rocker-${b.index}`} className="text-sm font-medium text-slate-600">
-                          É Rocker?
-                        </Label>
+                      <div className="mt-2 flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`is-rocker-${b.index}`}
+                            checked={b.is_rocker}
+                            onChange={(e) => {
+                              const is_rocker = e.target.checked;
+                              setButtonBindings((prev) =>
+                                prev.map((binding) =>
+                                  binding.index === b.index ? { ...binding, is_rocker } : binding
+                                )
+                              );
+                            }}
+                          />
+                          <Label htmlFor={`is-rocker-${b.index}`} className="text-sm font-medium text-slate-600">
+                            É Rocker?
+                          </Label>
+                        </div>
+                        {b.is_rocker && (
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm font-medium text-slate-600">Estilo:</Label>
+                            <Select
+                              value={b.rocker_style}
+                              onValueChange={(value: 'up-down' | 'left-right') => {
+                                setButtonBindings((prev) =>
+                                  prev.map((binding) =>
+                                    binding.index === b.index ? { ...binding, rocker_style: value } : binding
+                                  )
+                                );
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-sm rounded-lg w-[120px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="up-down">Sobe/Desce</SelectItem>
+                                <SelectItem value="left-right">Esq/Dir</SelectItem>
+                                <SelectItem value="previous-next">Ant/Prox</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

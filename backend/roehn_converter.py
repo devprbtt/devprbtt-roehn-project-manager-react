@@ -23,7 +23,9 @@ class RoehnProjectConverter:
         self.zero_guid = "00000000-0000-0000-0000-000000000000"
         self.keypad_driver_guid = "90000000-0000-0000-0000-000000000004"
         self.keypad_profile_guid = "40000000-0000-0000-0000-000000000001"
-        self.keypad_rocker_icon_guid = "11000000-0000-0000-0000-000000000004"
+        self.rocker_icon_guid_up_down = "11000000-0000-0000-0000-000000000001"
+        self.rocker_icon_guid_left_right = "11000000-0000-0000-0000-000000000002"
+        self.rocker_icon_guid_previous_next = "11000000-0000-0000-0000-000000000003"
         self.keypad_button_layouts = {1: 1, 2: 6, 4: 7}
         self._quadro_guid_map = {}
 
@@ -1350,10 +1352,16 @@ class RoehnProjectConverter:
 
             style_properties = None
             if button.is_rocker and target_guid != zero_guid:
+                rocker_icon_guid = self.rocker_icon_guid_up_down
+                if button.rocker_style == 'left-right':
+                    rocker_icon_guid = self.rocker_icon_guid_left_right
+                elif button.rocker_style == 'previous-next':
+                    rocker_icon_guid = self.rocker_icon_guid_previous_next
+
                 style_properties = {
                     "$type": "Dictionary`2",
                     "STYLE_PROP_ICON": None,
-                    "STYLE_PROP_ROCKER_ICON": self.keypad_rocker_icon_guid,
+                    "STYLE_PROP_ROCKER_ICON": rocker_icon_guid,
                 }
 
             button_payload = {
