@@ -92,8 +92,10 @@ const Dashboard: React.FC = () => {
   }, [fetchSession]);
   
   useEffect(() => {
-    if (user) loadProjects();   // <— só carrega dados se já estiver logado
-  }, [user]);
+    if (user) {
+      loadProjects();
+    }
+  }, [user, authLoading]);
 
   // Função para exportar projeto em JSON
   const handleExportProject = async () => {
