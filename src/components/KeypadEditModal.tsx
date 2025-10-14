@@ -77,7 +77,6 @@ const KeypadEditModal = ({ keypad, ambientes, isOpen, onClose, onSave }: KeypadE
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nome: updatedKeypad.nome,
-          hsnet: updatedKeypad.hsnet,
           color: updatedKeypad.color,
           button_color: updatedKeypad.button_color,
           ambiente_id: Number(ambienteId),
@@ -116,7 +115,7 @@ const KeypadEditModal = ({ keypad, ambientes, isOpen, onClose, onSave }: KeypadE
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-hsnet">HSNET</Label>
-              <Input id="edit-hsnet" type="number" value={hsnet} onChange={(e) => setHsnet(Number(e.target.value) || '')} />
+              <Input id="edit-hsnet" type="number" value={hsnet} disabled />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
