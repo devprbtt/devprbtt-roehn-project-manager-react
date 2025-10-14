@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, PlusCircle, Zap, DoorOpen, Sparkles, Lightbulb, Blinds, Snowflake, Search, Filter, X } from "lucide-react";
+import { Trash2, PlusCircle, Zap, DoorOpen, Sparkles, Lightbulb, Blinds, Snowflake, Search, Filter, X, Pencil } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProject } from "@/store/project";
 import { motion, AnimatePresence } from "framer-motion";
 import NavigationButtons from "@/components/NavigationButtons";
+import CircuitEditModal from "@/components/CircuitEditModal";
 
 
 type Ambiente = { id: number; nome: string; area?: { id: number; nome: string } };
@@ -36,6 +37,7 @@ export default function Circuitos() {
   const [dimerizavel, setDimerizavel] = useState(false);
   const [potencia, setPotencia] = useState<string>("");
   const onlyInts = (v: string) => v.replace(/[^\d]/g, "");
+  const [editingCircuito, setEditingCircuito] = useState<Circuito | null>(null);
 
 
   // Estados para filtros
@@ -657,15 +659,26 @@ export default function Circuitos() {
                                   )}
                                 </div>
                               </div>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleDelete(c.id)}
-                                disabled={!projetoSelecionado}
-                                className="opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setEditingCircuito(c)}
+                                  disabled={!projetoSelecionado}
+                                  className="rounded-xl shadow-sm hover:shadow-md"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleDelete(c.id)}
+                                  disabled={!projetoSelecionado}
+                                  className="rounded-xl shadow-lg hover:shadow-xl"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
                           </motion.div>
                         ))}
@@ -680,6 +693,16 @@ export default function Circuitos() {
           <NavigationButtons previousPath="/quadros" nextPath="/modulos" />
         </div>
       </div>
+      <CircuitEditModal
+        isOpen={!!editingCircuito}
+        onClose={() => setEditingCircuito(null)}
+        circuito={editingCircuito}
+        ambientes={ambientes}
+        onSave={(updatedCircuito) => {
+          checkAndFetchData();
+          setEditingCircuito(null);
+        }}
+      />
     </Layout>
   );
 }

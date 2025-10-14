@@ -189,6 +189,6 @@ class CustomAcao(db.Model):
     acao_id = db.Column(db.Integer, db.ForeignKey('acao.id'), nullable=False)
     target_guid = db.Column(db.String(36), nullable=False)  # GUID of the circuit inside the group
     enable = db.Column(db.Boolean, nullable=False, default=True)
-    level = db.Column(db.Integer, nullable=False, default=50)
+    level = db.Column(db.Integer, nullable=False, default=100)
 
     __table_args__ = (db.UniqueConstraint('acao_id', 'target_guid', name='unique_custom_acao'),)

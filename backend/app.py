@@ -1281,6 +1281,28 @@ def api_circuitos_update(circuito_id):
     if "nome" in data:
         c.nome = (data.get("nome") or "").strip()
     
+    if "identificador" in data:
+        novo_identificador = (data.get("identificador") or "").strip()
+        if novo_identificador != c.identificador:
+            exists = (
+                Circuito.query
+                .join(Ambiente, Circuito.ambiente_id == Ambiente.id)
+                .join(Area, Ambiente.area_id == Area.id)
+                .filter(Area.projeto_id == projeto_id, Circuito.identificador == novo_identificador)
+                .first()
+            )
+            if exists:
+                return jsonify({"ok": False, "error": "Identificador já existe neste projeto."}), 409
+        c.identificador = novo_identificador
+
+    if "ambiente_id" in data:
+        novo_ambiente_id = data.get("ambiente_id")
+        if novo_ambiente_id:
+            novo_ambiente = db.get_or_404(Ambiente, int(novo_ambiente_id))
+            if not getattr(novo_ambiente, "area", None) or getattr(novo_ambiente.area, "projeto_id", None) != projeto_id:
+                return jsonify({"ok": False, "error": "Ambiente não pertence ao projeto atual."}), 400
+            c.ambiente_id = novo_ambiente.id
+
     if "tipo" in data:
         novo_tipo = (data.get("tipo") or "").strip()
         c.tipo = novo_tipo
@@ -1292,10 +1314,15 @@ def api_circuitos_update(circuito_id):
 
     # NOVO: Atualizar campo potencia
     if "potencia" in data:
-        nova_potencia = float(data.get("potencia", 0.0))
-        if nova_potencia < 0:
-            return jsonify({"ok": False, "error": "A potência não pode ser negativa."}), 400
-        c.potencia = nova_potencia
+        nova_potencia = data.get("potencia")
+        if nova_potencia is not None:
+            nova_potencia = float(nova_potencia)
+            if nova_potencia < 0:
+                return jsonify({"ok": False, "error": "A potência não pode ser negativa."}), 400
+            c.potencia = nova_potencia
+        else:
+            c.potencia = None
+
 
     db.session.commit()
     
@@ -1305,7 +1332,7 @@ def api_circuitos_update(circuito_id):
         "nome": c.nome,
         "tipo": c.tipo,
         "dimerizavel": c.dimerizavel,
-        "potencia": c.potencia  # NOVO CAMPO
+        "potencia": c.potencia
     })
 
 
