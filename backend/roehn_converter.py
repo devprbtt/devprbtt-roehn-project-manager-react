@@ -1399,7 +1399,7 @@ class RoehnProjectConverter:
                 "UnitLed": unit_led,
                 "UnitSecondaryKey": unit_secondary_key,
                 "UnitSecondaryLed": unit_secondary_led,
-                "ButtonStyleGuid": "13000000-0000-0000-0000-000000000002" if button.is_rocker else zero_guid,
+                "ButtonStyleGuid": "13000000-0000-0000-0000-000000000002" if button.is_rocker or button.icon else zero_guid,
                 "EngraverText": button.engraver_text,
                 "Automode": True,
             }
