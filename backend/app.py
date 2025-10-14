@@ -2315,6 +2315,140 @@ def exportar_projeto(projeto_id):
         download_name=nome_arquivo
     )
 
+
+@app.route('/api/importar-planner', methods=['POST'])
+@login_required
+def importar_planner():
+    if 'file' not in request.files:
+        return jsonify({"ok": False, "error": "Nenhum arquivo enviado."}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"ok": False, "error": "Nenhum arquivo selecionado."}), 400
+
+    if not file or not file.filename.endswith('.json'):
+        return jsonify({"ok": False, "error": "Arquivo inválido. Apenas arquivos .json são permitidos."}), 400
+
+    try:
+        data = json.load(file)
+    except json.JSONDecodeError:
+        return jsonify({"ok": False, "error": "Arquivo JSON mal formatado."}), 400
+
+    required_keys = ["ProjectName", "ProjectDataAreas", "ProjectDataRooms", "ProjectDataDevices"]
+    if not all(key in data for key in required_keys):
+        return jsonify({"ok": False, "error": "Estrutura do JSON do planner inválida."}), 400
+
+    id_map = {
+        'areas': {},
+        'ambientes': {},
+    }
+
+    try:
+        with db.session.begin_nested():
+            # 1. Criar Projeto
+            original_nome = data['ProjectName']
+            novo_nome = original_nome
+            count = 1
+            while Projeto.query.filter_by(nome=novo_nome, user_id=current_user.id).first():
+                novo_nome = f"{original_nome} (importado {count})"
+                count += 1
+
+            novo_projeto = Projeto(nome=novo_nome, user_id=current_user.id)
+            db.session.add(novo_projeto)
+            db.session.flush()
+
+            # 2. Criar Áreas
+            for area_data in data.get('ProjectDataAreas', []):
+                nova_area = Area(nome=area_data['Name'], projeto_id=novo_projeto.id)
+                db.session.add(nova_area)
+                db.session.flush()
+                id_map['areas'][area_data['Id']] = nova_area
+
+            # 3. Criar Ambientes
+            for room_data in data.get('ProjectDataRooms', []):
+                area = id_map['areas'].get(room_data['IdArea'])
+                if not area:
+                    continue
+                novo_ambiente = Ambiente(nome=room_data['Name'], area_id=area.id)
+                db.session.add(novo_ambiente)
+                db.session.flush()
+                id_map['ambientes'][room_data['Id']] = novo_ambiente
+
+            # 4. Criar Keypads
+            hsnet_counter = 110
+            for device_data in data.get('ProjectDataDevices', []):
+                if device_data.get('Type') != 'Keypad':
+                    continue
+
+                ambiente = id_map['ambientes'].get(device_data['IdRoom'])
+                if not ambiente:
+                    continue
+
+                # Mapeamento de Cores
+                color_map = {"WHT": "WHITE", "BLK": "BLACK", "ASLV": "SILVER"}
+                faceplate_color = color_map.get(device_data.get('FaceplateColor'), 'WHITE')
+
+                # Mapeamento de Layout
+                model_key = 'ModelLeft' if 'ModelLeft' in device_data else 'ModelRight'
+                layout_map = {"K1": 1, "K2": 2, "K4": 4}
+                button_count = layout_map.get(device_data.get(model_key), 4)
+
+                # Garantir HSNET único
+                while is_hsnet_in_use(hsnet_counter, novo_projeto.id):
+                    hsnet_counter += 1
+
+                novo_keypad = Keypad(
+                    nome=device_data['Name'],
+                    modelo='RQR-K',
+                    color=faceplate_color,
+                    button_color='WHITE', # Padrão
+                    button_count=button_count,
+                    hsnet=hsnet_counter,
+                    dev_id=hsnet_counter,
+                    ambiente_id=ambiente.id,
+                    projeto_id=novo_projeto.id,
+                    notes=device_data.get('Notas', '')
+                )
+                db.session.add(novo_keypad)
+                db.session.flush()
+
+                ensure_keypad_button_slots(novo_keypad, button_count)
+                db.session.flush()
+
+                buttons_key = 'ButtonsLeft' if 'ButtonsLeft' in device_data else 'ButtonsRight'
+                for i, button_data in enumerate(device_data.get(buttons_key, [])):
+                    if i < len(novo_keypad.buttons):
+                        button = novo_keypad.buttons[i]
+                        button.engraver_text = button_data.get('ButtonText', '')
+                        button.is_rocker = bool(button_data.get('isRKR', 0))
+
+                        arrow_map = {1: 'up-down', 2: 'left-right', 3: 'previous-next'}
+                        button.rocker_style = arrow_map.get(button_data.get('ArrowID'))
+
+                        # IconID ainda precisa ser mapeado
+                        # button.icon = map_icon(button_data.get('IconID'))
+
+                hsnet_counter += 1
+
+        db.session.commit()
+
+        # Define o projeto recém-criado como o projeto atual na sessão
+        session["projeto_atual_id"] = novo_projeto.id
+        session["projeto_atual_nome"] = novo_projeto.nome
+
+        return jsonify({"ok": True, "message": f"Projeto '{novo_nome}' importado com sucesso do planner!", "projeto_id": novo_projeto.id})
+
+    except IntegrityError as e:
+        db.session.rollback()
+        app.logger.error(f"Erro de integridade na importação do planner: {e}")
+        return jsonify({"ok": False, "error": "Erro de integridade nos dados. Verifique se há nomes duplicados."}), 409
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        app.logger.error(f"Erro inesperado na importação do planner: {e}\n{traceback.format_exc()}")
+        return jsonify({"ok": False, "error": f"Ocorreu um erro inesperado: {e}"}), 500
+
+
 @app.route('/api/importar-projeto', methods=['POST'])
 @login_required
 def importar_projeto():
