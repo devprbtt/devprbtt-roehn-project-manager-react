@@ -33,15 +33,14 @@ type Keypad = {
   id: number;
   nome: string;
   hsnet: number;
-  color: string;          // <- backend
-  button_color: string;   // <- backend
-  button_count: number;   // <- backend
-  // layout opcional, só como fallback (se vc ainda devolver do back):
+  color: string;
+  button_color: string;
+  button_count: number;
   layout?: "ONE" | "TWO" | "FOUR";
   ambiente?: { id: number; nome: string; area?: AreaLite };
   buttons?: ButtonBinding[];
 };
-// 1) Tipos (ou ajuste o tipo atual para este shape)
+
 type Circuito = {
   id: number;
   identificador: string;
@@ -103,7 +102,6 @@ function layoutToCount(layout?: Keypad["layout"]): number | undefined {
   return undefined;
 }
 
-
 // ---------- Componente ----------
 export default function Keypads() {
   const { toast } = useToast();
@@ -143,37 +141,27 @@ export default function Keypads() {
   const [ambienteFilter, setAmbienteFilter] = useState<number | "todos">("todos");
   const [teclasFilter, setTeclasFilter] = useState<1 | 2 | 4 | "todos">("todos");
 
-  // options
+  // Aplicação de filtros/busca
+  const filteredKeypads = useMemo(() => {
+    return keypads.filter(keypad => {
+      const matchesSearch = searchTerm === "" ||
+        keypad.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(keypad.hsnet).includes(searchTerm.toLowerCase()) ||
+        (keypad.ambiente && keypad.ambiente.nome.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (keypad.ambiente?.area && keypad.ambiente.area.nome.toLowerCase().includes(searchTerm.toLowerCase()));
 
+      const matchesAmbiente = ambienteFilter === "todos" || keypad.ambiente?.id === ambienteFilter;
+      const matchesTeclas = teclasFilter === "todos" || keypad.button_count === teclasFilter;
 
-    // Aplicação de filtros/busca
-    const filteredKeypads = useMemo(() => {
-      return keypads.filter(keypad => {
-        // Filtro por texto (nome, hsnet, ambiente, area)
-        const matchesSearch = searchTerm === "" ||
-          keypad.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          String(keypad.hsnet).includes(searchTerm.toLowerCase()) ||
-          (keypad.ambiente && keypad.ambiente.nome.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (keypad.ambiente?.area && keypad.ambiente.area.nome.toLowerCase().includes(searchTerm.toLowerCase()));
-
-        // Filtro por ambiente
-        const matchesAmbiente = ambienteFilter === "todos" || keypad.ambiente?.id === ambienteFilter;
-
-        // Filtro por número de teclas
-        const matchesTeclas = teclasFilter === "todos" || keypad.button_count === teclasFilter;
-
-        return matchesSearch && matchesAmbiente && matchesTeclas;
-      });
-    }, [keypads, searchTerm, ambienteFilter, teclasFilter]);
+      return matchesSearch && matchesAmbiente && matchesTeclas;
+    });
+  }, [keypads, searchTerm, ambienteFilter, teclasFilter]);
 
   useEffect(() => {
-    // supondo que você tenha `keypads` no estado
     if (projetoSelecionado && (hsnet === '' || hsnet === undefined || hsnet === null)) {
       fetchNextHsnet();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projetoSelecionado, keypads.length]); // re-sugere quando a quantidade muda
-
+  }, [projetoSelecionado, keypads.length]);
 
   async function fetchNextHsnet() {
     try {
@@ -184,7 +172,6 @@ export default function Keypads() {
         setHsnet(data.hsnet);
       }
     } catch (e) {
-      // opcional: toast de aviso
     } finally {
       setLoadingNextHsnet(false);
     }
@@ -223,7 +210,6 @@ export default function Keypads() {
     }
   }
 
-  // --------- Fetch base ----------
   async function checkAndFetch() {
     setLoading(true);
     try {
@@ -269,7 +255,6 @@ export default function Keypads() {
     }
   }
 
-
   type KeypadStatus = "vazio" | "parcial" | "completo";
 
   function computeKeypadStatus(kp: {
@@ -304,11 +289,9 @@ export default function Keypads() {
       : "Vazio";
   }
 
-
   useEffect(() => {
     loadData();
-  }, [projeto?.id]); // ou [] se preferir
-
+  }, [projeto?.id]);
 
   // --------- Criação ----------
   function resetForm() {
@@ -323,13 +306,12 @@ export default function Keypads() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
 
-    // helper local para mapear layout -> button_count
     const layoutToCount = (l: string): 1 | 2 | 4 | 0 => {
       const L = String(l || "").toUpperCase();
       if (L === "ONE") return 1 as const;
       if (L === "TWO") return 2 as const;
       if (L === "FOUR") return 4 as const;
-      return 0 as const; // inválido
+      return 0 as const;
     };
 
     const count = layoutToCount(layout);
@@ -368,9 +350,9 @@ export default function Keypads() {
         body: JSON.stringify({
           nome: nome.trim(),
           hsnet: hs,
-          color: cor,                 // esperado pelo backend
-          button_color: corTeclas,    // esperado pelo backend
-          button_count: count,        // esperado pelo backend
+          color: cor,
+          button_color: corTeclas,
+          button_count: count,
           ambiente_id: ambId,
         }),
       });
@@ -384,13 +366,8 @@ export default function Keypads() {
       }
 
       toast({ title: "Sucesso!", description: "Keypad adicionado." });
-
-      // Limpa o formulário…
       resetForm?.();
-      // …e força o campo hsnet a vazio para o auto-suggest preencher o próximo (≥110)
       setHsnet("");
-
-      // Recarrega a lista; um useEffect pode chamar fetchNextHsnet se hsnet estiver vazio
       await checkAndFetch();
     } catch (err: any) {
       console.error(err);
@@ -403,7 +380,6 @@ export default function Keypads() {
       setLoadingCreate(false);
     }
   }
-
 
   // --------- Exclusão ----------
   async function handleDelete(id: number) {
@@ -516,7 +492,6 @@ export default function Keypads() {
               };
             }
 
-            // Found, but not linked
             return {
               ...baseReturn,
               type: 'none' as const,
@@ -528,8 +503,6 @@ export default function Keypads() {
       })
       .catch(() => setBindingsOpen(true));
   }
-
-
 
   function closeBindings() {
     setBindingsOpen(false);
@@ -570,7 +543,6 @@ export default function Keypads() {
     try {
       setBindingLoading(true);
 
-      // 1) Atualiza cada tecla
       await Promise.all(
         buttonBindings.map((b) => {
           const payload: { circuito_id?: number | null, cena_id?: number | null, engraver_text?: string | null, icon?: string | null, is_rocker?: boolean, rocker_style?: 'up-down' | 'left-right' | 'previous-next' } = {};
@@ -596,15 +568,12 @@ export default function Keypads() {
         })
       );
 
-      // 2) Busca esse keypad atualizado
       const res = await fetch(`/api/keypads/${bindingKeypad.id}`, { credentials: "same-origin" });
       const json = await res.json().catch(() => ({} as any));
 
       if (res.ok && json?.ok && json.keypad) {
-        // 3) Atualiza só ele na lista
         setKeypads((prev) => prev.map((k) => (k.id === bindingKeypad.id ? json.keypad : k)));
       } else {
-        // fallback: recarrega tudo
         await checkAndFetch();
       }
 
@@ -617,22 +586,21 @@ export default function Keypads() {
     }
   }
 
-
   // ---------- Render ----------
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           {/* Header */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
             <div>
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-                  <Keyboard className="w-8 h-8 text-white" />
+                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                  <Keyboard className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Keypads</h1>
-                  <p className="text-lg text-slate-600 max-w-2xl">
+                  <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">Gerenciar Keypads</h1>
+                  <p className="text-base sm:text-lg text-slate-600 max-w-2xl">
                     Cadastre e gerencie os keypads RQR-K do seu projeto.
                   </p>
                 </div>
@@ -641,7 +609,7 @@ export default function Keypads() {
             </div>
           </div>
 
-          {/* Alerta quando não há projeto (somente após loading terminar) */}
+          {/* Alerta quando não há projeto */}
           {!projetoSelecionado && !loading && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
               <Alert className="bg-amber-50 border-amber-200 shadow-sm">
@@ -653,24 +621,28 @@ export default function Keypads() {
             </motion.div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
             {/* Formulário */}
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              className="order-1 lg:order-1"
+            >
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
                 <CardHeader className="pb-6">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
-                      <PlusCircle className="w-6 h-6 text-white" />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <PlusCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-2xl font-bold text-slate-900">Adicionar Novo Keypad</CardTitle>
-                      <p className="text-slate-600 mt-1">Preencha as informações do dispositivo</p>
+                      <CardTitle className="text-xl sm:text-2xl font-bold text-slate-900">Adicionar Novo Keypad</CardTitle>
+                      <p className="text-slate-600 text-sm sm:text-base mt-1">Preencha as informações do dispositivo</p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <form className="space-y-6" onSubmit={handleCreate}>
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="nome" className="text-sm font-semibold text-slate-700">
                           Nome *
@@ -697,16 +669,15 @@ export default function Keypads() {
                             required
                             className="h-12 px-4 rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20"
                           />
-                          <Button type="button" variant="outline" onClick={fetchNextHsnet} disabled={loadingNextHsnet}>
+                          <Button type="button" variant="outline" onClick={fetchNextHsnet} disabled={loadingNextHsnet} className="h-12">
                             {loadingNextHsnet ? "..." : "Sugerir"}
                           </Button>
                         </div>
                         <p className="text-xs text-slate-500 mt-1">Sugerimos o primeiro HSNET livre a partir de 110.</p>
-
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="cor" className="text-sm font-semibold text-slate-700">
                           Cor *
@@ -784,7 +755,7 @@ export default function Keypads() {
                         value={ambienteId === "" ? "" : String(ambienteId)}
                         onChange={(e) => {
                           const v = e.target.value;
-                          setAmbienteId(v === "" ? "" : Number(v)); // <- evita NaN
+                          setAmbienteId(v === "" ? "" : Number(v));
                         }}
                         required
                         disabled={!projetoSelecionado || loading || ambientes.length === 0}
@@ -792,7 +763,7 @@ export default function Keypads() {
                         <option value="">{loading ? "Carregando ambientes..." : "Selecione um ambiente"}</option>
                         {!loading &&
                           ambientes
-                            .slice() // copia para ordenar sem mutar estado
+                            .slice()
                             .sort((a, b) => a.nome.localeCompare(b.nome))
                             .map((amb) => (
                               <option key={amb.id} value={amb.id}>
@@ -823,27 +794,31 @@ export default function Keypads() {
             </motion.div>
 
             {/* Lista */}
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: 0.1 }}
+              className="order-2 lg:order-2"
+            >
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <PanelsTopLeft className="w-6 h-6 text-white" />
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                        <PanelsTopLeft className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-2xl font-bold text-slate-900">Keypads Cadastrados</CardTitle>
-                        <p className="text-slate-600 mt-1">Lista com todos os keypads do projeto</p>
+                        <CardTitle className="text-xl sm:text-2xl font-bold text-slate-900">Keypads Cadastrados</CardTitle>
+                        <p className="text-slate-600 text-sm sm:text-base mt-1">Lista com todos os keypads do projeto</p>
                       </div>
                     </div>
-                    <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-medium px-3 py-1">
+                    <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-xs sm:text-sm font-medium px-2 sm:px-3 py-1">
                       {keypads.length} {keypads.length === 1 ? "keypad" : "keypads"}
                     </Badge>
                   </div>
-                </CardHeader>
-                <CardContent>
+
                   {/* Barra de Filtros */}
-                  <div className="mt-6 space-y-4">
+                  <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
                     {/* Filtro de Busca por Texto */}
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -864,7 +839,7 @@ export default function Keypads() {
                     </div>
 
                     {/* Filtros de Ambiente e Teclas */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {/* Filtro por Ambiente */}
                       <div className="space-y-1">
                         <Label htmlFor="filtro-ambiente" className="text-xs font-medium text-slate-600">
@@ -932,29 +907,29 @@ export default function Keypads() {
                       </div>
                     )}
                   </div>
-
+                </CardHeader>
+                <CardContent>
                   {loading ? (
-                    <div className="flex flex-col justify-center items-center py-12">
-                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
+                    <div className="flex flex-col justify-center items-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-3"></div>
                       <p className="text-slate-600 font-medium">Carregando keypads...</p>
                     </div>
                   ) : keypads.length === 0 ? (
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">
-
-                      <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Keyboard className="h-10 w-10 text-slate-400" />
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-8">
+                      <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Keyboard className="h-8 w-8 text-slate-400" />
                       </div>
-                      <h4 className="text-xl font-semibold text-slate-900 mb-2">
+                      <h4 className="text-lg font-semibold text-slate-900 mb-2">
                         {projetoSelecionado ? "Nenhum keypad cadastrado" : "Selecione um projeto"}
                       </h4>
-                      <p className="text-slate-600 max-w-sm mx-auto">
+                      <p className="text-slate-600 max-w-sm mx-auto text-sm">
                         {projetoSelecionado
                           ? "Comece adicionando seu primeiro keypad usando o formulário ao lado."
                           : "Selecione um projeto para visualizar e gerenciar os keypads."}
                       </p>
                     </motion.div>
                   ) : (
-                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                    <div className="space-y-3 max-h-80 sm:max-h-96 overflow-y-auto pr-2">
                       <AnimatePresence>
                         {filteredKeypads.map((k, index) => (
                           <motion.div
@@ -963,22 +938,21 @@ export default function Keypads() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ delay: index * 0.05 }}
-                            className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
+                            className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-3 sm:p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
                           >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1 mr-4">
-                                <div className="flex items-center gap-3 mb-2">
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                              <div className="flex-1">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
                                   <Badge className="text-xs font-medium px-2 py-1 bg-blue-100 text-blue-800">
                                     {k.button_count === 4 ? "4 teclas" : k.button_count === 2 ? "2 teclas" : "1 tecla"}
                                   </Badge>
-                                  <span className="text-sm font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                  <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
                                     HSNET: {k.hsnet}
                                   </span>
                                 </div>
-                                {/* título e meta */}
-                                <div className="flex items-center justify-between gap-3">
-                                  <h4 className="font-bold text-slate-900 text-lg">{k.nome}</h4>
-
+                                
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                                  <h4 className="font-bold text-slate-900 text-base sm:text-lg">{k.nome}</h4>
                                   {(() => {
                                     const { status, linked, total } = computeKeypadStatus(k);
                                     return (
@@ -996,8 +970,7 @@ export default function Keypads() {
                                   })()}
                                 </div>
 
-
-                                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 mb-2">
+                                <div className="flex flex-wrap items-center gap-1 text-xs sm:text-sm text-slate-600 mb-2">
                                   <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
                                     Corpo: {k.color}
                                   </span>
@@ -1006,8 +979,8 @@ export default function Keypads() {
                                   </span>
                                 </div>
 
-                                <div className="flex items-center gap-2 text-sm text-slate-600">
-                                  <DoorOpen className="h-4 w-4 text-slate-400" />
+                                <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600">
+                                  <DoorOpen className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400" />
                                   <span className="font-medium">{k.ambiente?.nome || "Sem ambiente"}</span>
                                   {k.ambiente?.area?.nome && (
                                     <>
@@ -1018,36 +991,36 @@ export default function Keypads() {
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1 sm:gap-2 self-end sm:self-auto">
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   onClick={() => openBindings(k)}
                                   disabled={!projetoSelecionado}
-                                  className="rounded-xl shadow hover:shadow-md"
+                                  className="rounded-xl shadow hover:shadow-md h-8 w-8 sm:h-9 sm:w-auto p-0 sm:px-3 sm:py-2"
                                   title="Vincular teclas a circuitos"
                                 >
-                                  <Link2 className="h-4 w-4 mr-2" />
-                                  Vincular Teclas
+                                  <Link2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                                  <span className="hidden sm:inline">Vincular</span>
                                 </Button>
                                 <Button
                                   variant="outline"
-                                  size="icon"
+                                  size="sm"
                                   onClick={() => openEditModal(k)}
                                   disabled={!projetoSelecionado}
-                                  className="rounded-xl shadow hover:shadow-md"
+                                  className="rounded-xl shadow hover:shadow-md h-8 w-8 p-0 sm:h-9 sm:w-9"
                                   title="Editar keypad"
                                 >
-                                  <Pencil className="h-4 w-4" />
+                                  <Pencil className="h-3 w-3 sm:h-4 sm:w-4" />
                                 </Button>
                                 <Button
                                   variant="destructive"
                                   size="sm"
                                   onClick={() => handleDelete(k.id)}
                                   disabled={!projetoSelecionado}
-                                  className="opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl"
+                                  className="rounded-xl shadow-lg hover:shadow-xl h-8 w-8 p-0 sm:h-9 sm:w-9"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                                 </Button>
                               </div>
                             </div>
@@ -1080,24 +1053,23 @@ export default function Keypads() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
             >
               <motion.div
                 initial={{ y: -50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: -50, opacity: 0 }}
-                className="bg-white p-6 md:p-8 rounded-3xl shadow-2xl w-full max-w-2xl"
+                className="bg-white p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h3 className="text-2xl font-bold">Vincular Teclas</h3>
+                    <h3 className="text-xl sm:text-2xl font-bold">Vincular Teclas</h3>
                     <p className="text-sm text-muted-foreground">
                       {bindingKeypad.nome} — {
                         (bindingKeypad.button_count ?? layoutToCount(bindingKeypad.layout)) === 4 ? "4 teclas" :
                         (bindingKeypad.button_count ?? layoutToCount(bindingKeypad.layout)) === 2 ? "2 teclas" : "1 tecla"
                       }
                     </p>
-
                   </div>
                   <Button variant="ghost" size="icon" onClick={closeBindings} className="rounded-full">
                     <X className="w-5 h-5" />
@@ -1106,8 +1078,8 @@ export default function Keypads() {
 
                 <div className="flex flex-col gap-4 max-h-[50vh] overflow-y-auto pr-2">
                   {buttonBindings.map((b) => (
-                    <div key={b.index} className="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
-                      <div className="flex items-center justify-between mb-2">
+                    <div key={b.index} className="rounded-xl border border-slate-200 p-3 sm:p-4 bg-slate-50/50">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                         <div className="text-sm font-semibold text-slate-700">
                           Tecla {b.index + 1}
                         </div>
@@ -1116,7 +1088,7 @@ export default function Keypads() {
                           size="sm"
                           variant="ghost"
                           onClick={() => setBinding(b.index, b.type === 'cena' ? 'cena' : 'circuito', '')}
-                          className="h-8"
+                          className="h-8 text-xs"
                           title="Limpar vinculação"
                         >
                           Limpar
@@ -1124,7 +1096,7 @@ export default function Keypads() {
                       </div>
 
                       <div className="flex items-center gap-4 mb-2">
-                        <Label className="flex items-center gap-2 cursor-pointer">
+                        <Label className="flex items-center gap-2 cursor-pointer text-sm">
                           <input
                             type="radio"
                             name={`binding-type-${b.index}`}
@@ -1133,7 +1105,7 @@ export default function Keypads() {
                           />
                           Circuito
                         </Label>
-                        <Label className="flex items-center gap-2 cursor-pointer">
+                        <Label className="flex items-center gap-2 cursor-pointer text-sm">
                           <input
                             type="radio"
                             name={`binding-type-${b.index}`}
@@ -1148,7 +1120,7 @@ export default function Keypads() {
                         <select
                           value={b.cena_id ?? ''}
                           onChange={(e) => setBinding(b.index, 'cena', e.target.value ? Number(e.target.value) : '')}
-                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3"
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
                         >
                           <option value="">— Selecione a Cena —</option>
                           {cenas.map((c) => (
@@ -1162,7 +1134,7 @@ export default function Keypads() {
                         <select
                           value={b.circuito_id ?? ''}
                           onChange={(e) => setBinding(b.index, 'circuito', e.target.value ? Number(e.target.value) : '')}
-                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3"
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
                         >
                           <option value="">— Não vinculado —</option>
                           {circuitos.map((c) => (
@@ -1174,10 +1146,11 @@ export default function Keypads() {
                         </select>
                       )}
 
+                      {/* Restante do código do modal de vinculação permanece igual */}
                       <div className="mt-2">
                         <Label className="text-sm font-medium text-slate-600">Tipo de Rótulo</Label>
                         <div className="flex items-center gap-4 mt-1">
-                          <Label className="flex items-center gap-2 cursor-pointer">
+                          <Label className="flex items-center gap-2 cursor-pointer text-sm">
                             <input
                               type="radio"
                               name={`label-type-${b.index}`}
@@ -1192,7 +1165,7 @@ export default function Keypads() {
                             />
                             Texto
                           </Label>
-                          <Label className="flex items-center gap-2 cursor-pointer">
+                          <Label className="flex items-center gap-2 cursor-pointer text-sm">
                             <input
                               type="radio"
                               name={`label-type-${b.index}`}
@@ -1225,7 +1198,7 @@ export default function Keypads() {
                               );
                             }}
                           >
-                            <SelectTrigger id={`icon-select-${b.index}`} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3">
+                            <SelectTrigger id={`icon-select-${b.index}`} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1309,12 +1282,12 @@ export default function Keypads() {
                             }}
                             maxLength={7}
                             placeholder="Max 7 chars"
-                            className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3"
+                            className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
                           />
                         </div>
                       )}
 
-                      <div className="mt-2 flex items-center gap-4">
+                      <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"
@@ -1362,11 +1335,11 @@ export default function Keypads() {
                   ))}
                 </div>
 
-                <div className="flex justify-end gap-2 mt-6">
-                  <Button type="button" variant="ghost" onClick={closeBindings}>
+                <div className="flex flex-col sm:flex-row justify-end gap-2 mt-6">
+                  <Button type="button" variant="ghost" onClick={closeBindings} className="order-2 sm:order-1">
                     Cancelar
                   </Button>
-                  <Button onClick={saveBindings} disabled={bindingLoading}>
+                  <Button onClick={saveBindings} disabled={bindingLoading} className="order-1 sm:order-2">
                     {bindingLoading ? "Salvando..." : "Salvar"}
                   </Button>
                 </div>
