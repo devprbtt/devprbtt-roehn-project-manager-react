@@ -69,6 +69,7 @@ type ButtonBinding = {
   circuito_id: number | null;
   cena_id: number | null;
   engraver_text: string | null;
+  icon?: string | null;
   is_rocker: boolean;
   rocker_style: 'up-down' | 'left-right' | 'previous-next';
 };
@@ -446,6 +447,7 @@ export default function Keypads() {
       circuito_id: null,
       cena_id: null,
       engraver_text: null,
+      icon: null,
       is_rocker: false,
       rocker_style: 'up-down',
     }));
@@ -468,36 +470,35 @@ export default function Keypads() {
                 ? rocker_style_from_api
                 : 'up-down';
 
+            const baseReturn = {
+              ...b,
+              engraver_text: found.engraver_text,
+              icon: found.icon,
+              is_rocker: !!found.is_rocker,
+              rocker_style: new_rocker_style,
+            };
+
             if (found.cena_id) {
               return {
-                ...b,
+                ...baseReturn,
                 type: 'cena' as const,
                 cena_id: found.cena_id,
                 circuito_id: null,
-                engraver_text: found.engraver_text,
-                is_rocker: !!found.is_rocker,
-                rocker_style: new_rocker_style,
               };
             }
             if (found.circuito_id) {
               return {
-                ...b,
+                ...baseReturn,
                 type: 'circuito' as const,
                 circuito_id: found.circuito_id,
                 cena_id: null,
-                engraver_text: found.engraver_text,
-                is_rocker: !!found.is_rocker,
-                rocker_style: new_rocker_style,
               };
             }
 
             // Found, but not linked
             return {
-              ...b,
+              ...baseReturn,
               type: 'none' as const,
-              engraver_text: found.engraver_text,
-              is_rocker: !!found.is_rocker,
-              rocker_style: new_rocker_style,
             };
           });
           setButtonBindings(merged);
@@ -551,7 +552,7 @@ export default function Keypads() {
       // 1) Atualiza cada tecla
       await Promise.all(
         buttonBindings.map((b) => {
-          const payload: { circuito_id?: number | null, cena_id?: number | null, engraver_text?: string | null, is_rocker?: boolean, rocker_style?: 'up-down' | 'left-right' | 'previous-next' } = {};
+          const payload: { circuito_id?: number | null, cena_id?: number | null, engraver_text?: string | null, icon?: string | null, is_rocker?: boolean, rocker_style?: 'up-down' | 'left-right' | 'previous-next' } = {};
           if (b.type === 'circuito') {
             payload.circuito_id = b.circuito_id;
           } else if (b.type === 'cena') {
@@ -561,6 +562,7 @@ export default function Keypads() {
             payload.cena_id = null;
           }
           payload.engraver_text = b.engraver_text;
+          payload.icon = b.icon;
           payload.is_rocker = b.is_rocker;
           payload.rocker_style = b.rocker_style;
 
@@ -1133,25 +1135,90 @@ export default function Keypads() {
                       )}
 
                       <div className="mt-2">
-                        <Label htmlFor={`engraver-text-${b.index}`} className="text-sm font-medium text-slate-600">
-                          Texto do Botão
-                        </Label>
-                        <Input
-                          id={`engraver-text-${b.index}`}
-                          value={b.engraver_text ?? ''}
-                          onChange={(e) => {
-                            const text = e.target.value.slice(0, 7);
-                            setButtonBindings((prev) =>
-                              prev.map((binding) =>
-                                binding.index === b.index ? { ...binding, engraver_text: text } : binding
-                              )
-                            );
-                          }}
-                          maxLength={7}
-                          placeholder="Max 7 chars"
-                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3"
-                        />
+                        <Label className="text-sm font-medium text-slate-600">Tipo de Rótulo</Label>
+                        <div className="flex items-center gap-4 mt-1">
+                          <Label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`label-type-${b.index}`}
+                              checked={!b.icon}
+                              onChange={() => {
+                                setButtonBindings((prev) =>
+                                  prev.map((binding) =>
+                                    binding.index === b.index ? { ...binding, icon: null } : binding
+                                  )
+                                );
+                              }}
+                            />
+                            Texto
+                          </Label>
+                          <Label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`label-type-${b.index}`}
+                              checked={!!b.icon}
+                              onChange={() => {
+                                setButtonBindings((prev) =>
+                                  prev.map((binding) =>
+                                    binding.index === b.index ? { ...binding, engraver_text: null, icon: 'hvac' } : binding
+                                  )
+                                );
+                              }}
+                              disabled={b.is_rocker}
+                            />
+                            Ícone
+                          </Label>
+                        </div>
                       </div>
+
+                      {b.icon ? (
+                        <div className="mt-2">
+                          <Label htmlFor={`icon-select-${b.index}`} className="text-sm font-medium text-slate-600">
+                            Ícone
+                          </Label>
+                          <Select
+                            value={b.icon}
+                            onValueChange={(value) => {
+                              setButtonBindings((prev) =>
+                                prev.map((binding) =>
+                                  binding.index === b.index ? { ...binding, icon: value } : binding
+                                )
+                              );
+                            }}
+                          >
+                            <SelectTrigger id={`icon-select-${b.index}`} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="hvac">HVAC</SelectItem>
+                              <SelectItem value="fan">Fan</SelectItem>
+                              <SelectItem value="welcome">Welcome</SelectItem>
+                              <SelectItem value="reading">Reading</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <div className="mt-2">
+                          <Label htmlFor={`engraver-text-${b.index}`} className="text-sm font-medium text-slate-600">
+                            Texto do Botão
+                          </Label>
+                          <Input
+                            id={`engraver-text-${b.index}`}
+                            value={b.engraver_text ?? ''}
+                            onChange={(e) => {
+                              const text = e.target.value.slice(0, 7);
+                              setButtonBindings((prev) =>
+                                prev.map((binding) =>
+                                  binding.index === b.index ? { ...binding, engraver_text: text, icon: null } : binding
+                                )
+                              );
+                            }}
+                            maxLength={7}
+                            placeholder="Max 7 chars"
+                            className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3"
+                          />
+                        </div>
+                      )}
 
                       <div className="mt-2 flex items-center gap-4">
                         <div className="flex items-center gap-2">

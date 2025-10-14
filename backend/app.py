@@ -130,6 +130,7 @@ def serialize_keypad_button(button):
         "ordem": button.ordem,
         "guid": button.guid,
         "engraver_text": button.engraver_text,
+        "icon": button.icon,
         "modo": button.modo,
         "command_on": button.command_on,
         "command_off": button.command_off,
@@ -3330,6 +3331,14 @@ def api_keypad_button_update(keypad_id, ordem):
         if len(text) > 7:
             return jsonify({"ok": False, "error": "Texto do botão pode ter no máximo 7 caracteres."}), 400
         button.engraver_text = text or None
+        if text:
+            button.icon = None
+
+    if "icon" in data:
+        icon = (data.get("icon") or "").strip()
+        button.icon = icon or None
+        if icon:
+            button.engraver_text = None
 
     db.session.commit()
     return jsonify({"ok": True, "keypad": serialize_keypad(keypad)})
