@@ -10,8 +10,7 @@ import ImportProjectSection from "@/components/dashboard/ImportProjectSection";
 import NavigationGuide from "@/components/dashboard/NavigationGuide";
 import type { Project, ProjectStatus } from '@/types/project';
 
-import { Download, Plus, Search, Filter } from "lucide-react"; // Adicione Search e Filter
-
+import { Download, Plus, Search, Filter, Upload } from "lucide-react";
 
 
 const Dashboard: React.FC = () => {
@@ -24,6 +23,7 @@ const Dashboard: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [isImportingPlanner, setIsImportingPlanner] = useState(false);
 
   // Novos estados para busca e filtro
   const [searchTerm, setSearchTerm] = useState("");
@@ -139,6 +139,41 @@ const Dashboard: React.FC = () => {
       alert("Erro ao exportar projeto. Tente novamente.");
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleImportPlanner = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setIsImportingPlanner(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("/api/importar-planner", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.ok) {
+        alert(data.message || "Projeto importado com sucesso!");
+        await loadProjects(); // Recarrega os projetos para refletir o novo projeto importado
+      } else {
+        alert(`Erro ao importar: ${data.error}` || "Ocorreu um erro desconhecido.");
+      }
+    } catch (error) {
+      console.error("Erro ao importar do planner:", error);
+      alert("Erro de conexão ao tentar importar o projeto do planner.");
+    } finally {
+      setIsImportingPlanner(false);
+      // Reset the input value to allow re-uploading the same file
+      event.target.value = '';
     }
   };
 
@@ -293,6 +328,18 @@ const Dashboard: React.FC = () => {
                 {isExporting ? 'Exportando...' : 'Exportar JSON'}
               </button>
             )}
+            {/* Botão de Importar do Planner */}
+            <label className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3 cursor-pointer disabled:opacity-50">
+              <Upload className="w-5 h-5" />
+              {isImportingPlanner ? 'Importando...' : 'Importar do Planner'}
+              <input
+                type="file"
+                className="hidden"
+                accept=".json"
+                onChange={handleImportPlanner}
+                disabled={isImportingPlanner}
+              />
+            </label>
             <button
               onClick={() => setShowCreateForm(true)}
               className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3"
