@@ -2353,7 +2353,13 @@ def importar_planner():
                 novo_nome = f"{original_nome} (importado {count})"
                 count += 1
 
-            novo_projeto = Projeto(nome=novo_nome, user_id=current_user.id)
+            now = datetime.utcnow()
+            novo_projeto = Projeto(
+                nome=novo_nome,
+                user_id=current_user.id,
+                status='ATIVO',
+                data_ativo=now
+            )
             db.session.add(novo_projeto)
             db.session.flush()
 
