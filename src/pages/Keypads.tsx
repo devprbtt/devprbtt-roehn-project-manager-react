@@ -1189,10 +1189,65 @@ export default function Keypads() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="hvac">HVAC</SelectItem>
+                              <SelectItem value="abajour">Abajour</SelectItem>
+                              <SelectItem value="arandela">Arandela</SelectItem>
+                              <SelectItem value="bright">Bright</SelectItem>
+                              <SelectItem value="cascata">Cascata</SelectItem>
+                              <SelectItem value="churrasco">Churrasco</SelectItem>
+                              <SelectItem value="clean room">Clean Room</SelectItem>
+                              <SelectItem value="concierge">Concierge</SelectItem>
+                              <SelectItem value="curtains">Curtains</SelectItem>
+                              <SelectItem value="curtains preset 1">Curtains Preset 1</SelectItem>
+                              <SelectItem value="curtains preset 2">Curtains Preset 2</SelectItem>
+                              <SelectItem value="day">Day</SelectItem>
+                              <SelectItem value="dim penumbra">Dim Penumbra</SelectItem>
+                              <SelectItem value="dinner">Dinner</SelectItem>
+                              <SelectItem value="do not disturb">Do Not Disturb</SelectItem>
+                              <SelectItem value="door">Door</SelectItem>
+                              <SelectItem value="doorbell">Doorbell</SelectItem>
                               <SelectItem value="fan">Fan</SelectItem>
-                              <SelectItem value="welcome">Welcome</SelectItem>
+                              <SelectItem value="fireplace">Fireplace</SelectItem>
+                              <SelectItem value="garage">Garage</SelectItem>
+                              <SelectItem value="gate">Gate</SelectItem>
+                              <SelectItem value="good night">Good Night</SelectItem>
+                              <SelectItem value="gym1">Gym 1</SelectItem>
+                              <SelectItem value="gym2">Gym 2</SelectItem>
+                              <SelectItem value="gym3">Gym 3</SelectItem>
+                              <SelectItem value="hvac">HVAC</SelectItem>
+                              <SelectItem value="irrigação">Irrigação</SelectItem>
+                              <SelectItem value="jardim1">Jardim 1</SelectItem>
+                              <SelectItem value="jardim2">Jardim 2</SelectItem>
+                              <SelectItem value="lampada">Lampada</SelectItem>
+                              <SelectItem value="laundry">Laundry</SelectItem>
+                              <SelectItem value="leaving">Leaving</SelectItem>
+                              <SelectItem value="light preset 1">Light Preset 1</SelectItem>
+                              <SelectItem value="light preset 2">Light Preset 2</SelectItem>
+                              <SelectItem value="lower shades">Lower Shades</SelectItem>
+                              <SelectItem value="luminaria de piso">Luminaria de Piso</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="meeting">Meeting</SelectItem>
+                              <SelectItem value="movie">Movie</SelectItem>
+                              <SelectItem value="music">Music</SelectItem>
+                              <SelectItem value="night">Night</SelectItem>
+                              <SelectItem value="onoff">On/Off</SelectItem>
+                              <SelectItem value="padlock">Padlock</SelectItem>
+                              <SelectItem value="party">Party</SelectItem>
+                              <SelectItem value="pendant">Pendant</SelectItem>
+                              <SelectItem value="piscina 1">Piscina 1</SelectItem>
+                              <SelectItem value="piscina 2">Piscina 2</SelectItem>
+                              <SelectItem value="pizza">Pizza</SelectItem>
+                              <SelectItem value="raise shades">Raise Shades</SelectItem>
                               <SelectItem value="reading">Reading</SelectItem>
+                              <SelectItem value="shades">Shades</SelectItem>
+                              <SelectItem value="shades preset 1">Shades Preset 1</SelectItem>
+                              <SelectItem value="shades preset 2">Shades Preset 2</SelectItem>
+                              <SelectItem value="spot">Spot</SelectItem>
+                              <SelectItem value="steam room">Steam Room</SelectItem>
+                              <SelectItem value="turned off">Turned Off</SelectItem>
+                              <SelectItem value="tv">TV</SelectItem>
+                              <SelectItem value="volume">Volume</SelectItem>
+                              <SelectItem value="welcome">Welcome</SelectItem>
+                              <SelectItem value="wine">Wine</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
