@@ -1164,7 +1164,6 @@ export default function Keypads() {
                                   )
                                 );
                               }}
-                              disabled={b.is_rocker}
                             />
                             Ícone
                           </Label>

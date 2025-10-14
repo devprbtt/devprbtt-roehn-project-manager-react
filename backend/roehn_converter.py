@@ -1357,7 +1357,25 @@ class RoehnProjectConverter:
                     print(f"      - Button {button.ordem}: Not linked.")
 
             style_properties = None
-            if button.is_rocker and target_guid != zero_guid:
+            button_style_guid = zero_guid
+
+            # Case 1: Rocker with Icon
+            if button.is_rocker and button.icon and button.icon in self.icon_guids:
+                button_style_guid = "13000000-0000-0000-0000-000000000003"
+                rocker_icon_guid = self.rocker_icon_guid_up_down
+                if button.rocker_style == 'left-right':
+                    rocker_icon_guid = self.rocker_icon_guid_left_right
+                elif button.rocker_style == 'previous-next':
+                    rocker_icon_guid = self.rocker_icon_guid_previous_next
+
+                style_properties = {
+                    "$type": "Dictionary`2",
+                    "STYLE_PROP_ICON": self.icon_guids[button.icon],
+                    "STYLE_PROP_ROCKER_ICON": rocker_icon_guid,
+                }
+            # Case 2: Rocker only
+            elif button.is_rocker:
+                button_style_guid = "13000000-0000-0000-0000-000000000004"
                 rocker_icon_guid = self.rocker_icon_guid_up_down
                 if button.rocker_style == 'left-right':
                     rocker_icon_guid = self.rocker_icon_guid_left_right
@@ -1369,7 +1387,9 @@ class RoehnProjectConverter:
                     "STYLE_PROP_ICON": None,
                     "STYLE_PROP_ROCKER_ICON": rocker_icon_guid,
                 }
-            elif button.icon and not button.is_rocker and button.icon in self.icon_guids:
+            # Case 3: Icon only
+            elif button.icon and button.icon in self.icon_guids:
+                button_style_guid = "13000000-0000-0000-0000-000000000002"
                 style_properties = {
                     "$type": "Dictionary`2",
                     "STYLE_PROP_ICON": self.icon_guids[button.icon],
@@ -1399,7 +1419,7 @@ class RoehnProjectConverter:
                 "UnitLed": unit_led,
                 "UnitSecondaryKey": unit_secondary_key,
                 "UnitSecondaryLed": unit_secondary_led,
-                "ButtonStyleGuid": "13000000-0000-0000-0000-000000000002" if button.is_rocker or button.icon else zero_guid,
+                "ButtonStyleGuid": button_style_guid,
                 "EngraverText": button.engraver_text,
                 "Automode": True,
             }
