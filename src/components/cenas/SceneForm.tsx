@@ -463,7 +463,7 @@ export const SceneForm = ({
   };
 
   return (
-    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5 w-full">
         <CardHeader className="pb-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
@@ -482,7 +482,7 @@ export const SceneForm = ({
         <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                     control={form.control}
                     name="nome"
@@ -552,7 +552,7 @@ export const SceneForm = ({
 
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Ações</h3>
-              <ScrollArea className="space-y-3 max-h-96 overflow-y-auto pr-2">
+              <ScrollArea className="space-y-3 max-h-64 sm:max-h-96 overflow-y-auto pr-2">
                 {fields.map((field, index) => (
                     <ActionItem
                         key={field.id}
@@ -566,20 +566,24 @@ export const SceneForm = ({
                     />
                 ))}
               </ScrollArea>
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <Button
                   type="button"
                   onClick={() => addAction('circuit')}
-                  className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                  className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 text-sm sm:text-base"
                 >
-                  <PlusCircle className="h-5 w-5" /> Adicionar Circuito
+                  <PlusCircle className="h-4 w-4 sm:h-5 sm:w-5" /> 
+                  <span className="hidden xs:inline">Adicionar Circuito</span>
+                  <span className="xs:hidden">Circuito</span>
                 </Button>
                 <Button
                   type="button"
                   onClick={() => addAction('room')}
-                  className="flex-1 h-11 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                  className="flex-1 h-11 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 text-sm sm:text-base"
                 >
-                  <PlusCircle className="h-5 w-5" /> Adicionar Grupo de Luzes
+                  <PlusCircle className="h-4 w-4 sm:h-5 sm:w-5" /> 
+                  <span className="hidden xs:inline">Adicionar Grupo</span>
+                  <span className="xs:hidden">Grupo</span>
                 </Button>
               </div>
             </div>
