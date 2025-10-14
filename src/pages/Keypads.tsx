@@ -458,13 +458,47 @@ export default function Keypads() {
           const buttons = json.keypad.buttons;
           const merged = base.map((b) => {
             const found = buttons.find((x: any) => x.ordem === b.index + 1);
-            if (found?.cena_id) {
-                return { ...base[0], index: b.index, type: 'cena' as const, cena_id: found.cena_id, circuito_id: null, engraver_text: found.engraver_text, is_rocker: found.is_rocker, rocker_style: found.rocker_style || 'up-down' };
+            if (!found) {
+              return b;
             }
-            if (found?.circuito_id) {
-                return { ...base[0], index: b.index, type: 'circuito' as const, circuito_id: found.circuito_id, cena_id: null, engraver_text: found.engraver_text, is_rocker: found.is_rocker, rocker_style: found.rocker_style || 'up-down' };
+
+            const rocker_style_from_api = found.rocker_style;
+            const new_rocker_style: ButtonBinding['rocker_style'] =
+              rocker_style_from_api === 'left-right' || rocker_style_from_api === 'previous-next'
+                ? rocker_style_from_api
+                : 'up-down';
+
+            if (found.cena_id) {
+              return {
+                ...b,
+                type: 'cena' as const,
+                cena_id: found.cena_id,
+                circuito_id: null,
+                engraver_text: found.engraver_text,
+                is_rocker: !!found.is_rocker,
+                rocker_style: new_rocker_style,
+              };
             }
-            return { ...base[0], index: b.index, type: 'none' as const, circuito_id: null, cena_id: null, engraver_text: null, is_rocker: false, rocker_style: 'up-down' };
+            if (found.circuito_id) {
+              return {
+                ...b,
+                type: 'circuito' as const,
+                circuito_id: found.circuito_id,
+                cena_id: null,
+                engraver_text: found.engraver_text,
+                is_rocker: !!found.is_rocker,
+                rocker_style: new_rocker_style,
+              };
+            }
+
+            // Found, but not linked
+            return {
+              ...b,
+              type: 'none' as const,
+              engraver_text: found.engraver_text,
+              is_rocker: !!found.is_rocker,
+              rocker_style: new_rocker_style,
+            };
           });
           setButtonBindings(merged);
         }
