@@ -69,6 +69,7 @@ type ButtonBinding = {
   circuito_id: number | null;
   cena_id: number | null;
   engraver_text: string | null;
+  is_rocker: boolean;
 };
 
 const COLORS = [
@@ -444,6 +445,7 @@ export default function Keypads() {
       circuito_id: null,
       cena_id: null,
       engraver_text: null,
+      is_rocker: false,
     }));
     setButtonBindings(base);
 
@@ -455,12 +457,12 @@ export default function Keypads() {
           const merged = base.map((b) => {
             const found = buttons.find((x: any) => x.ordem === b.index + 1);
             if (found?.cena_id) {
-                return { index: b.index, type: 'cena' as const, cena_id: found.cena_id, circuito_id: null, engraver_text: found.engraver_text };
+                return { index: b.index, type: 'cena' as const, cena_id: found.cena_id, circuito_id: null, engraver_text: found.engraver_text, is_rocker: found.is_rocker };
             }
             if (found?.circuito_id) {
-                return { index: b.index, type: 'circuito' as const, circuito_id: found.circuito_id, cena_id: null, engraver_text: found.engraver_text };
+                return { index: b.index, type: 'circuito' as const, circuito_id: found.circuito_id, cena_id: null, engraver_text: found.engraver_text, is_rocker: found.is_rocker };
             }
-            return { index: b.index, type: 'none' as const, circuito_id: null, cena_id: null, engraver_text: null };
+            return { index: b.index, type: 'none' as const, circuito_id: null, cena_id: null, engraver_text: null, is_rocker: false };
           });
           setButtonBindings(merged);
         }
@@ -513,7 +515,7 @@ export default function Keypads() {
       // 1) Atualiza cada tecla
       await Promise.all(
         buttonBindings.map((b) => {
-          const payload: { circuito_id?: number | null, cena_id?: number | null, engraver_text?: string | null } = {};
+          const payload: { circuito_id?: number | null, cena_id?: number | null, engraver_text?: string | null, is_rocker?: boolean } = {};
           if (b.type === 'circuito') {
             payload.circuito_id = b.circuito_id;
           } else if (b.type === 'cena') {
@@ -523,6 +525,7 @@ export default function Keypads() {
             payload.cena_id = null;
           }
           payload.engraver_text = b.engraver_text;
+          payload.is_rocker = b.is_rocker;
 
           return fetch(`/api/keypads/${bindingKeypad.id}/buttons/${b.index + 1}`, {
             method: "PUT",
@@ -1111,6 +1114,25 @@ export default function Keypads() {
                           placeholder="Max 7 chars"
                           className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3"
                         />
+                      </div>
+
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`is-rocker-${b.index}`}
+                          checked={b.is_rocker}
+                          onChange={(e) => {
+                            const is_rocker = e.target.checked;
+                            setButtonBindings((prev) =>
+                              prev.map((binding) =>
+                                binding.index === b.index ? { ...binding, is_rocker } : binding
+                              )
+                            );
+                          }}
+                        />
+                        <Label htmlFor={`is-rocker-${b.index}`} className="text-sm font-medium text-slate-600">
+                          É Rocker?
+                        </Label>
                       </div>
                     </div>
                   ))}

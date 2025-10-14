@@ -146,6 +146,7 @@ class KeypadButton(db.Model):
     command_on = db.Column(db.Integer, nullable=False, default=0)
     command_off = db.Column(db.Integer, nullable=False, default=0)
     can_hold = db.Column(db.Boolean, nullable=False, default=False)
+    is_rocker = db.Column(db.Boolean, nullable=False, default=False)
     modo_double_press = db.Column(db.Integer, nullable=False, default=3)
     command_double_press = db.Column(db.Integer, nullable=False, default=0)
     target_object_guid = db.Column(db.String(36), nullable=False, default='00000000-0000-0000-0000-000000000000')

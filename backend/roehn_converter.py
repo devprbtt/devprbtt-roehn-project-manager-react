@@ -23,7 +23,7 @@ class RoehnProjectConverter:
         self.zero_guid = "00000000-0000-0000-0000-000000000000"
         self.keypad_driver_guid = "90000000-0000-0000-0000-000000000004"
         self.keypad_profile_guid = "40000000-0000-0000-0000-000000000001"
-        self.keypad_rocker_icon_guid = "11000000-0000-0000-0000-000000000001"
+        self.keypad_rocker_icon_guid = "11000000-0000-0000-0000-000000000004"
         self.keypad_button_layouts = {1: 1, 2: 6, 4: 7}
         self._quadro_guid_map = {}
 
@@ -1349,7 +1349,7 @@ class RoehnProjectConverter:
                     print(f"      - Button {button.ordem}: Not linked.")
 
             style_properties = None
-            if target_guid != zero_guid:
+            if button.is_rocker and target_guid != zero_guid:
                 style_properties = {
                     "$type": "Dictionary`2",
                     "STYLE_PROP_ICON": None,
@@ -1379,8 +1379,8 @@ class RoehnProjectConverter:
                 "UnitLed": unit_led,
                 "UnitSecondaryKey": unit_secondary_key,
                 "UnitSecondaryLed": unit_secondary_led,
-                "ButtonStyleGuid": zero_guid,
-                "EngraverText": button.notes,
+                "ButtonStyleGuid": "13000000-0000-0000-0000-000000000004" if button.is_rocker else zero_guid,
+                "EngraverText": button.engraver_text,
                 "Automode": True,
             }
             payload["ListKeypadButtons"].append(button_payload)
