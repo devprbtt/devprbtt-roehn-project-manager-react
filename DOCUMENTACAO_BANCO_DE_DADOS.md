@@ -95,7 +95,7 @@ Define um circuito de iluminação ou outro dispositivo elétrico a ser controla
 | `id` | Integer | Identificador único do circuito (Chave Primária). |
 | `identificador` | String(50) | Identificador único do circuito dentro do ambiente (ex: "C01"). |
 | `nome` | String(100) | Nome descritivo do circuito (ex: "Luz Central"). |
-| `tipo` | String(50) | Tipo do circuito (ex: "Iluminação", "Tomada"). |
+| `tipo` | String(50) | Tipo do circuito (ex: "Iluminação", "Persiana, "HVAC"). |
 | `dimerizavel` | Boolean | Indica se o circuito suporta dimerização. |
 | `potencia` | Float | Potência total do circuito em Watts. |
 | `ambiente_id` | Integer | ID do ambiente ao qual o circuito pertence (Chave Estrangeira para `Ambiente`). |
@@ -114,7 +114,7 @@ Representa um módulo de hardware da Roehn, responsável por controlar os circui
 | :--- | :--- | :--- |
 | `id` | Integer | Identificador único do módulo (Chave Primária). |
 | `nome` | String(100) | Nome do módulo. Deve ser único dentro do projeto. |
-| `tipo` | String(50) | Modelo do módulo (ex: "R-DIM4", "R-RLY8"). |
+| `tipo` | String(50) | Modelo do módulo (ex: "DIM8", "RL12"). |
 | `quantidade_canais`| Integer | Número de canais (saídas) que o módulo possui. |
 | `projeto_id` | Integer | ID do projeto ao qual o módulo pertence (Chave Estrangeira para `Projeto`). |
 | `hsnet` | Integer | Endereço HS-Net do módulo. |
