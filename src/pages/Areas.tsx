@@ -417,6 +417,7 @@ export default function Areas() {
                                   type="submit"
                                   size="icon"
                                   className="h-9 w-9 bg-green-500 hover:bg-green-600"
+                                  onClick={handleUpdateArea}
                                 >
                                   <Check className="h-4 w-4" />
                                 </Button>

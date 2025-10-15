@@ -1517,6 +1517,53 @@ def api_modulos_create():
     db.session.commit()
     return jsonify({"ok": True, "id": m.id})
 
+@app.put("/api/modulos/<int:modulo_id>")
+@login_required
+def api_modulos_update(modulo_id):
+    data = request.get_json(silent=True) or request.form or {}
+    m = db.get_or_404(Modulo, modulo_id)
+    projeto_id = session.get("projeto_atual_id")
+
+    if m.projeto_id != projeto_id:
+        return jsonify({"ok": False, "error": "Módulo não pertence ao projeto atual."}), 400
+
+    if "nome" in data:
+        nome = (data.get("nome") or "").strip()
+        if not nome:
+            return jsonify({"ok": False, "error": "Nome é obrigatório."}), 400
+        m.nome = nome
+    
+    if "quadro_eletrico_id" in data:
+        quadro_id = data.get("quadro_eletrico_id")
+        if quadro_id:
+            quadro = db.get_or_404(QuadroEletrico, int(quadro_id))
+            if quadro.projeto_id != projeto_id:
+                return jsonify({"ok": False, "error": "Quadro elétrico não pertence ao projeto atual."}), 400
+            m.quadro_eletrico_id = quadro.id
+        else:
+            m.quadro_eletrico_id = None
+
+    if "hsnet" in data:
+        hsnet_val = data.get("hsnet")
+        if hsnet_val not in (None, ""):
+            try:
+                hsnet = int(hsnet_val)
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "error": "hsnet invalido."}), 400
+            if hsnet <= 0:
+                return jsonify({"ok": False, "error": "hsnet deve ser positivo."}), 400
+            if is_hsnet_in_use(hsnet, projeto_id, exclude_modulo_id=m.id):
+                return jsonify({"ok": False, "error": "HSNET ja esta em uso."}), 409
+            m.hsnet = hsnet
+        else:
+            # Do not allow setting hsnet to null if it's already set
+            if m.hsnet is not None:
+                return jsonify({"ok": False, "error": "HSNET não pode ser vazio."}), 400
+            m.hsnet = None
+            
+    db.session.commit()
+    return jsonify({"ok": True})
+
 
 @app.get("/vinculacao")
 def vinculacao_spa():
