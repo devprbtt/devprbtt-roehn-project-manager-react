@@ -891,6 +891,30 @@ def api_ambientes_create():
 
     return jsonify({"ok": True, "success": True, "id": amb.id})
 
+# ATUALIZAR AMBIENTE
+@app.put("/api/ambientes/<int:ambiente_id>")
+@login_required
+def api_ambientes_update(ambiente_id):
+    data = request.get_json(silent=True) or request.form or {}
+    nome = (data.get("nome") or "").strip()
+    area_id = data.get("area_id")
+
+    if not nome or not area_id:
+        return jsonify({"ok": False, "error": "Nome e área são obrigatórios."}), 400
+
+    amb = db.get_or_404(Ambiente, ambiente_id)
+    area = db.get_or_404(Area, int(area_id))
+
+    # Validar que a área pertence ao projeto selecionado
+    if session.get("projeto_atual_id") != getattr(area, "projeto_id", None):
+        return jsonify({"ok": False, "error": "Área não pertence ao projeto atual."}), 400
+
+    amb.nome = nome
+    amb.area_id = area.id
+    db.session.commit()
+
+    return jsonify({"ok": True, "success": True})
+
 # EXCLUIR AMBIENTE
 @app.delete("/api/ambientes/<int:ambiente_id>")
 @login_required

@@ -14,7 +14,10 @@ import {
   Building2,
   Sparkles,
   FolderPlus,
-  MapPin, 
+  MapPin,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import NavigationButtons from "@/components/NavigationButtons";
@@ -27,7 +30,9 @@ type Area = {
 export default function Areas() {
   const { toast } = useToast();
   const { projeto } = useProject();
-  const [projetoSelecionado, setProjetoSelecionado] = useState<boolean | null>(projeto ? true : null);
+  const [projetoSelecionado, setProjetoSelecionado] = useState<boolean | null>(
+    projeto ? true : null
+  );
   const isLocked = projetoSelecionado !== true;
 
   // Se o store já tem projeto, marcamos como selecionado
@@ -42,7 +47,9 @@ export default function Areas() {
     const checkProject = async () => {
       try {
         if (projetoSelecionado !== null) return;
-        const res = await fetch("/api/projeto_atual", { credentials: "same-origin" });
+        const res = await fetch("/api/projeto_atual", {
+          credentials: "same-origin",
+        });
         const data = await res.json();
         setProjetoSelecionado(!!(data?.ok && data?.projeto_atual));
       } catch {
@@ -52,12 +59,15 @@ export default function Areas() {
     checkProject();
   }, [projetoSelecionado]);
 
-
   const [areas, setAreas] = useState<Area[]>([]);
   const [loading, setLoading] = useState(true);
 
   // form
   const [novaArea, setNovaArea] = useState("");
+
+  // editing state
+  const [editingAreaId, setEditingAreaId] = useState<number | null>(null);
+  const [editingAreaName, setEditingAreaName] = useState("");
 
   const fetchAreas = async () => {
     setLoading(true);
@@ -104,14 +114,20 @@ export default function Areas() {
       const response = await fetch("/api/areas", {
         method: "POST",
         credentials: "same-origin",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: JSON.stringify({ nome: novaArea.trim() }),
       });
       const data = await response.json().catch(() => null);
       if (response.ok && (data?.ok || data?.success)) {
         setNovaArea("");
         await fetchAreas();
-        toast({ title: "Sucesso!", description: "Área adicionada com sucesso." });
+        toast({
+          title: "Sucesso!",
+          description: "Área adicionada com sucesso.",
+        });
       } else {
         toast({
           variant: "destructive",
@@ -120,7 +136,63 @@ export default function Areas() {
         });
       }
     } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Erro de conexão com o servidor." });
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro de conexão com o servidor.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartEdit = (area: Area) => {
+    setEditingAreaId(area.id);
+    setEditingAreaName(area.nome);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingAreaId(null);
+    setEditingAreaName("");
+  };
+
+  const handleUpdateArea = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingAreaId === null || !editingAreaName.trim()) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/areas/${editingAreaId}`, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ nome: editingAreaName.trim() }),
+      });
+      const data = await response.json().catch(() => null);
+
+      if (response.ok && data?.ok) {
+        handleCancelEdit();
+        await fetchAreas();
+        toast({
+          title: "Sucesso!",
+          description: "Área atualizada com sucesso.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: data?.error || "Não foi possível atualizar a área.",
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erro de Conexão",
+        description: "Não foi possível conectar ao servidor.",
+      });
     } finally {
       setLoading(false);
     }
@@ -129,7 +201,12 @@ export default function Areas() {
   const handleDeleteArea = async (id: number) => {
     const areaToDelete = areas.find((a) => a.id === id);
     if (!areaToDelete) return;
-    if (!window.confirm("Tem certeza que deseja excluir esta área? Esta ação não pode ser desfeita.")) return;
+    if (
+      !window.confirm(
+        "Tem certeza que deseja excluir esta área? Esta ação não pode ser desfeita."
+      )
+    )
+      return;
     setLoading(true);
     try {
       const response = await fetch(`/api/areas/${id}`, {
@@ -140,7 +217,10 @@ export default function Areas() {
       const data = await response.json().catch(() => null);
       if (response.ok && (data?.ok || data?.success)) {
         await fetchAreas();
-        toast({ title: "Sucesso!", description: "Área excluída com sucesso." });
+        toast({
+          title: "Sucesso!",
+          description: "Área excluída com sucesso.",
+        });
       } else {
         toast({
           variant: "destructive",
@@ -149,7 +229,11 @@ export default function Areas() {
         });
       }
     } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Erro de conexão com o servidor." });
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro de conexão com o servidor.",
+      });
     } finally {
       setLoading(false);
     }
@@ -166,9 +250,11 @@ export default function Areas() {
                   <MapPin className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Áreas</h1>
+                  <h1 className="text-4xl font-bold text-slate-900 mb-2">
+                    Gerenciar Áreas
+                  </h1>
                   <p className="text-lg text-slate-600 max-w-2xl">
-                    Adicione áreas ao seu projeto.
+                    Adicione ou edite as áreas do seu projeto.
                   </p>
                 </div>
               </div>
@@ -177,7 +263,11 @@ export default function Areas() {
           </div>
 
           {projetoSelecionado === false && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-8"
+            >
               <Alert className="bg-amber-50 border-amber-200 shadow-sm">
                 <Sparkles className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-amber-800">
@@ -188,7 +278,11 @@ export default function Areas() {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+            >
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
                 <CardHeader className="pb-6">
                   <div className="flex items-center gap-3">
@@ -196,15 +290,22 @@ export default function Areas() {
                       <FolderPlus className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-2xl font-bold text-slate-900">Adicionar Nova Área</CardTitle>
-                      <p className="text-slate-600 mt-1">Preencha as informações da área</p>
+                      <CardTitle className="text-2xl font-bold text-slate-900">
+                        Adicionar Nova Área
+                      </CardTitle>
+                      <p className="text-slate-600 mt-1">
+                        Preencha as informações da área
+                      </p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleAddArea} className="space-y-6">
                     <div>
-                      <Label htmlFor="area-name" className="text-sm font-semibold text-slate-700">
+                      <Label
+                        htmlFor="area-name"
+                        className="text-sm font-semibold text-slate-700"
+                      >
                         Nome da Área *
                       </Label>
                       <Input
@@ -231,7 +332,11 @@ export default function Areas() {
               </Card>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
@@ -240,8 +345,12 @@ export default function Areas() {
                         <MapPin className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-2xl font-bold text-slate-900">Áreas Cadastradas</CardTitle>
-                        <p className="text-slate-600 mt-1">Lista de todas as áreas do projeto</p>
+                        <CardTitle className="text-2xl font-bold text-slate-900">
+                          Áreas Cadastradas
+                        </CardTitle>
+                        <p className="text-slate-600 mt-1">
+                          Lista de todas as áreas do projeto
+                        </p>
                       </div>
                     </div>
                     <Badge className="bg-gradient-to-r from-purple-500 to-violet-500 text-white text-sm font-medium px-3 py-1">
@@ -250,10 +359,12 @@ export default function Areas() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {loading ? (
+                  {loading && areas.length === 0 ? (
                     <div className="flex flex-col justify-center items-center py-12">
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-4"></div>
-                      <p className="text-slate-600 font-medium">Carregando áreas...</p>
+                      <p className="text-slate-600 font-medium">
+                        Carregando áreas...
+                      </p>
                     </div>
                   ) : areas.length === 0 ? (
                     <motion.div
@@ -265,7 +376,9 @@ export default function Areas() {
                         <Building2 className="h-10 w-10 text-slate-400" />
                       </div>
                       <h4 className="text-xl font-semibold text-slate-900 mb-2">
-                        {projetoSelecionado ? "Nenhuma área cadastrada" : "Selecione um projeto"}
+                        {projetoSelecionado
+                          ? "Nenhuma área cadastrada"
+                          : "Selecione um projeto"}
                       </h4>
                       <p className="text-slate-600 max-w-sm mx-auto">
                         {projetoSelecionado
@@ -279,21 +392,69 @@ export default function Areas() {
                         {areas.map((area, index) => (
                           <motion.li
                             key={area.id}
+                            layout
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ delay: index * 0.05 }}
                             className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300 flex items-center justify-between"
                           >
-                            <span className="font-bold text-lg text-slate-900">{area.nome}</span>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleDeleteArea(area.id)}
-                              className="opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {editingAreaId === area.id ? (
+                              <form
+                                onSubmit={handleUpdateArea}
+                                className="flex-grow flex items-center gap-2"
+                              >
+                                <Input
+                                  type="text"
+                                  value={editingAreaName}
+                                  onChange={(e) =>
+                                    setEditingAreaName(e.target.value)
+                                  }
+                                  className="h-9"
+                                  autoFocus
+                                />
+                                <Button
+                                  type="submit"
+                                  size="icon"
+                                  className="h-9 w-9 bg-green-500 hover:bg-green-600"
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={handleCancelEdit}
+                                  className="h-9 w-9"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </form>
+                            ) : (
+                              <>
+                                <span className="font-bold text-lg text-slate-900">
+                                  {area.nome}
+                                </span>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleStartEdit(area)}
+                                    className="h-8 w-8 hover:bg-blue-100"
+                                  >
+                                    <Pencil className="h-4 w-4 text-blue-600" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteArea(area.id)}
+                                    className="h-8 w-8 hover:bg-red-100"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-600" />
+                                  </Button>
+                                </div>
+                              </>
+                            )}
                           </motion.li>
                         ))}
                       </AnimatePresence>
