@@ -1,11 +1,25 @@
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useProject } from "@/store/project";
 import {
@@ -16,6 +30,7 @@ import {
   Building2,
   FolderPlus,
   Grid3X3,
+  Pencil,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import NavigationButtons from "@/components/NavigationButtons";
@@ -26,7 +41,9 @@ type Ambiente = { id: number; nome: string; area?: Area; area_id?: number };
 export default function Ambientes() {
   const { toast } = useToast();
   const { projeto } = useProject();
-  const [projetoSelecionado, setProjetoSelecionado] = useState<boolean | null>(projeto ? true : null);
+  const [projetoSelecionado, setProjetoSelecionado] = useState<boolean | null>(
+    projeto ? true : null
+  );
   const isLocked = projetoSelecionado !== true;
 
   // Se o store já tem projeto, marcamos como selecionado
@@ -41,7 +58,9 @@ export default function Ambientes() {
     const checkProject = async () => {
       try {
         if (projetoSelecionado !== null) return;
-        const res = await fetch("/api/projeto_atual", { credentials: "same-origin" });
+        const res = await fetch("/api/projeto_atual", {
+          credentials: "same-origin",
+        });
         const data = await res.json();
         setProjetoSelecionado(!!(data?.ok && data?.projeto_atual));
       } catch {
@@ -51,14 +70,17 @@ export default function Ambientes() {
     checkProject();
   }, [projetoSelecionado]);
 
-
   const [areas, setAreas] = useState<Area[]>([]);
   const [ambientes, setAmbientes] = useState<Ambiente[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // form
+  // form state
   const [nome, setNome] = useState("");
   const [areaId, setAreaId] = useState<number | "">("");
+
+  // edit state
+  const [editingAmbiente, setEditingAmbiente] = useState<Ambiente | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const fetchAreas = async () => {
     try {
@@ -145,23 +167,83 @@ export default function Ambientes() {
         setNome("");
         setAreaId("");
         await fetchAmbientes();
-        toast({ title: "Sucesso!", description: "Ambiente adicionado com sucesso." });
+        toast({
+          title: "Sucesso!",
+          description: "Ambiente adicionado com sucesso.",
+        });
       } else {
         toast({
           variant: "destructive",
           title: "Erro",
-          description: data?.error || data?.message || "Erro ao adicionar ambiente.",
+          description:
+            data?.error || data?.message || "Erro ao adicionar ambiente.",
         });
       }
     } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Erro de conexão com o servidor." });
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro de conexão com o servidor.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (ambiente: Ambiente) => {
+    setEditingAmbiente(ambiente);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAmbiente) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/ambientes/${editingAmbiente.id}`, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          nome: editingAmbiente.nome.trim(),
+          area_id: editingAmbiente.area?.id,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && (data?.ok || data?.success)) {
+        setIsEditModalOpen(false);
+        await fetchAmbientes();
+        toast({
+          title: "Sucesso!",
+          description: "Ambiente atualizado com sucesso.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description:
+            data?.error || data?.message || "Erro ao atualizar ambiente.",
+        });
+      }
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro de conexão com o servidor.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm("Tem certeza que deseja excluir este ambiente?")) return;
+    if (!window.confirm("Tem certeza que deseja excluir este ambiente?"))
+      return;
     setLoading(true);
     try {
       const res = await fetch(`/api/ambientes/${id}`, {
@@ -172,16 +254,24 @@ export default function Ambientes() {
       const data = await res.json().catch(() => null);
       if (res.ok && (data?.ok || data?.success)) {
         setAmbientes((prev) => prev.filter((a) => a.id !== id));
-        toast({ title: "Sucesso!", description: "Ambiente excluído com sucesso." });
+        toast({
+          title: "Sucesso!",
+          description: "Ambiente excluído com sucesso.",
+        });
       } else {
         toast({
           variant: "destructive",
           title: "Erro",
-          description: data?.error || data?.message || "Erro ao excluir ambiente.",
+          description:
+            data?.error || data?.message || "Erro ao excluir ambiente.",
         });
       }
     } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Erro de conexão com o servidor." });
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro de conexão com o servidor.",
+      });
     } finally {
       setLoading(false);
     }
@@ -198,9 +288,11 @@ export default function Ambientes() {
                   <Grid3X3 className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Ambientes</h1>
+                  <h1 className="text-4xl font-bold text-slate-900 mb-2">
+                    Gerenciar Ambientes
+                  </h1>
                   <p className="text-lg text-slate-600 max-w-2xl">
-                    Adicione ambientes dentro de áreas.
+                    Adicione ou edite ambientes dentro de áreas.
                   </p>
                 </div>
               </div>
@@ -209,18 +301,27 @@ export default function Ambientes() {
           </div>
 
           {projetoSelecionado === false && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-8"
+            >
               <Alert className="bg-amber-50 border-amber-200 shadow-sm">
                 <Sparkles className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-amber-800">
-                  Selecione um projeto na página inicial para gerenciar ambientes.
+                  Selecione um projeto na página inicial para gerenciar
+                  ambientes.
                 </AlertDescription>
               </Alert>
             </motion.div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+            >
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
                 <CardHeader className="pb-6">
                   <div className="flex items-center gap-3">
@@ -228,15 +329,22 @@ export default function Ambientes() {
                       <FolderPlus className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-2xl font-bold text-slate-900">Adicionar Novo Ambiente</CardTitle>
-                      <p className="text-slate-600 mt-1">Preencha as informações do ambiente</p>
+                      <CardTitle className="text-2xl font-bold text-slate-900">
+                        Adicionar Novo Ambiente
+                      </CardTitle>
+                      <p className="text-slate-600 mt-1">
+                        Preencha as informações do ambiente
+                      </p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <form className="space-y-6" onSubmit={handleCreate}>
                     <div className="space-y-2">
-                      <Label htmlFor="nome" className="text-sm font-semibold text-slate-700">
+                      <Label
+                        htmlFor="nome"
+                        className="text-sm font-semibold text-slate-700"
+                      >
                         Nome do Ambiente *
                       </Label>
                       <Input
@@ -250,7 +358,10 @@ export default function Ambientes() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="areaId" className="text-sm font-semibold text-slate-700">
+                      <Label
+                        htmlFor="areaId"
+                        className="text-sm font-semibold text-slate-700"
+                      >
                         Área *
                       </Label>
                       <select
@@ -268,12 +379,14 @@ export default function Ambientes() {
                           </option>
                         ))}
                       </select>
-                      {!loading && projetoSelecionado === true && areas.length === 0 && (
-                        <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" />
-                          Nenhuma área disponível. Crie áreas primeiro.
-                        </p>
-                      )}
+                      {!loading &&
+                        projetoSelecionado === true &&
+                        areas.length === 0 && (
+                          <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" />
+                            Nenhuma área disponível. Crie áreas primeiro.
+                          </p>
+                        )}
                     </div>
 
                     <Button
@@ -289,7 +402,11 @@ export default function Ambientes() {
               </Card>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
@@ -298,12 +415,17 @@ export default function Ambientes() {
                         <Grid3X3 className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-2xl font-bold text-slate-900">Ambientes Cadastrados</CardTitle>
-                        <p className="text-slate-600 mt-1">Lista de todos os ambientes</p>
+                        <CardTitle className="text-2xl font-bold text-slate-900">
+                          Ambientes Cadastrados
+                        </CardTitle>
+                        <p className="text-slate-600 mt-1">
+                          Lista de todos os ambientes
+                        </p>
                       </div>
                     </div>
                     <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-medium px-3 py-1">
-                      {ambientes.length} {ambientes.length === 1 ? "ambiente" : "ambientes"}
+                      {ambientes.length}{" "}
+                      {ambientes.length === 1 ? "ambiente" : "ambientes"}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -311,7 +433,9 @@ export default function Ambientes() {
                   {loading ? (
                     <div className="flex flex-col justify-center items-center py-12">
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
-                      <p className="text-slate-600 font-medium">Carregando ambientes...</p>
+                      <p className="text-slate-600 font-medium">
+                        Carregando ambientes...
+                      </p>
                     </div>
                   ) : ambientes.length === 0 ? (
                     <motion.div
@@ -323,7 +447,9 @@ export default function Ambientes() {
                         <DoorOpen className="h-10 w-10 text-slate-400" />
                       </div>
                       <h4 className="text-xl font-semibold text-slate-900 mb-2">
-                        {projetoSelecionado ? "Nenhum ambiente cadastrado" : "Selecione um projeto"}
+                        {projetoSelecionado
+                          ? "Nenhum ambiente cadastrado"
+                          : "Selecione um projeto"}
                       </h4>
                       <p className="text-slate-600 max-w-sm mx-auto">
                         {projetoSelecionado
@@ -345,26 +471,40 @@ export default function Ambientes() {
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1 mr-4">
-                                <h4 className="font-bold text-slate-900 text-lg mb-1">{amb.nome}</h4>
+                                <h4 className="font-bold text-slate-900 text-lg mb-1">
+                                  {amb.nome}
+                                </h4>
                                 <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
                                   <Building2 className="h-4 w-4 text-slate-400" />
                                   <span className="font-medium">
                                     Área:{" "}
                                     {amb.area?.nome ||
-                                      areas.find((a) => a.id === amb.area_id)?.nome ||
+                                      areas.find(
+                                        (a) => a.id === amb.area_id
+                                      )?.nome ||
                                       "—"}
                                   </span>
                                 </div>
                               </div>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleDelete(amb.id)}
-                                disabled={loading}
-                                className="opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEdit(amb)}
+                                  className="h-8 w-8 hover:bg-blue-100"
+                                >
+                                  <Pencil className="h-4 w-4 text-blue-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(amb.id)}
+                                  disabled={loading}
+                                  className="h-8 w-8 hover:bg-red-100"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </div>
                             </div>
                           </motion.div>
                         ))}
@@ -376,7 +516,70 @@ export default function Ambientes() {
             </motion.div>
           </div>
 
-          <NavigationButtons previousPath="/areas" nextPath="/quadros" />
+          {editingAmbiente && (
+            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar Ambiente</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleUpdate}>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-nome">Nome do Ambiente</Label>
+                      <Input
+                        id="edit-nome"
+                        value={editingAmbiente.nome}
+                        onChange={(e) =>
+                          setEditingAmbiente({
+                            ...editingAmbiente,
+                            nome: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-area">Área</Label>
+                      <select
+                        id="edit-area"
+                        value={editingAmbiente.area?.id || ""}
+                        onChange={(e) => {
+                          const newAreaId = Number(e.target.value);
+                          const newArea = areas.find(
+                            (a) => a.id === newAreaId
+                          );
+                          if (newArea) {
+                            setEditingAmbiente({
+                              ...editingAmbiente,
+                              area: newArea,
+                            });
+                          }
+                        }}
+                        className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                      >
+                        {areas.map((area) => (
+                          <option key={area.id} value={area.id}>
+                            {area.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button type="button" variant="secondary">
+                        Cancelar
+                      </Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={loading}>
+                      Salvar Alterações
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          <NavigationButtons previousPath="/areas" nextPath="/quadros_eletricos" />
         </div>
       </div>
     </Layout>

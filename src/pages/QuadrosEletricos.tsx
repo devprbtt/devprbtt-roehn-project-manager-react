@@ -1,11 +1,24 @@
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useProject } from "@/store/project";
 import {
@@ -17,15 +30,16 @@ import {
   FolderPlus,
   CircuitBoard,
   Wrench,
+  Pencil,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import NavigationButtons from "@/components/NavigationButtons";
 
 type Area = { id: number; nome: string };
 type Ambiente = { id: number; nome: string; area?: Area; area_id?: number };
-type QuadroEletrico = { 
-  id: number; 
-  nome: string; 
+type QuadroEletrico = {
+  id: number;
+  nome: string;
   notes?: string;
   ambiente: Ambiente;
   quantidade_modulos: number;
@@ -34,7 +48,9 @@ type QuadroEletrico = {
 export default function QuadrosEletricos() {
   const { toast } = useToast();
   const { projeto } = useProject();
-  const [projetoSelecionado, setProjetoSelecionado] = useState<boolean | null>(projeto ? true : null);
+  const [projetoSelecionado, setProjetoSelecionado] = useState<boolean | null>(
+    projeto ? true : null
+  );
   const isLocked = projetoSelecionado !== true;
 
   // Se o store já tem projeto, marcamos como selecionado
@@ -49,7 +65,9 @@ export default function QuadrosEletricos() {
     const checkProject = async () => {
       try {
         if (projetoSelecionado !== null) return;
-        const res = await fetch("/api/projeto_atual", { credentials: "same-origin" });
+        const res = await fetch("/api/projeto_atual", {
+          credentials: "same-origin",
+        });
         const data = await res.json();
         setProjetoSelecionado(!!(data?.ok && data?.projeto_atual));
       } catch {
@@ -63,10 +81,16 @@ export default function QuadrosEletricos() {
   const [quadros, setQuadros] = useState<QuadroEletrico[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // form
+  // form state
   const [nome, setNome] = useState("");
   const [ambienteId, setAmbienteId] = useState<number | "">("");
   const [notes, setNotes] = useState("");
+
+  // edit state
+  const [editingQuadro, setEditingQuadro] = useState<QuadroEletrico | null>(
+    null
+  );
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const fetchAmbientes = async () => {
     try {
@@ -101,7 +125,8 @@ export default function QuadrosEletricos() {
       toast({
         variant: "destructive",
         title: "Erro",
-        description: "Não foi possível carregar os quadros elétricos do projeto.",
+        description:
+          "Não foi possível carregar os quadros elétricos do projeto.",
       });
     }
   };
@@ -131,7 +156,8 @@ export default function QuadrosEletricos() {
       toast({
         variant: "destructive",
         title: "Erro",
-        description: "Preencha o nome do quadro elétrico e selecione um ambiente.",
+        description:
+          "Preencha o nome do quadro elétrico e selecione um ambiente.",
       });
       return;
     }
@@ -145,10 +171,10 @@ export default function QuadrosEletricos() {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({ 
-          nome: nome.trim(), 
+        body: JSON.stringify({
+          nome: nome.trim(),
           ambiente_id: ambienteId,
-          notes: notes.trim() || null 
+          notes: notes.trim() || null,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -158,7 +184,10 @@ export default function QuadrosEletricos() {
         setAmbienteId("");
         setNotes("");
         await fetchQuadros();
-        toast({ title: "Sucesso!", description: "Quadro elétrico adicionado com sucesso." });
+        toast({
+          title: "Sucesso!",
+          description: "Quadro elétrico adicionado com sucesso.",
+        });
       } else {
         toast({
           variant: "destructive",
@@ -167,14 +196,70 @@ export default function QuadrosEletricos() {
         });
       }
     } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Erro de conexão com o servidor." });
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro de conexão com o servidor.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (quadro: QuadroEletrico) => {
+    setEditingQuadro(quadro);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingQuadro) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/quadros_eletricos/${editingQuadro.id}`, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          nome: editingQuadro.nome.trim(),
+          ambiente_id: editingQuadro.ambiente.id,
+          notes: editingQuadro.notes?.trim() || null,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.ok) {
+        setIsEditModalOpen(false);
+        await fetchQuadros();
+        toast({
+          title: "Sucesso!",
+          description: "Quadro elétrico atualizado com sucesso.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: data?.error || "Erro ao atualizar quadro elétrico.",
+        });
+      }
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro de conexão com o servidor.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm("Tem certeza que deseja excluir este quadro elétrico?")) return;
+    if (!window.confirm("Tem certeza que deseja excluir este quadro elétrico?"))
+      return;
     setLoading(true);
     try {
       const res = await fetch(`/api/quadros_eletricos/${id}`, {
@@ -185,7 +270,10 @@ export default function QuadrosEletricos() {
       const data = await res.json().catch(() => null);
       if (res.ok && data?.ok) {
         setQuadros((prev) => prev.filter((q) => q.id !== id));
-        toast({ title: "Sucesso!", description: "Quadro elétrico excluído com sucesso." });
+        toast({
+          title: "Sucesso!",
+          description: "Quadro elétrico excluído com sucesso.",
+        });
       } else {
         toast({
           variant: "destructive",
@@ -194,7 +282,11 @@ export default function QuadrosEletricos() {
         });
       }
     } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Erro de conexão com o servidor." });
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro de conexão com o servidor.",
+      });
     } finally {
       setLoading(false);
     }
@@ -211,9 +303,12 @@ export default function QuadrosEletricos() {
                   <CircuitBoard className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Quadros Elétricos</h1>
+                  <h1 className="text-4xl font-bold text-slate-900 mb-2">
+                    Gerenciar Quadros Elétricos
+                  </h1>
                   <p className="text-lg text-slate-600 max-w-2xl">
-                    Adicione quadros elétricos dentro de ambientes para organizar seus módulos.
+                    Adicione ou edite quadros elétricos para organizar seus
+                    módulos.
                   </p>
                 </div>
               </div>
@@ -222,18 +317,27 @@ export default function QuadrosEletricos() {
           </div>
 
           {projetoSelecionado === false && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-8"
+            >
               <Alert className="bg-amber-50 border-amber-200 shadow-sm">
                 <Sparkles className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-amber-800">
-                  Selecione um projeto na página inicial para gerenciar quadros elétricos.
+                  Selecione um projeto na página inicial para gerenciar quadros
+                  elétricos.
                 </AlertDescription>
               </Alert>
             </motion.div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 }}
+            >
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
                 <CardHeader className="pb-6">
                   <div className="flex items-center gap-3">
@@ -241,15 +345,22 @@ export default function QuadrosEletricos() {
                       <FolderPlus className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-2xl font-bold text-slate-900">Adicionar Novo Quadro</CardTitle>
-                      <p className="text-slate-600 mt-1">Preencha as informações do quadro elétrico</p>
+                      <CardTitle className="text-2xl font-bold text-slate-900">
+                        Adicionar Novo Quadro
+                      </CardTitle>
+                      <p className="text-slate-600 mt-1">
+                        Preencha as informações do quadro elétrico
+                      </p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <form className="space-y-6" onSubmit={handleCreate}>
                     <div className="space-y-2">
-                      <Label htmlFor="nome" className="text-sm font-semibold text-slate-700">
+                      <Label
+                        htmlFor="nome"
+                        className="text-sm font-semibold text-slate-700"
+                      >
                         Nome do Quadro Elétrico *
                       </Label>
                       <Input
@@ -262,9 +373,12 @@ export default function QuadrosEletricos() {
                         className="h-12 px-4 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
                       />
                     </div>
-                    
+
                     <div className="space-y-2">
-                      <Label htmlFor="ambienteId" className="text-sm font-semibold text-slate-700">
+                      <Label
+                        htmlFor="ambienteId"
+                        className="text-sm font-semibold text-slate-700"
+                      >
                         Ambiente *
                       </Label>
                       <select
@@ -278,20 +392,26 @@ export default function QuadrosEletricos() {
                         <option value="">Selecione um ambiente</option>
                         {ambientes.map((ambiente) => (
                           <option key={ambiente.id} value={ambiente.id}>
-                            {ambiente.nome} {ambiente.area && `- ${ambiente.area.nome}`}
+                            {ambiente.nome}{" "}
+                            {ambiente.area && `- ${ambiente.area.nome}`}
                           </option>
                         ))}
                       </select>
-                      {!loading && projetoSelecionado === true && ambientes.length === 0 && (
-                        <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" />
-                          Nenhum ambiente disponível. Crie ambientes primeiro.
-                        </p>
-                      )}
+                      {!loading &&
+                        projetoSelecionado === true &&
+                        ambientes.length === 0 && (
+                          <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" />
+                            Nenhum ambiente disponível. Crie ambientes primeiro.
+                          </p>
+                        )}
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="notes" className="text-sm font-semibold text-slate-700">
+                      <Label
+                        htmlFor="notes"
+                        className="text-sm font-semibold text-slate-700"
+                      >
                         Observações (Opcional)
                       </Label>
                       <textarea
@@ -318,7 +438,11 @@ export default function QuadrosEletricos() {
               </Card>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
               <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
@@ -327,12 +451,17 @@ export default function QuadrosEletricos() {
                         <CircuitBoard className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-2xl font-bold text-slate-900">Quadros Cadastrados</CardTitle>
-                        <p className="text-slate-600 mt-1">Lista de todos os quadros elétricos</p>
+                        <CardTitle className="text-2xl font-bold text-slate-900">
+                          Quadros Cadastrados
+                        </CardTitle>
+                        <p className="text-slate-600 mt-1">
+                          Lista de todos os quadros elétricos
+                        </p>
                       </div>
                     </div>
                     <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-medium px-3 py-1">
-                      {quadros.length} {quadros.length === 1 ? "quadro" : "quadros"}
+                      {quadros.length}{" "}
+                      {quadros.length === 1 ? "quadro" : "quadros"}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -340,7 +469,9 @@ export default function QuadrosEletricos() {
                   {loading ? (
                     <div className="flex flex-col justify-center items-center py-12">
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
-                      <p className="text-slate-600 font-medium">Carregando quadros elétricos...</p>
+                      <p className="text-slate-600 font-medium">
+                        Carregando quadros elétricos...
+                      </p>
                     </div>
                   ) : quadros.length === 0 ? (
                     <motion.div
@@ -352,7 +483,9 @@ export default function QuadrosEletricos() {
                         <Cpu className="h-10 w-10 text-slate-400" />
                       </div>
                       <h4 className="text-xl font-semibold text-slate-900 mb-2">
-                        {projetoSelecionado ? "Nenhum quadro elétrico cadastrado" : "Selecione um projeto"}
+                        {projetoSelecionado
+                          ? "Nenhum quadro elétrico cadastrado"
+                          : "Selecione um projeto"}
                       </h4>
                       <p className="text-slate-600 max-w-sm mx-auto">
                         {projetoSelecionado
@@ -375,12 +508,20 @@ export default function QuadrosEletricos() {
                             <div className="flex items-start justify-between">
                               <div className="flex-1 mr-4">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <h4 className="font-bold text-slate-900 text-lg">{quadro.nome}</h4>
-                                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                                    {quadro.quantidade_modulos} módulo{quadro.quantidade_modulos !== 1 ? 's' : ''}
+                                  <h4 className="font-bold text-slate-900 text-lg">
+                                    {quadro.nome}
+                                  </h4>
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-blue-100 text-blue-700"
+                                  >
+                                    {quadro.quantidade_modulos} módulo
+                                    {quadro.quantidade_modulos !== 1
+                                      ? "s"
+                                      : ""}
                                   </Badge>
                                 </div>
-                                
+
                                 <div className="space-y-1">
                                   <div className="flex items-center gap-2 text-sm text-slate-600">
                                     <Building2 className="h-4 w-4 text-slate-400" />
@@ -391,7 +532,8 @@ export default function QuadrosEletricos() {
                                   <div className="flex items-center gap-2 text-sm text-slate-600">
                                     <Wrench className="h-4 w-4 text-slate-400" />
                                     <span className="font-medium">
-                                      Área: {quadro.ambiente.area?.nome || "—"}
+                                      Área:{" "}
+                                      {quadro.ambiente.area?.nome || "—"}
                                     </span>
                                   </div>
                                 </div>
@@ -404,22 +546,44 @@ export default function QuadrosEletricos() {
                                   </div>
                                 )}
                               </div>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleDelete(quadro.id)}
-                                disabled={loading || quadro.quantidade_modulos > 0}
-                                className="opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl"
-                                title={quadro.quantidade_modulos > 0 ? "Remova os módulos antes de excluir" : "Excluir quadro"}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEdit(quadro)}
+                                  className="h-8 w-8 hover:bg-blue-100"
+                                >
+                                  <Pencil className="h-4 w-4 text-blue-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(quadro.id)}
+                                  disabled={
+                                    loading || quadro.quantidade_modulos > 0
+                                  }
+                                  className="h-8 w-8 hover:bg-red-100"
+                                  title={
+                                    quadro.quantidade_modulos > 0
+                                      ? "Remova os módulos antes de excluir"
+                                      : "Excluir quadro"
+                                  }
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </div>
                             </div>
-                            
+
                             {quadro.quantidade_modulos > 0 && (
                               <div className="mt-2">
-                                <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
-                                  Contém {quadro.quantidade_modulos} módulo{quadro.quantidade_modulos !== 1 ? 's' : ''}
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs bg-amber-50 text-amber-700 border-amber-200"
+                                >
+                                  Contém {quadro.quantidade_modulos} módulo
+                                  {quadro.quantidade_modulos !== 1
+                                    ? "s"
+                                    : ""}
                                 </Badge>
                               </div>
                             )}
@@ -432,6 +596,84 @@ export default function QuadrosEletricos() {
               </Card>
             </motion.div>
           </div>
+
+          {editingQuadro && (
+            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar Quadro Elétrico</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleUpdate}>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-nome">Nome do Quadro</Label>
+                      <Input
+                        id="edit-nome"
+                        value={editingQuadro.nome}
+                        onChange={(e) =>
+                          setEditingQuadro({
+                            ...editingQuadro,
+                            nome: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-ambiente">Ambiente</Label>
+                      <select
+                        id="edit-ambiente"
+                        value={editingQuadro.ambiente.id}
+                        onChange={(e) => {
+                          const newAmbienteId = Number(e.target.value);
+                          const newAmbiente = ambientes.find(
+                            (a) => a.id === newAmbienteId
+                          );
+                          if (newAmbiente) {
+                            setEditingQuadro({
+                              ...editingQuadro,
+                              ambiente: newAmbiente,
+                            });
+                          }
+                        }}
+                        className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                      >
+                        {ambientes.map((ambiente) => (
+                          <option key={ambiente.id} value={ambiente.id}>
+                            {ambiente.nome} - {ambiente.area?.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-notes">Observações</Label>
+                      <textarea
+                        id="edit-notes"
+                        value={editingQuadro.notes || ""}
+                        onChange={(e) =>
+                          setEditingQuadro({
+                            ...editingQuadro,
+                            notes: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 rounded-md border border-input bg-background"
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button type="button" variant="secondary">
+                        Cancelar
+                      </Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={loading}>
+                      Salvar Alterações
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
 
           <NavigationButtons previousPath="/ambientes" nextPath="/circuitos" />
         </div>

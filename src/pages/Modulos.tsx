@@ -6,9 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useProject } from "@/store/project";
-import { PlusCircle, Trash2, Boxes, Server, Sparkles, CircuitBoard } from "lucide-react";
+import { PlusCircle, Trash2, Boxes, Server, Sparkles, CircuitBoard, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import NavigationButtons from "@/components/NavigationButtons";
 
@@ -34,6 +42,7 @@ type Modulo = {
   id: number;
   nome: string;
   tipo: string;
+  hsnet?: number;
   quantidade_canais: number;
   vinc_count?: number;
   quadro_eletrico?: {
@@ -59,6 +68,10 @@ export default function Modulos() {
   const [tipo, setTipo] = useState<string>("");
   const [nome, setNome] = useState("");
   const [quadroEletricoId, setQuadroEletricoId] = useState<number | "">("");
+
+  // edit state
+  const [editingModulo, setEditingModulo] = useState<Modulo | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const tipoOptions = useMemo(() => Object.keys(meta), [meta]);
 
@@ -170,6 +183,59 @@ export default function Modulos() {
       toast({ variant: "destructive", title: "Erro", description: "Falha ao se conectar ao servidor." });
     }
   }
+
+  const handleEdit = (modulo: Modulo) => {
+    setEditingModulo(modulo);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingModulo) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/modulos/${editingModulo.id}`, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          nome: editingModulo.nome.trim(),
+          quadro_eletrico_id: editingModulo.quadro_eletrico?.id || null,
+          hsnet: editingModulo.hsnet,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && (data?.ok || data?.success)) {
+        setIsEditModalOpen(false);
+        await fetchModulos();
+        toast({
+          title: "Sucesso!",
+          description: "Módulo atualizado com sucesso.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description:
+            data?.error || data?.message || "Erro ao atualizar módulo.",
+        });
+      }
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro de conexão com o servidor.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   async function handleDelete(id: number) {
     if (!confirm("Tem certeza que deseja excluir este módulo? Esta ação não pode ser desfeita.")) return;
@@ -394,16 +460,26 @@ export default function Modulos() {
                                 </Badge>
                               )}
                             </div>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleDelete(m.id)}
-                              disabled={!!m.vinc_count && m.vinc_count > 0}
-                              title={m.vinc_count && m.vinc_count > 0 ? "Exclua as vinculações antes de remover este módulo." : undefined}
-                              className="opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEdit(m)}
+                                  className="h-8 w-8 hover:bg-blue-100"
+                                >
+                                  <Pencil className="h-4 w-4 text-blue-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDelete(m.id)}
+                                  disabled={!!m.vinc_count && m.vinc_count > 0}
+                                  className="h-8 w-8 hover:bg-red-100"
+                                  title={m.vinc_count && m.vinc_count > 0 ? "Exclua as vinculações antes de remover este módulo." : undefined}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                </Button>
+                              </div>
                           </motion.li>
                         ))}
                       </AnimatePresence>
@@ -415,6 +491,74 @@ export default function Modulos() {
           </div>
 
           <NavigationButtons previousPath="/circuitos" nextPath="/vinculacao" />
+
+          {editingModulo && (
+            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar Módulo</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleUpdate} className="space-y-4">
+                  <div>
+                    <Label htmlFor="edit-nome">Nome do Módulo</Label>
+                    <Input
+                      id="edit-nome"
+                      value={editingModulo.nome}
+                      onChange={(e) =>
+                        setEditingModulo({ ...editingModulo, nome: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-hsnet">HSNET</Label>
+                    <Input
+                      id="edit-hsnet"
+                      type="number"
+                      value={editingModulo.hsnet || ""}
+                      onChange={(e) =>
+                        setEditingModulo({ ...editingModulo, hsnet: Number(e.target.value) })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-quadro">Quadro Elétrico</Label>
+                    <select
+                      id="edit-quadro"
+                      value={editingModulo.quadro_eletrico?.id || ""}
+                      onChange={(e) => {
+                        const newQuadroId = Number(e.target.value);
+                        const newQuadro = quadros.find(
+                          (q) => q.id === newQuadroId
+                        );
+                        setEditingModulo({
+                          ...editingModulo,
+                          quadro_eletrico: newQuadro ? { id: newQuadro.id, nome: newQuadro.nome } : undefined,
+                        });
+                      }}
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                    >
+                      <option value="">Nenhum</option>
+                      {quadros.map((quadro) => (
+                        <option key={quadro.id} value={quadro.id}>
+                          {quadro.nome} ({quadro.ambiente.nome})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button type="button" variant="secondary">
+                        Cancelar
+                      </Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={loading}>
+                      Salvar Alterações
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
     </Layout>
