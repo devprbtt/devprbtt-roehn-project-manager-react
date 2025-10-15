@@ -190,23 +190,30 @@ Representa um teclado físico (keypad) instalado em um ambiente.
 
 ### 10. `KeypadButton`
 
-Representa um único botão em um `Keypad`. Cada botão pode ser configurado para controlar um circuito ou acionar uma cena.
+Representa um único botão em um `Keypad`.
 
 | Coluna | Tipo | Descrição |
-| --- | --- | --- |
+| :--- | :--- | :--- |
 | `id` | Integer | Identificador único do botão (Chave Primária). |
-| `keypad_id` | Integer | Chave estrangeira para a tabela `Keypad`. |
+| `keypad_id` | Integer | ID do keypad ao qual o botão pertence (Chave Estrangeira para `Keypad`). |
 | `ordem` | Integer | Posição do botão no keypad (ex: 1, 2, 3...). |
-| `engraver_text`| String | Texto gravado no botão (máximo de 7 caracteres). |
-| `icon` | String | Ícone exibido no botão. |
-| `rocker_style` | String | Estilo do botão, se for do tipo gangorra (ex: 'up-down'). |
-| `guid` | String | Identificador único global (UUID) para o botão. |
-| `circuito_id` | Integer | Chave estrangeira para o `Circuito` que este botão controla (pode ser nulo). |
-| `cena_id` | Integer | Chave estrangeira para a `Cena` que este botão aciona (pode ser nulo). |
+| `engraver_text`| String(7) | Texto gravado no botão (máximo de 7 caracteres). |
+| `icon` | String(50) | Ícone exibido no botão. |
+| `rocker_style` | String(50) | Estilo do botão do tipo "rocker" (gangorra), ex: 'up-down'. |
+| `guid` | String(36) | GUID único para o botão. |
+| `circuito_id` | Integer | ID do `Circuito` que o botão controla diretamente (Chave Estrangeira para `Circuito`). |
+| `cena_id` | Integer | ID da `Cena` que o botão aciona (Chave Estrangeira para `Cena`). |
 | `modo` | Integer | Modo de operação do botão (ex: Toggle, On, Off). |
-| `is_rocker` | Boolean | Indica se o botão é do tipo gangorra (rocker). |
-| `...` | ... | Outras colunas para configuração de comandos, duplo clique, etc. |
-| `cena` | Relationship | Relacionamento com a `Cena` que este botão pode controlar. |
+| `command_on` | Integer | Comando enviado ao pressionar (para ligar). |
+| `command_off` | Integer | Comando enviado ao pressionar (para desligar). |
+| `can_hold` | Boolean | Indica se o botão suporta a ação de "pressionar e segurar". |
+| `is_rocker` | Boolean | Indica se o botão é do tipo "rocker" (gangorra). |
+| `modo_double_press` | Integer | Modo de operação para o duplo clique. |
+| `command_double_press`| Integer | Comando enviado no duplo clique. |
+| `target_object_guid` | String(36) | GUID do objeto alvo (circuito ou cena). |
+| `notes` | Text | Anotações ou observações sobre o botão. |
+| `created_at` | DateTime | Data e hora de criação do registro. |
+| `updated_at` | DateTime | Data e hora da última atualização do registro. |
 
 ---
 
