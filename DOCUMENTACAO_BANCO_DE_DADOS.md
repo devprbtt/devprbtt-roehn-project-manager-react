@@ -125,7 +125,7 @@ Define um circuito de iluminação ou outro dispositivo elétrico a ser controla
 | `id` | Integer | Identificador único do circuito (Chave Primária). |
 | `identificador` | String | Identificador único do circuito dentro do ambiente (ex: "C01"). |
 | `nome` | String | Nome descritivo do circuito (ex: "Spots Sanca"). |
-| `tipo` | String | Tipo do circuito (ex: "Iluminação", "Tomada"). |
+| `tipo` | String | Tipo do circuito (ex: "Iluminação", "HVAC", "Persiana"). |
 | `dimerizavel` | Boolean | Indica se o circuito suporta dimerização. |
 | `potencia` | Float | Potência total do circuito em Watts. |
 | `ambiente_id` | Integer | Chave estrangeira para a tabela `Ambiente`. |
@@ -144,7 +144,7 @@ Representa um módulo de hardware (ex: dimmer, switch) que controla os circuitos
 | --- | --- | --- |
 | `id` | Integer | Identificador único do módulo (Chave Primária). |
 | `nome` | String | Nome do módulo. Deve ser único dentro do projeto. |
-| `tipo` | String | Modelo do módulo (ex: "RQR-DIM4", "RQR-RLC8"). |
+| `tipo` | String | Modelo do módulo (ex: "DIM8", "RL12"). |
 | `quantidade_canais`| Integer | Número de canais (saídas) que o módulo possui. |
 | `projeto_id` | Integer | Chave estrangeira para a tabela `Projeto`. |
 | `hsnet` | Integer | Endereço do módulo na rede HS-NET. |
