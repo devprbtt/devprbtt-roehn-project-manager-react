@@ -33,6 +33,7 @@ class Projeto(db.Model):
     data_ativo = db.Column(db.DateTime, nullable=True)
     data_inativo = db.Column(db.DateTime, nullable=True)
     data_concluido = db.Column(db.DateTime, nullable=True)
+    controlador = db.Column(db.String(50), nullable=False, default='AQL-GV-M4')
 
     areas = db.relationship('Area', backref='projeto', lazy=True, cascade='all, delete-orphan')
     modulos = db.relationship('Modulo', backref='projeto', lazy=True, cascade='all, delete-orphan')

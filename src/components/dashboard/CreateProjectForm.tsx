@@ -12,6 +12,7 @@ type FormData = {
   name: string;
   description?: string;
   status: "active" | "inactive" | "completed";
+  controlador: "AQL-GV-M4" | "ADP-M8" | "ADP-M16";
 };
 
 type Props = {
@@ -22,7 +23,8 @@ type Props = {
 const defaultForm: FormData = {
   name: "",
   description: "",
-  status: "active"
+  status: "active",
+  controlador: "AQL-GV-M4"
 };
 
 const CreateProjectForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
@@ -100,6 +102,25 @@ const CreateProjectForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
                 </Select>
               </div>
             </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="controlador" className="text-sm font-semibold text-slate-700">
+                  Controlador
+                </Label>
+                <Select
+                  value={formData.controlador}
+                  onValueChange={(value: "AQL-GV-M4" | "ADP-M8" | "ADP-M16") => setFormData({ ...formData, controlador: value })}
+                >
+                  <SelectTrigger className="h-12 rounded-xl border-border focus:border-blue-500 focus:ring-blue-500/20">
+                    <SelectValue placeholder="Selecione o controlador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AQL-GV-M4">AQL-GV-M4</SelectItem>
+                    <SelectItem value="ADP-M8">ADP-M8</SelectItem>
+                    <SelectItem value="ADP-M16">ADP-M16</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             
             <div className="space-y-2">
               <Label htmlFor="description" className="text-sm font-semibold text-slate-700">

@@ -178,14 +178,14 @@ const Dashboard: React.FC = () => {
   };
 
   // Criar novo projeto
-  const handleProjectCreated = async (formData: { name: string; description?: string; status: string }) => {
+  const handleProjectCreated = async (formData: { name: string; description?: string; status: string; controlador: string; }) => {
     setIsLoading(true);
     try {
       const res = await fetch("/api/projetos", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: formData.name }),
+        body: JSON.stringify({ nome: formData.name, controlador: formData.controlador }),
       });
       const data = await res.json();
       if (data.ok) {

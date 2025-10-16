@@ -351,6 +351,7 @@ def roehn_import():
         'programmer_name': request.form.get('programmer_name', current_user.username),
         'programmer_email': request.form.get('programmer_email', current_user.email),
         'programmer_guid': str(uuid.uuid4()),
+        'controlador': projeto.controlador,
     }
     raw_m4_quadro = request.form.get('m4_quadro_id')
     m4_quadro_id = None
@@ -634,6 +635,7 @@ def api_projetos_list():
         "id": p.id,
         "nome": p.nome,
         "status": (p.status or "ATIVO"),
+        "controlador": p.controlador,
         "selected": (p.id == selected_id),
         "data_criacao": p.data_criacao.isoformat() if p.data_criacao else None,
         "data_ativo": p.data_ativo.isoformat() if p.data_ativo else None,
@@ -676,6 +678,12 @@ def api_projetos_update(projeto_id):
             return jsonify({"ok": False, "error": "Nome é obrigatório."}), 400
         p.nome = nome
 
+    if "controlador" in data:
+        controlador = (data.get("controlador") or "").strip()
+        if controlador not in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]:
+            return jsonify({"ok": False, "error": "Controlador inválido."}), 400
+        p.controlador = controlador
+
     if "status" in data:
         status = (data.get("status") or "").strip().upper()
         if status not in {"ATIVO", "INATIVO", "CONCLUIDO"}:
@@ -702,6 +710,7 @@ def api_projetos_update(projeto_id):
             "id": p.id,
             "nome": p.nome,
             "status": p.status,
+            "controlador": p.controlador,
             "data_criacao": p.data_criacao.isoformat(),
             "data_ativo": p.data_ativo.isoformat() if p.data_ativo else None,
             "data_inativo": p.data_inativo.isoformat() if p.data_inativo else None,
@@ -730,10 +739,15 @@ def api_projetos_create():
         return jsonify({"ok": False, "error": "Status inválido (use ATIVO, INATIVO ou CONCLUIDO)."}), 400
 
     now = datetime.utcnow()
+    controlador = (data.get("controlador") or "AQL-GV-M4").strip()
+    if controlador not in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]:
+        return jsonify({"ok": False, "error": "Controlador inválido."}), 400
+
     p = Projeto(
         nome=nome,
         user_id=current_user.id,
         status=status,
+        controlador=controlador,
         data_criacao=now,
         data_ativo=now if status == 'ATIVO' else None,
         data_inativo=now if status == 'INATIVO' else None,
@@ -756,6 +770,7 @@ def api_projetos_create():
         "id": p.id,
         "nome": p.nome,
         "status": p.status,
+        "controlador": p.controlador,
         "data_criacao": p.data_criacao.isoformat(),
         "data_ativo": p.data_ativo.isoformat() if p.data_ativo else None,
         "data_inativo": p.data_inativo.isoformat() if p.data_inativo else None,

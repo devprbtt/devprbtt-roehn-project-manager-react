@@ -91,6 +91,124 @@ class RoehnProjectConverter:
         }
         self._quadro_guid_map = {}
 
+    def _create_controller_module(self, controller_type, project_info):
+        """Creates the main controller module based on its type."""
+
+        controller_configs = {
+            "AQL-GV-M4": {
+                "Name": "AQL-GV-M4",
+                "DriverGuid": "80000000-0000-0000-0000-000000000016",
+                "DevID": 1,
+                "ACNET_SlotCapacity": 24,
+                "Scene_SlotCapacity": 96,
+                "StartUnitId": 39
+            },
+            "ADP-M8": {
+                "Name": "ADP-M8",
+                "DriverGuid": "80000000-0000-0000-0000-000000000018",
+                "DevID": 4,
+                "ACNET_SlotCapacity": 250,
+                "Scene_SlotCapacity": 256,
+                "StartUnitId": 85
+            },
+            "ADP-M16": {
+                "Name": "ADP-M16",
+                "DriverGuid": "80000000-0000-0000-0000-000000000004",
+                "DevID": 5,
+                "ACNET_SlotCapacity": 250,
+                "Scene_SlotCapacity": 256,
+                "StartUnitId": 104
+            }
+        }
+
+        config = controller_configs.get(controller_type, controller_configs["AQL-GV-M4"])
+
+        # UnitComposers are the same for all controllers, only the start ID changes
+        unit_composers_data = [
+            {"Name": "Ativo", "PortNumber": 1, "PortType": 0, "IO": 0, "Kind": 0, "NotProgrammable": False},
+            {"Name": "Modulos HSNET ativos", "PortNumber": 1, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Modulos HSNET registrados", "PortNumber": 2, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Data", "PortNumber": 3, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
+            {"Name": "Hora", "PortNumber": 4, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
+            {"Name": "DST", "PortNumber": 2, "PortType": 0, "IO": 0, "Kind": 0, "NotProgrammable": False},
+            {"Name": "Nascer do Sol", "PortNumber": 5, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
+            {"Name": "Por do sol", "PortNumber": 6, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
+            {"Name": "Posição Solar", "PortNumber": 7, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Flag RTC", "PortNumber": 8, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Flag SNTP", "PortNumber": 9, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Flag MYIP", "PortNumber": 10, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Flag DDNS", "PortNumber": 11, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Web IP", "PortNumber": 1, "PortType": 1100, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Ultima inicializacao", "PortNumber": 2, "PortType": 1100, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Tensao", "PortNumber": 12, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Corrente", "PortNumber": 13, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Power", "PortNumber": 14, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Temperatura", "PortNumber": 15, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+        ]
+
+        unit_composers = []
+        next_unit_id = config["StartUnitId"]
+        for composer_data in unit_composers_data:
+            unit_composers.append({
+                "$type": "UnitComposer",
+                "Name": composer_data["Name"],
+                "PortNumber": composer_data["PortNumber"],
+                "PortType": composer_data["PortType"],
+                "IO": composer_data["IO"],
+                "Kind": composer_data["Kind"],
+                "NotProgrammable": composer_data["NotProgrammable"],
+                "Unit": {
+                    "$type": "Unit", "Id": next_unit_id, "Event": 0, "Scene": 0,
+                    "Disabled": False, "Logged": False, "Memo": False, "Increment": False
+                },
+                "Value": 0
+            })
+            next_unit_id += 1
+
+        controller_module = {
+            "$type": "Module",
+            "Name": config["Name"],
+            "DriverGuid": config["DriverGuid"],
+            "Guid": str(uuid.uuid4()),
+            "IpAddress": project_info.get('m4_ip'),
+            "HsnetAddress": int(project_info.get('m4_hsnet', 245)),
+            "PollTiming": 0,
+            "Disabled": False,
+            "RemotePort": 0,
+            "RemoteIpAddress": None,
+            "Notes": None,
+            "Logicserver": True,
+            "DevID": config["DevID"],
+            "DevIDSlave": 0,
+            "UnitComposers": unit_composers,
+            "Slots": [
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": config["ACNET_SlotCapacity"],
+                    "SlotType": 0,
+                    "InitialPort": 1,
+                    "IO": 0,
+                    "UnitComposers": None,
+                    "SubItemsGuid": [self.zero_guid],
+                    "Name": "ACNET",
+                },
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": config["Scene_SlotCapacity"],
+                    "SlotType": 8,
+                    "InitialPort": 1,
+                    "IO": 1,
+                    "UnitComposers": None,
+                    "SubItemsGuid": [self.zero_guid] * config["Scene_SlotCapacity"],
+                    "Name": "Scene",
+                },
+            ],
+            "SmartGroup": 1,
+            "UserInterfaceGuid": self.zero_guid,
+            "PIRSensorReportEnable": False,
+            "PIRSensorReportID": 0,
+        }
+        return controller_module
 
     def process_json_project(self):
         try:
@@ -481,103 +599,8 @@ class RoehnProjectConverter:
         
         # No método create_project, substitua a definição do m4_module por:
 
-        # Módulo base M4 (obrigatório) com UnitComposers
-        m4_module_guid = str(uuid.uuid4())
-        m4_unit_composers = []
-
-        # Lista de UnitComposers para o M4 baseada no exemplo do Roehn Wizard
-        m4_composers_data = [
-            {"Name": "Ativo", "PortNumber": 1, "PortType": 0, "IO": 0, "Kind": 0, "NotProgrammable": False},
-            {"Name": "Modulos HSNET ativos", "PortNumber": 1, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Modulos HSNET registrados", "PortNumber": 2, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Data", "PortNumber": 3, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
-            {"Name": "Hora", "PortNumber": 4, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
-            {"Name": "DST", "PortNumber": 2, "PortType": 0, "IO": 0, "Kind": 0, "NotProgrammable": False},
-            {"Name": "Nascer do Sol", "PortNumber": 5, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
-            {"Name": "Por do sol", "PortNumber": 6, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
-            {"Name": "Posição Solar", "PortNumber": 7, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Flag RTC", "PortNumber": 8, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Flag SNTP", "PortNumber": 9, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Flag MYIP", "PortNumber": 10, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Flag DDNS", "PortNumber": 11, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Web IP", "PortNumber": 1, "PortType": 1100, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Ultima inicializacao", "PortNumber": 2, "PortType": 1100, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Tensao", "PortNumber": 12, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Corrente", "PortNumber": 13, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Power", "PortNumber": 14, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Temperatura", "PortNumber": 15, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-        ]
-
-        # Iniciar IDs a partir de 39, conforme o exemplo
-        next_unit_id = 39
-
-        for composer in m4_composers_data:
-            unit_composer = {
-                "$type": "UnitComposer",
-                "Name": composer["Name"],
-                "PortNumber": composer["PortNumber"],
-                "PortType": composer["PortType"],
-                "IO": composer["IO"],
-                "Kind": composer["Kind"],
-                "NotProgrammable": composer["NotProgrammable"],
-                "Unit": {
-                    "$type": "Unit",
-                    "Id": next_unit_id,
-                    "Event": 0,
-                    "Scene": 0,
-                    "Disabled": False,
-                    "Logged": False,
-                    "Memo": False,
-                    "Increment": False
-                },
-                "Value": 0
-            }
-            m4_unit_composers.append(unit_composer)
-            next_unit_id += 1
-
-        m4_module = {
-            "$type": "Module",
-            "Name": "AQL-GV-M4",
-            "DriverGuid": "80000000-0000-0000-0000-000000000016",
-            "Guid": m4_module_guid,
-            "IpAddress": project_info.get('m4_ip'),
-            "HsnetAddress": int(project_info.get('m4_hsnet', 245)),
-            "PollTiming": 0,
-            "Disabled": False,
-            "RemotePort": 0,
-            "RemoteIpAddress": None,
-            "Notes": None,
-            "Logicserver": True,
-            "DevID": int(project_info.get('m4_devid', 1)),
-            "DevIDSlave": 0,
-            "UnitComposers": m4_unit_composers,  # Adicionando os UnitComposers
-            "Slots": [
-                {
-                    "$type": "Slot",
-                    "SlotCapacity": 24,
-                    "SlotType": 0,
-                    "InitialPort": 1,
-                    "IO": 0,
-                    "UnitComposers": None,
-                    "SubItemsGuid": ["00000000-0000-0000-0000-000000000000"],
-                    "Name": "ACNET",
-                },
-                {
-                    "$type": "Slot",
-                    "SlotCapacity": 96,
-                    "SlotType": 8,
-                    "InitialPort": 1,
-                    "IO": 1,
-                    "UnitComposers": None,
-                    "SubItemsGuid": ["00000000-0000-0000-0000-000000000000"] * 96,
-                    "Name": "Scene",
-                },
-            ],
-            "SmartGroup": 1,
-            "UserInterfaceGuid": "00000000-0000-0000-0000-000000000000",
-            "PIRSensorReportEnable": False,
-            "PIRSensorReportID": 0,
-        }
+        controlador = project_info.get('controlador', 'AQL-GV-M4')
+        m4_module = self._create_controller_module(controlador, project_info)
 
         # SpecialActions padrão
         def default_special_actions():
@@ -1200,7 +1223,13 @@ class RoehnProjectConverter:
 
     def _get_m4_module_components(self):
         """Retorna o módulo M4, o quadro em que ele está e o slot ACNET associado."""
-        module, board = self._find_module_in_any_board("AQL-GV-M4")
+        for controller_name in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]:
+            module, board = self._find_module_in_any_board(controller_name)
+            if module:
+                break
+        else:
+            return None, None, None
+
         if not module:
             return None, None, None
         acnet_slot = None
