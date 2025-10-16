@@ -129,11 +129,11 @@ const BarraProgressoGrupo = ({ utilizacao, index, canalSelecionado }: BarraProgr
       className={`p-4 rounded-xl border-2 transition-all duration-300 ${
         canalNoGrupo 
           ? 'border-blue-300 bg-blue-50 shadow-sm' 
-          : 'border-slate-200 bg-white'
+          : 'border-border bg-background'
       }`}
     >
       <div className="flex justify-between items-center mb-3">
-        <span className="text-sm font-semibold text-slate-800">
+        <span className="text-sm font-semibold text-foreground">
           Grupo {index + 1} • Canais {grupo.canais.join(', ')}
         </span>
         <span className={`text-xs font-bold px-2 py-1 rounded-full ${
@@ -169,7 +169,7 @@ const BarraProgressoGrupo = ({ utilizacao, index, canalSelecionado }: BarraProgr
                     ? 'bg-blue-500 text-white ring-2 ring-blue-300 shadow-sm'
                     : utilizado
                     ? 'bg-slate-600 text-white shadow-sm'
-                    : 'bg-slate-200 text-slate-600'
+                    : 'bg-slate-200 text-muted-foreground'
                 }`}
                 title={`Canal ${canal} - ${utilizado ? 'Utilizado' : 'Disponível'}${
                   selecionado ? ' - Selecionado' : ''
@@ -256,11 +256,11 @@ export default function Vinculacao() {
       case "luz":
         return { label: "💡 Luz", color: "bg-yellow-100 text-yellow-800" };
       case "persiana":
-        return { label: "🪟 Persiana", color: "bg-blue-100 text-blue-800" };
+        return { label: "🪟 Persiana", color: "bg-blue-100 text-primary" };
       case "hvac":
         return { label: "❄️ HVAC", color: "bg-green-100 text-green-800" };
       default:
-        return { label: tipo, color: "bg-slate-100 text-slate-800" };
+        return { label: tipo, color: "bg-muted text-foreground" };
     }
   }, []);
 
@@ -628,7 +628,7 @@ export default function Vinculacao() {
               <Zap className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <h4 className="font-semibold text-blue-900">Limites Elétricos</h4>
+              <h4 className="font-semibold text-primary">Limites Elétricos</h4>
               <p className="text-sm text-blue-700">Especificações do módulo</p>
             </div>
           </div>
@@ -649,8 +649,8 @@ export default function Vinculacao() {
               <Boxes className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <h4 className="font-semibold text-slate-900">Utilização dos Grupos</h4>
-              <p className="text-sm text-slate-600">Monitoramento em tempo real</p>
+              <h4 className="font-semibold text-foreground">Utilização dos Grupos</h4>
+              <p className="text-sm text-muted-foreground">Monitoramento em tempo real</p>
             </div>
           </div>
           
@@ -665,8 +665,8 @@ export default function Vinculacao() {
             ))}
           </div>
           
-          <div className="pt-3 border-t border-slate-200">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-slate-600">
+          <div className="pt-3 border-t border-border">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-2 justify-center">
                 <div className="w-3 h-3 bg-green-500 rounded"></div>
                 <span>Baixa (≤60%)</span>
@@ -759,7 +759,7 @@ export default function Vinculacao() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:from-background dark:via-background/40 dark:to-primary/25">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           {/* Header atualizado para mobile */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
@@ -769,8 +769,8 @@ export default function Vinculacao() {
                   <Link2 className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">Gerenciar Vinculações</h1>
-                  <p className="text-base sm:text-lg text-slate-600 max-w-2xl">
+                  <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-2">Gerenciar Vinculações</h1>
+                  <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
                     Conecte circuitos aos canais de seus módulos físicos.
                     {quadrosEletricos.length === 1 && (
                       <span className="text-green-600 font-semibold ml-2">• 1 quadro detectado</span>
@@ -806,7 +806,7 @@ export default function Vinculacao() {
               <Button
                 onClick={() => fetchAllData()}
                 variant="outline"
-                className="group flex items-center justify-center gap-2 h-12 px-4 sm:px-6 rounded-full border-slate-200 text-slate-600 hover:text-slate-900 transition-all duration-300 text-sm sm:text-base"
+                className="group flex items-center justify-center gap-2 h-12 px-4 sm:px-6 rounded-full border-border text-muted-foreground hover:text-foreground transition-all duration-300 text-sm sm:text-base"
                 disabled={loading}
               >
                 <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
@@ -834,15 +834,15 @@ export default function Vinculacao() {
               animate={{ opacity: 1, y: 0 }} 
               className="order-1 lg:order-1"
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-4 sm:pb-6">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
                       <Plug className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-xl sm:text-2xl font-bold text-slate-900">Nova Vinculação</CardTitle>
-                      <p className="text-slate-600 text-sm sm:text-base mt-1">Conecte um circuito a um módulo</p>
+                      <CardTitle className="text-xl sm:text-2xl font-bold text-foreground">Nova Vinculação</CardTitle>
+                      <p className="text-muted-foreground text-sm sm:text-base mt-1">Conecte um circuito a um módulo</p>
                     </div>
                   </div>
                 </CardHeader>
@@ -862,7 +862,7 @@ export default function Vinculacao() {
                           setCanal("");
                         }}
                         required
-                        className="mt-2 w-full h-12 px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        className="mt-2 w-full h-12 px-4 rounded-xl border border-border bg-background focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                         disabled={isLocked || loading || circuitosNaoVinculados.length === 0}
                       >
                         <option value="">{loading ? "Carregando circuitos..." : "Selecione um circuito"}</option>
@@ -896,7 +896,7 @@ export default function Vinculacao() {
                           setCanal("");
                         }}
                         required
-                        className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                        className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                         disabled={isLocked || loading || modulosFiltrados.length === 0}
                       >
                         <option value="">{loading ? "Carregando módulos..." : "Selecione um módulo"}</option>
@@ -924,14 +924,14 @@ export default function Vinculacao() {
                           id="tensao"
                           value={tensao}
                           onChange={(e) => setTensao(Number(e.target.value) as 120 | 220)}
-                          className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                          className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
                           disabled={isLocked || loading}
                         >
                           <option value={220}>220 V</option>
                           <option value={120}>120 V</option>
                         </select>
                         {selectedCircuito && (
-                          <p className="text-xs text-slate-600 mt-2">
+                          <p className="text-xs text-muted-foreground mt-2">
                             Potência: {selectedCircuito.potencia ?? 0}W<br/>
                             Corrente: {calcularCorrente(selectedCircuito.potencia).toFixed(2)}A
                           </p>
@@ -947,7 +947,7 @@ export default function Vinculacao() {
                           value={canal as any}
                           onChange={(e) => setCanal(Number(e.target.value))}
                           required
-                          className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                          className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                           disabled={!selectedModulo || canaisDisponiveis.length === 0}
                         >
                           <option value="">Selecione um canal</option>
@@ -958,7 +958,7 @@ export default function Vinculacao() {
                           ))}
                         </select>
                         {!selectedModulo && (
-                          <p className="text-sm text-slate-500 mt-1">Selecione um módulo</p>
+                          <p className="text-sm text-muted-foreground/90 mt-1">Selecione um módulo</p>
                         )}
                       </div>
                     </div>
@@ -991,7 +991,7 @@ export default function Vinculacao() {
               transition={{ delay: 0.1 }}
               className="order-2 lg:order-2"
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-4 sm:pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -999,8 +999,8 @@ export default function Vinculacao() {
                         <Link2 className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-xl sm:text-2xl font-bold text-slate-900">Vinculações Cadastradas</CardTitle>
-                        <p className="text-slate-600 text-sm sm:text-base mt-1">Lista de todas as vinculações do projeto</p>
+                        <CardTitle className="text-xl sm:text-2xl font-bold text-foreground">Vinculações Cadastradas</CardTitle>
+                        <p className="text-muted-foreground text-sm sm:text-base mt-1">Lista de todas as vinculações do projeto</p>
                       </div>
                     </div>
                     <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-xs sm:text-sm font-medium px-2 sm:px-3 py-1">
@@ -1012,17 +1012,17 @@ export default function Vinculacao() {
                   {loading ? (
                     <div className="flex flex-col justify-center items-center py-8 sm:py-12">
                       <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-4 border-blue-500 border-t-transparent mb-3 sm:mb-4"></div>
-                      <p className="text-slate-600 font-medium text-sm sm:text-base">Carregando vinculações...</p>
+                      <p className="text-muted-foreground font-medium text-sm sm:text-base">Carregando vinculações...</p>
                     </div>
                   ) : vinculacoes.length === 0 ? (
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-8 sm:py-12">
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
-                        <Link2 className="h-6 w-6 sm:h-10 sm:w-10 text-slate-400" />
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+                        <Link2 className="h-6 w-6 sm:h-10 sm:w-10 text-muted-foreground/80" />
                       </div>
-                      <h4 className="text-lg sm:text-xl font-semibold text-slate-900 mb-2">
+                      <h4 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
                         {projetoSelecionado === true ? "Nenhuma vinculação cadastrada" : "Selecione um projeto"}
                       </h4>
-                      <p className="text-slate-600 max-w-sm mx-auto text-sm sm:text-base">
+                      <p className="text-muted-foreground max-w-sm mx-auto text-sm sm:text-base">
                         {projetoSelecionado
                           ? "Comece adicionando a primeira vinculação usando o formulário ao lado."
                           : "Selecione um projeto para visualizar e gerenciar as vinculações."}
@@ -1040,7 +1040,7 @@ export default function Vinculacao() {
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -20 }}
                               transition={{ delay: index * 0.05 }}
-                              className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-3 sm:p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
+                              className="group relative overflow-hidden rounded-2xl border border-border bg-card/85 backdrop-blur-sm p-3 sm:p-4 hover:bg-card/90 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
                             >
                               <div className="flex items-start justify-between">
                                 <div className="flex-1 mr-3">
@@ -1048,18 +1048,18 @@ export default function Vinculacao() {
                                     <Badge className={`text-xs font-medium px-2 py-1 ${badge.color}`}>
                                       {badge.label.toUpperCase()}
                                     </Badge>
-                                    <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                    <span className="text-xs font-mono text-muted-foreground/90 bg-muted px-2 py-1 rounded-lg">
                                       Canal {v.canal}
                                     </span>
                                   </div>
-                                  <h4 className="font-bold text-slate-900 text-base sm:text-lg mb-1">{v.circuito_nome}</h4>
-                                  <p className="text-xs sm:text-sm text-slate-600 mb-1">
+                                  <h4 className="font-bold text-foreground text-base sm:text-lg mb-1">{v.circuito_nome}</h4>
+                                  <p className="text-xs sm:text-sm text-muted-foreground mb-1">
                                     <span className="font-medium">Identificador:</span> {v.identificador}
                                   </p>
-                                  <p className="text-xs sm:text-sm text-slate-600 mb-1">
+                                  <p className="text-xs sm:text-sm text-muted-foreground mb-1">
                                     <span className="font-medium">Módulo:</span> {v.modulo_nome}
                                   </p>
-                                  <p className="text-xs sm:text-sm text-slate-500">
+                                  <p className="text-xs sm:text-sm text-muted-foreground/90">
                                     {v.area_nome} &gt; {v.ambiente_nome}
                                   </p>
                                 </div>
@@ -1093,15 +1093,15 @@ export default function Vinculacao() {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl"
+            className="bg-card rounded-2xl p-6 max-w-md w-full shadow-xl border border-border"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
                 <Zap className="w-6 h-6 text-red-600" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-slate-900">Atenção: Restrição de Carga</h3>
-                <p className="text-slate-600 text-sm">Você está prestes a exceder os limites elétricos</p>
+                <h3 className="text-xl font-bold text-foreground">Atenção: Restrição de Carga</h3>
+                <p className="text-muted-foreground text-sm">Você está prestes a exceder os limites elétricos</p>
               </div>
             </div>
 
@@ -1136,7 +1136,7 @@ export default function Vinculacao() {
               <Button
                 variant="outline"
                 onClick={() => setModalRestricao({ aberto: false, restricao: null, dadosVinculacao: null })}
-                className="flex-1 h-12 rounded-xl border-slate-300 text-slate-700 hover:bg-slate-50"
+                className="flex-1 h-12 rounded-xl border-border text-slate-700 hover:bg-muted"
               >
                 Cancelar
               </Button>

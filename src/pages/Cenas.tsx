@@ -88,7 +88,7 @@ const Cenas = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:from-background dark:via-background/40 dark:to-primary/25">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           {/* Header */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
@@ -98,8 +98,8 @@ const Cenas = () => {
                   <Clapperboard className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">Gerenciar Cenas</h1>
-                  <p className="text-base sm:text-lg text-slate-600">Crie e configure cenas para automatizar seus ambientes.</p>
+                  <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-2">Gerenciar Cenas</h1>
+                  <p className="text-base sm:text-lg text-muted-foreground">Crie e configure cenas para automatizar seus ambientes.</p>
                 </div>
               </div>
               <div className="h-1 w-32 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full shadow-sm" />
@@ -129,7 +129,7 @@ const Cenas = () => {
               transition={{ delay: 0.1 }}
               className="order-1 lg:order-2"
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -137,8 +137,8 @@ const Cenas = () => {
                         <Clapperboard className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-xl sm:text-2xl font-bold text-slate-900">Cenas Cadastradas</CardTitle>
-                        <p className="text-slate-600 text-sm sm:text-base mt-1">Lista de todas as cenas</p>
+                        <CardTitle className="text-xl sm:text-2xl font-bold text-foreground">Cenas Cadastradas</CardTitle>
+                        <p className="text-muted-foreground text-sm sm:text-base mt-1">Lista de todas as cenas</p>
                       </div>
                     </div>
                     <Badge className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs sm:text-sm font-medium px-2 sm:px-3 py-1">
@@ -150,17 +150,17 @@ const Cenas = () => {
                   <div className="mt-4 sm:mt-6 space-y-3 sm:space-y-4">
                     {/* Filtro de Busca por Texto */}
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/80 w-4 h-4" />
                       <Input
                         placeholder="Buscar por nome..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-10 h-10 rounded-xl border-slate-200 focus:border-indigo-500"
+                        className="pl-10 pr-10 h-10 rounded-xl border-border focus:border-indigo-500"
                       />
                       {searchTerm && (
                         <button
                           onClick={() => setSearchTerm("")}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/80 hover:text-muted-foreground"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -169,7 +169,7 @@ const Cenas = () => {
 
                     {/* Filtro por Ambiente */}
                     <div className="space-y-1">
-                      <Label htmlFor="filtro-ambiente" className="text-xs font-medium text-slate-600">
+                      <Label htmlFor="filtro-ambiente" className="text-xs font-medium text-muted-foreground">
                         Ambiente
                       </Label>
                       <Select value={String(ambienteFilter)} onValueChange={(v) => setAmbienteFilter(v === "todos" ? "todos" : Number(v))}>
@@ -210,7 +210,7 @@ const Cenas = () => {
                   {loadingCenas ? (
                     <div className="flex flex-col justify-center items-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent mb-3"></div>
-                      <p className="text-slate-600 font-medium">Carregando cenas...</p>
+                      <p className="text-muted-foreground font-medium">Carregando cenas...</p>
                     </div>
                   ) : filteredCenas && filteredCenas.length > 0 ? (
                     <ScrollArea className="h-[400px] sm:h-[500px] pr-2 sm:pr-4">
@@ -223,7 +223,7 @@ const Cenas = () => {
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -20 }}
                               transition={{ delay: index * 0.05 }}
-                              className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-3 sm:p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
+                              className="group relative overflow-hidden rounded-2xl border border-border bg-card/85 backdrop-blur-sm p-3 sm:p-4 hover:bg-card/90 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
                             >
                               <div className="flex items-start justify-between">
                                 <div className="flex-1 mr-3">
@@ -232,8 +232,8 @@ const Cenas = () => {
                                       {cena.acoes.length} {cena.acoes.length === 1 ? 'Ação' : 'Ações'}
                                     </Badge>
                                   </div>
-                                  <h4 className="font-bold text-slate-900 text-base sm:text-lg">{cena.nome}</h4>
-                                  <p className="text-xs sm:text-sm text-slate-600">
+                                  <h4 className="font-bold text-foreground text-base sm:text-lg">{cena.nome}</h4>
+                                  <p className="text-xs sm:text-sm text-muted-foreground">
                                     {cena.ambiente.nome}
                                     {cena.ambiente.area && ` (${cena.ambiente.area.nome})`}
                                   </p>
@@ -265,13 +265,13 @@ const Cenas = () => {
                     </ScrollArea>
                   ) : (
                     <div className="text-center py-8">
-                      <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Clapperboard className="h-8 w-8 text-slate-400" />
+                      <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Clapperboard className="h-8 w-8 text-muted-foreground/80" />
                       </div>
-                      <h4 className="text-lg font-semibold text-slate-900 mb-2">
+                      <h4 className="text-lg font-semibold text-foreground mb-2">
                         Nenhuma cena encontrada
                       </h4>
-                      <p className="text-slate-600 max-w-sm mx-auto text-sm">
+                      <p className="text-muted-foreground max-w-sm mx-auto text-sm">
                         {searchTerm || ambienteFilter !== "todos" 
                           ? "Tente ajustar os filtros de busca para encontrar o que procura." 
                           : "Comece adicionando sua primeira cena usando o formulário ao lado."}

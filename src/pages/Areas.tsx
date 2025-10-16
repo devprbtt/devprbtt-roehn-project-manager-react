@@ -241,7 +241,7 @@ export default function Areas() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:from-background dark:via-background/40 dark:to-primary/25">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
             <div>
@@ -250,10 +250,10 @@ export default function Areas() {
                   <MapPin className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-slate-900 mb-2">
+                  <h1 className="text-4xl font-bold text-foreground mb-2">
                     Gerenciar Áreas
                   </h1>
-                  <p className="text-lg text-slate-600 max-w-2xl">
+                  <p className="text-lg text-muted-foreground max-w-2xl">
                     Adicione ou edite as áreas do seu projeto.
                   </p>
                 </div>
@@ -283,17 +283,17 @@ export default function Areas() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-6">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
                       <FolderPlus className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-2xl font-bold text-slate-900">
+                      <CardTitle className="text-2xl font-bold text-foreground">
                         Adicionar Nova Área
                       </CardTitle>
-                      <p className="text-slate-600 mt-1">
+                      <p className="text-muted-foreground mt-1">
                         Preencha as informações da área
                       </p>
                     </div>
@@ -315,7 +315,7 @@ export default function Areas() {
                         onChange={(e) => setNovaArea(e.target.value)}
                         placeholder="Ex: Térreo, Cobertura..."
                         required
-                        className="mt-2 h-12 px-4 rounded-xl border-slate-200 focus:border-purple-500 focus:ring-purple-500/20"
+                        className="mt-2 h-12 px-4 rounded-xl border-border focus:border-purple-500 focus:ring-purple-500/20"
                         disabled={isLocked}
                       />
                     </div>
@@ -337,7 +337,7 @@ export default function Areas() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -345,10 +345,10 @@ export default function Areas() {
                         <MapPin className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-2xl font-bold text-slate-900">
+                        <CardTitle className="text-2xl font-bold text-foreground">
                           Áreas Cadastradas
                         </CardTitle>
-                        <p className="text-slate-600 mt-1">
+                        <p className="text-muted-foreground mt-1">
                           Lista de todas as áreas do projeto
                         </p>
                       </div>
@@ -362,7 +362,7 @@ export default function Areas() {
                   {loading && areas.length === 0 ? (
                     <div className="flex flex-col justify-center items-center py-12">
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-4"></div>
-                      <p className="text-slate-600 font-medium">
+                      <p className="text-muted-foreground font-medium">
                         Carregando áreas...
                       </p>
                     </div>
@@ -372,15 +372,15 @@ export default function Areas() {
                       animate={{ opacity: 1, y: 0 }}
                       className="text-center py-12"
                     >
-                      <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Building2 className="h-10 w-10 text-slate-400" />
+                      <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Building2 className="h-10 w-10 text-muted-foreground/80" />
                       </div>
-                      <h4 className="text-xl font-semibold text-slate-900 mb-2">
+                      <h4 className="text-xl font-semibold text-foreground mb-2">
                         {projetoSelecionado
                           ? "Nenhuma área cadastrada"
                           : "Selecione um projeto"}
                       </h4>
-                      <p className="text-slate-600 max-w-sm mx-auto">
+                      <p className="text-muted-foreground max-w-sm mx-auto">
                         {projetoSelecionado
                           ? "Comece adicionando sua primeira área usando o formulário ao lado."
                           : "Selecione um projeto para visualizar e gerenciar as áreas."}
@@ -397,7 +397,7 @@ export default function Areas() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ delay: index * 0.05 }}
-                            className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300 flex items-center justify-between"
+                            className="group relative overflow-hidden rounded-2xl border border-border bg-card/85 backdrop-blur-sm p-4 hover:bg-card/90 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300 flex items-center justify-between"
                           >
                             {editingAreaId === area.id ? (
                               <form
@@ -433,7 +433,7 @@ export default function Areas() {
                               </form>
                             ) : (
                               <>
-                                <span className="font-bold text-lg text-slate-900">
+                                <span className="font-bold text-lg text-foreground">
                                   {area.nome}
                                 </span>
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

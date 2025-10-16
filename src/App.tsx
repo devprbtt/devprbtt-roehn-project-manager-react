@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AdminRoute from "@/routes/AdminRoute";
+import { ThemeProvider } from "@/components/theme-provider";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -135,18 +136,20 @@ function AppInner() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        {/* Bootstrap da sessão UMA vez ao iniciar o app */}
-        <AuthBootstrapper />
-        <ProjectBootstrapper />
-        <AppInner />
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ThemeProvider storageKey="roehn-theme" defaultTheme="light">
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          {/* Bootstrap da sessão UMA vez ao iniciar o app */}
+          <AuthBootstrapper />
+          <ProjectBootstrapper />
+          <AppInner />
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;

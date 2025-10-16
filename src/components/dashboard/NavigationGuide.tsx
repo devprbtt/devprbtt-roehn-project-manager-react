@@ -80,15 +80,15 @@ const NavigationGuide: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.5 }}
     >
-      <Card className="bg-gradient-to-br from-slate-50 to-white border-slate-200/60 shadow-lg">
+      <Card className="bg-gradient-to-br from-slate-50 to-white border-border shadow-lg">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+          <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl flex items-center justify-center">
               <ArrowRight className="w-5 h-5 text-white" />
             </div>
             Próximos Passos
           </CardTitle>
-          <p className="text-slate-600 mt-2">
+          <p className="text-muted-foreground mt-2">
             Use o menu lateral para navegar pelas diferentes seções e configurar seu projeto completo
           </p>
         </CardHeader>
@@ -100,15 +100,15 @@ const NavigationGuide: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 + index * 0.1 }}
-                className="group p-4 rounded-xl bg-white border border-slate-200/60 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+                className="group p-4 rounded-xl bg-card border border-border hover:shadow-md transition-all duration-300 hover:-translate-y-1"
               >
                 <div className="flex items-start gap-3">
                   <div className={`w-10 h-10 bg-gradient-to-br ${step.color} rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow`}>
                     <step.icon className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-slate-900 mb-1">{step.title}</h4>
-                    <p className="text-sm text-slate-600 leading-relaxed">
+                    <h4 className="font-semibold text-foreground mb-1">{step.title}</h4>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
                       {step.description}
                     </p>
                   </div>

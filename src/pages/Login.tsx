@@ -63,7 +63,7 @@ export default function Login() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:from-background dark:via-background/40 dark:to-primary/25">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
             <div>
@@ -72,8 +72,8 @@ export default function Login() {
                   <LogIn className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Login</h1>
-                  <p className="text-lg text-slate-600 max-w-2xl">
+                  <h1 className="text-4xl font-bold text-foreground mb-2">Login</h1>
+                  <p className="text-lg text-muted-foreground max-w-2xl">
                     Entre para acessar seu painel e gerenciar seus projetos.
                   </p>
                 </div>

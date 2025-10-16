@@ -235,7 +235,7 @@ export default function Circuitos() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:from-background dark:via-background/40 dark:to-primary/25">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
             <div>
@@ -244,8 +244,8 @@ export default function Circuitos() {
                   <Zap className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Circuitos</h1>
-                  <p className="text-lg text-slate-600 max-w-2xl">
+                  <h1 className="text-4xl font-bold text-foreground mb-2">Gerenciar Circuitos</h1>
+                  <p className="text-lg text-muted-foreground max-w-2xl">
                     Cadastre os circuitos elétricos do seu projeto.
                   </p>
                 </div>
@@ -268,15 +268,15 @@ export default function Circuitos() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Card de Adicionar Circuito */}
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-6">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
                       <PlusCircle className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-2xl font-bold text-slate-900">Adicionar Novo Circuito</CardTitle>
-                      <p className="text-slate-600 mt-1">Preencha as informações do circuito</p>
+                      <CardTitle className="text-2xl font-bold text-foreground">Adicionar Novo Circuito</CardTitle>
+                      <p className="text-muted-foreground mt-1">Preencha as informações do circuito</p>
                     </div>
                   </div>
                 </CardHeader>
@@ -294,7 +294,7 @@ export default function Circuitos() {
                           onChange={(e) => setIdentificador(e.target.value)}
                           required
                           disabled={!projetoSelecionado}
-                          className="h-12 px-4 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                          className="h-12 px-4 rounded-xl border-border focus:border-blue-500 focus:ring-blue-500/20"
                         />
                       </div>
                       <div className="space-y-2">
@@ -308,7 +308,7 @@ export default function Circuitos() {
                           onChange={(e) => setNome(e.target.value)}
                           required
                           disabled={!projetoSelecionado}
-                          className="h-12 px-4 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                          className="h-12 px-4 rounded-xl border-border focus:border-blue-500 focus:ring-blue-500/20"
                         />
                       </div>
                     </div>
@@ -324,7 +324,7 @@ export default function Circuitos() {
                           onValueChange={(v) => setTipo(v as "luz" | "persiana" | "hvac")}
                           disabled={!projetoSelecionado}
                         >
-                          <SelectTrigger id="tipo" className="h-12 w-full rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all">
+                          <SelectTrigger id="tipo" className="h-12 w-full rounded-xl border border-border bg-background focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all">
                             <SelectValue placeholder="Selecione o tipo" />
                           </SelectTrigger>
 
@@ -352,13 +352,13 @@ export default function Circuitos() {
                       </div>
 
                       {tipo === 'luz' && (
-                        <div className="flex items-center space-x-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <div className="flex items-center space-x-2 p-3 bg-slate-50 rounded-xl border border-border">
                           <input
                             type="checkbox"
                             id="dimerizavel"
                             checked={dimerizavel}
                             onChange={(e) => setDimerizavel(e.target.checked)}
-                            className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                            className="h-4 w-4 text-blue-600 border-border rounded focus:ring-blue-500"
                           />
                           <label htmlFor="dimerizavel" className="text-sm font-medium text-slate-700 flex items-center gap-2">
                             <Sparkles className="w-4 h-4 text-blue-500" />
@@ -390,7 +390,7 @@ export default function Circuitos() {
                             title="Digite apenas números inteiros"
                             required
                             disabled={!projetoSelecionado}
-                            className="h-12 px-4 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                            className="h-12 px-4 rounded-xl border-border focus:border-blue-500 focus:ring-blue-500/20"
                           />
                         </div>
 
@@ -400,7 +400,7 @@ export default function Circuitos() {
                         </Label>
                         <select
                           id="ambiente_id"
-                          className="h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          className="h-12 w-full px-4 rounded-xl border border-border bg-background focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                           value={ambienteId as any}
                           onChange={(e) => setAmbienteId(Number(e.target.value))}
                           required
@@ -437,7 +437,7 @@ export default function Circuitos() {
 
             {/* Card de Circuitos Cadastrados com Filtros */}
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -445,8 +445,8 @@ export default function Circuitos() {
                         <Zap className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-2xl font-bold text-slate-900">Circuitos Cadastrados</CardTitle>
-                        <p className="text-slate-600 mt-1">Lista de todos os circuitos</p>
+                        <CardTitle className="text-2xl font-bold text-foreground">Circuitos Cadastrados</CardTitle>
+                        <p className="text-muted-foreground mt-1">Lista de todos os circuitos</p>
                       </div>
                     </div>
                     <Badge className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-sm font-medium px-3 py-1">
@@ -458,17 +458,17 @@ export default function Circuitos() {
                   <div className="mt-6 space-y-4">
                     {/* Filtro de Busca por Texto */}
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/80 w-4 h-4" />
                       <Input
                         placeholder="Buscar por nome ou identificador..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-10 h-10 rounded-xl border-slate-200 focus:border-blue-500"
+                        className="pl-10 pr-10 h-10 rounded-xl border-border focus:border-blue-500"
                       />
                       {searchTerm && (
                         <button
                           onClick={() => setSearchTerm("")}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/80 hover:text-muted-foreground"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -479,7 +479,7 @@ export default function Circuitos() {
                     <div className="grid grid-cols-2 gap-3">
                       {/* Filtro por Tipo */}
                       <div className="space-y-1">
-                        <Label htmlFor="filtro-tipo" className="text-xs font-medium text-slate-600">
+                        <Label htmlFor="filtro-tipo" className="text-xs font-medium text-muted-foreground">
                           Tipo
                         </Label>
                         <Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}>
@@ -497,7 +497,7 @@ export default function Circuitos() {
                       
                       {/* Filtro por Ambiente */}
                       <div className="space-y-1">
-                        <Label htmlFor="filtro-ambiente" className="text-xs font-medium text-slate-600">
+                        <Label htmlFor="filtro-ambiente" className="text-xs font-medium text-muted-foreground">
                           Ambiente
                         </Label>
                         <Select 
@@ -545,7 +545,7 @@ export default function Circuitos() {
                   {loading ? (
                     <div className="flex flex-col justify-center items-center py-12">
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
-                      <p className="text-slate-600 font-medium">Carregando circuitos...</p>
+                      <p className="text-muted-foreground font-medium">Carregando circuitos...</p>
                     </div>
                   ) : circuitos.length === 0 ? (
                     <motion.div
@@ -553,13 +553,13 @@ export default function Circuitos() {
                       animate={{ opacity: 1, y: 0 }}
                       className="text-center py-12"
                     >
-                      <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Zap className="h-10 w-10 text-slate-400" />
+                      <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Zap className="h-10 w-10 text-muted-foreground/80" />
                       </div>
-                      <h4 className="text-xl font-semibold text-slate-900 mb-2">
+                      <h4 className="text-xl font-semibold text-foreground mb-2">
                         {projetoSelecionado ? "Nenhum circuito cadastrado" : "Selecione um projeto"}
                       </h4>
-                      <p className="text-slate-600 max-w-sm mx-auto">
+                      <p className="text-muted-foreground max-w-sm mx-auto">
                         {projetoSelecionado
                           ? "Comece adicionando seu primeiro circuito usando o formulário ao lado."
                           : "Selecione um projeto para visualizar e gerenciar os circuitos."}
@@ -571,13 +571,13 @@ export default function Circuitos() {
                       animate={{ opacity: 1, y: 0 }}
                       className="text-center py-12"
                     >
-                      <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Search className="h-10 w-10 text-slate-400" />
+                      <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Search className="h-10 w-10 text-muted-foreground/80" />
                       </div>
-                      <h4 className="text-xl font-semibold text-slate-900 mb-2">
+                      <h4 className="text-xl font-semibold text-foreground mb-2">
                         Nenhum circuito encontrado
                       </h4>
-                      <p className="text-slate-600 max-w-sm mx-auto">
+                      <p className="text-muted-foreground max-w-sm mx-auto">
                         Tente ajustar os filtros de busca para encontrar o que procura.
                       </p>
                     </motion.div>
@@ -591,7 +591,7 @@ export default function Circuitos() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ delay: index * 0.05 }}
-                            className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
+                            className="group relative overflow-hidden rounded-2xl border border-border bg-card/85 backdrop-blur-sm p-4 hover:bg-card/90 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1 mr-4">
@@ -603,7 +603,7 @@ export default function Circuitos() {
                                           ? "bg-purple-100 text-purple-800" // Cor diferente para dimerizável
                                           : "bg-yellow-100 text-yellow-800"
                                         : c.tipo === "persiana"
-                                          ? "bg-blue-100 text-blue-800"
+                                          ? "bg-blue-100 text-primary"
                                           : "bg-green-100 text-green-800"
                                     }`}
                                   >
@@ -620,22 +620,22 @@ export default function Circuitos() {
                                     )}
                                   </Badge>
 
-                                  <span className="text-sm font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                  <span className="text-sm font-mono text-muted-foreground/90 bg-muted px-2 py-1 rounded-lg">
                                     {c.identificador}
                                   </span>
                                 </div>
-                                <h4 className="font-bold text-slate-900 text-lg mb-2">{c.nome}</h4>
-                                <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
-                                  <DoorOpen className="h-4 w-4 text-slate-400" />
+                                <h4 className="font-bold text-foreground text-lg mb-2">{c.nome}</h4>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                                  <DoorOpen className="h-4 w-4 text-muted-foreground/80" />
                                   <span className="font-medium">{c.ambiente?.nome}</span>
                                   {c.ambiente?.area?.nome && (
                                     <>
-                                      <span className="text-slate-400">•</span>
-                                      <span className="text-slate-500">Área: {c.ambiente.area.nome}</span>
+                                      <span className="text-muted-foreground/80">•</span>
+                                      <span className="text-muted-foreground/90">Área: {c.ambiente.area.nome}</span>
                                     </>
                                   )}
                                 </div>
-                                <div className="text-xs text-slate-500">
+                                <div className="text-xs text-muted-foreground/90">
                                   <span className="font-medium">SAK: </span>
                                   {c.tipo !== "hvac" ? (
                                     (c.sak ?? <span className="italic opacity-60">Não definido</span>)

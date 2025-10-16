@@ -45,14 +45,14 @@ const EditProjectModal: React.FC<Props> = ({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-bold text-slate-900">
+            <DialogTitle className="text-xl font-bold text-foreground">
               Editar Projeto
             </DialogTitle>
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="rounded-full hover:bg-slate-100"
+              className="rounded-full hover:bg-muted"
               type="button"
             >
               <X className="w-4 h-4" />
@@ -68,7 +68,7 @@ const EditProjectModal: React.FC<Props> = ({
               id="edit-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-11 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+              className="h-11 rounded-xl border-border focus:border-blue-500 focus:ring-blue-500/20"
               required
             />
           </div>
@@ -79,7 +79,7 @@ const EditProjectModal: React.FC<Props> = ({
             </Label>
             <select
               id="edit-status"
-              className="h-11 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+              className="h-11 w-full px-4 rounded-xl border border-border bg-background focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
               value={status}
               onChange={(e) => setStatus(e.target.value as ProjectStatus)}
             >
@@ -95,7 +95,7 @@ const EditProjectModal: React.FC<Props> = ({
                 type="button"
                 variant="outline"
                 onClick={onClose}
-                className="flex-1 h-11 rounded-xl border-slate-200 hover:bg-slate-50"
+                className="flex-1 h-11 rounded-xl border-border hover:bg-muted"
               >
                 Cancelar
               </Button>

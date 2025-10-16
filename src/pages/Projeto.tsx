@@ -215,7 +215,7 @@ export default function Projeto() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:from-background dark:via-background/40 dark:to-primary/25">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           {/* Header */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
@@ -225,8 +225,8 @@ export default function Projeto() {
                   <LayoutList className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">Visão Geral do Projeto</h1>
-                  <p className="text-base sm:text-lg text-slate-600 max-w-2xl">
+                  <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-2">Visão Geral do Projeto</h1>
+                  <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
                     Visualize todos os circuitos, módulos e vinculações do seu projeto.
                   </p>
                 </div>
@@ -253,7 +253,7 @@ export default function Projeto() {
               <Button
                 onClick={() => { fetchProjectData(); fetchKeypads(); }}
                 variant="outline"
-                className="group flex items-center justify-center gap-2 h-12 px-4 sm:px-6 rounded-full border-slate-200 text-slate-600 hover:text-slate-900 transition-all duration-300 text-sm sm:text-base"
+                className="group flex items-center justify-center gap-2 h-12 px-4 sm:px-6 rounded-full border-border text-muted-foreground hover:text-foreground transition-all duration-300 text-sm sm:text-base"
               >
                 <RefreshCcw className="h-4 w-4 group-hover:rotate-180 transition-transform duration-500" />
                 Recarregar
@@ -275,7 +275,7 @@ export default function Projeto() {
           {loading ? (
             <div className="flex flex-col justify-center items-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
-              <p className="text-slate-600 font-medium">Carregando dados do projeto...</p>
+              <p className="text-muted-foreground font-medium">Carregando dados do projeto...</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
@@ -285,48 +285,48 @@ export default function Projeto() {
                 animate={{ opacity: 1, y: 0 }} 
                 className="order-1 lg:order-1"
               >
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+                <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                   <CardHeader className="pb-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
                         <LayoutList className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-xl sm:text-2xl font-bold text-slate-900">Resumo de Circuitos</CardTitle>
-                        <p className="text-slate-600 text-sm sm:text-base mt-1">Visão geral dos circuitos cadastrados.</p>
+                        <CardTitle className="text-xl sm:text-2xl font-bold text-foreground">Resumo de Circuitos</CardTitle>
+                        <p className="text-muted-foreground text-sm sm:text-base mt-1">Visão geral dos circuitos cadastrados.</p>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                     <div className="flex flex-col items-center justify-center rounded-xl p-3 sm:p-4 bg-slate-50/50">
                       <Lightbulb className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-500 mb-2" />
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900">{stats.luz}</div>
-                      <div className="text-xs sm:text-sm text-slate-600">Luz</div>
+                      <div className="text-xl sm:text-2xl font-bold text-foreground">{stats.luz}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">Luz</div>
                     </div>
                     <div className="flex flex-col items-center justify-center rounded-xl p-3 sm:p-4 bg-slate-50/50">
                       <Blinds className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500 mb-2" />
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900">{stats.persiana}</div>
-                      <div className="text-xs sm:text-sm text-slate-600">Persiana</div>
+                      <div className="text-xl sm:text-2xl font-bold text-foreground">{stats.persiana}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">Persiana</div>
                     </div>
                     <div className="flex flex-col items-center justify-center rounded-xl p-3 sm:p-4 bg-slate-50/50">
                       <Snowflake className="h-6 w-6 sm:h-8 sm:w-8 text-green-500 mb-2" />
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900">{stats.hvac}</div>
-                      <div className="text-xs sm:text-sm text-slate-600">HVAC</div>
+                      <div className="text-xl sm:text-2xl font-bold text-foreground">{stats.hvac}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">HVAC</div>
                     </div>
                     <div className="flex flex-col items-center justify-center rounded-xl p-3 sm:p-4 bg-slate-50/50">
                       <KeySquare className="h-6 w-6 sm:h-8 sm:w-8 text-violet-600 mb-2" />
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900">{keypadCount}</div>
-                      <div className="text-xs sm:text-sm text-slate-600">Keypads</div>
+                      <div className="text-xl sm:text-2xl font-bold text-foreground">{keypadCount}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">Keypads</div>
                     </div>
                     <div className="flex flex-col items-center justify-center rounded-xl p-3 sm:p-4 bg-slate-50/50">
-                      <Cpu className="h-6 w-6 sm:h-8 sm:w-8 text-slate-500 mb-2" />
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900">{stats.modulos}</div>
-                      <div className="text-xs sm:text-sm text-slate-600">Módulos</div>
+                      <Cpu className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground/90 mb-2" />
+                      <div className="text-xl sm:text-2xl font-bold text-foreground">{stats.modulos}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">Módulos</div>
                     </div>
                     <div className="flex flex-col items-center justify-center rounded-xl p-3 sm:p-4 bg-slate-50/50">
                       <Film className="h-6 w-6 sm:h-8 sm:w-8 text-red-500 mb-2" />
-                      <div className="text-xl sm:text-2xl font-bold text-slate-900">{stats.cenas}</div>
-                      <div className="text-xs sm:text-sm text-slate-600">Cenas</div>
+                      <div className="text-xl sm:text-2xl font-bold text-foreground">{stats.cenas}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">Cenas</div>
                     </div>
                   </CardContent>
                 </Card>
@@ -339,26 +339,26 @@ export default function Projeto() {
                 transition={{ delay: 0.1 }}
                 className="order-2 lg:order-2"
               >
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+                <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                   <CardHeader className="pb-6">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
                         <FileOutput className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-xl sm:text-2xl font-bold text-slate-900">Árvore do Projeto</CardTitle>
-                        <p className="text-slate-600 text-sm sm:text-base mt-1">Estrutura completa do projeto.</p>
+                        <CardTitle className="text-xl sm:text-2xl font-bold text-foreground">Árvore do Projeto</CardTitle>
+                        <p className="text-muted-foreground text-sm sm:text-base mt-1">Estrutura completa do projeto.</p>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
                     {data.areas.length === 0 ? (
                       <div className="text-center py-8">
-                        <LayoutList className="h-10 w-10 sm:h-12 sm:w-12 text-slate-400 mx-auto mb-3" />
-                        <h4 className="text-lg font-semibold text-slate-900 mb-2">
+                        <LayoutList className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground/80 mx-auto mb-3" />
+                        <h4 className="text-lg font-semibold text-foreground mb-2">
                           Nenhuma área, ambiente ou circuito cadastrado.
                         </h4>
-                        <p className="text-slate-600 text-sm">
+                        <p className="text-muted-foreground text-sm">
                           Use as páginas "Áreas", "Ambientes" e "Circuitos" para começar a estruturar seu projeto.
                         </p>
                       </div>
@@ -366,7 +366,7 @@ export default function Projeto() {
                       <div className="space-y-4 sm:space-y-6 max-h-80 sm:max-h-96 overflow-y-auto pr-2">
                         {data.areas.map((area, index) => (
                           <motion.div key={area.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.1 }}>
-                            <h3 className="font-bold text-base sm:text-lg text-slate-800 flex items-center gap-2">
+                            <h3 className="font-bold text-base sm:text-lg text-foreground flex items-center gap-2">
                               {area.nome}
                             </h3>
                             <div className="ml-3 sm:ml-4 mt-2 space-y-3 sm:space-y-4">
@@ -381,26 +381,26 @@ export default function Projeto() {
                                 }, {} as Record<string, typeof ambiente.circuitos>);
 
                                 return (
-                                <div key={ambiente.id} className="border-l-2 border-slate-200 pl-3 sm:pl-4 relative before:content-[''] before:absolute before:left-0 before:top-3 before:w-3 sm:before:w-4 before:h-px before:bg-slate-200">
+                                <div key={ambiente.id} className="border-l-2 border-border pl-3 sm:pl-4 relative before:content-[''] before:absolute before:left-0 before:top-3 before:w-3 sm:before:w-4 before:h-px before:bg-slate-200">
                                   <h4 className="font-semibold text-slate-700 flex items-center gap-2 text-sm sm:text-base">
                                     {ambiente.nome}
                                   </h4>
                                   <div className="mt-2 sm:mt-3 space-y-3 sm:space-y-4">
                                     {ambiente.circuitos.length === 0 ? (
-                                      <p className="text-xs sm:text-sm text-slate-500 italic">Nenhum circuito neste ambiente.</p>
+                                      <p className="text-xs sm:text-sm text-muted-foreground/90 italic">Nenhum circuito neste ambiente.</p>
                                     ) : (
                                       Object.entries(groupedCircuits).map(([type, circuits]) => {
-                                        const config = circuitTypeConfig[type] || { icon: LayoutList, label: type.charAt(0).toUpperCase() + type.slice(1), color: "text-slate-500" };
+                                        const config = circuitTypeConfig[type] || { icon: LayoutList, label: type.charAt(0).toUpperCase() + type.slice(1), color: "text-muted-foreground/90" };
                                         const Icon = config.icon;
                                         return (
                                           <div key={type}>
-                                            <h5 className={`font-semibold text-slate-800 flex items-center gap-2 text-xs sm:text-sm`}>
+                                            <h5 className={`font-semibold text-foreground flex items-center gap-2 text-xs sm:text-sm`}>
                                               <Icon className={`h-3 w-3 sm:h-4 sm:w-4 ${config.color}`} />
                                               {config.label}
                                             </h5>
                                             <ul className="space-y-1 sm:space-y-2 mt-1 sm:mt-2 pl-4 sm:pl-6">
                                               {circuits.map((circuito) => (
-                                                <li key={circuito.id} className="text-xs sm:text-sm text-slate-600 flex items-center gap-2 flex-wrap">
+                                                <li key={circuito.id} className="text-xs sm:text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
                                                   <span className="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
                                                   <span className="font-medium">{circuito.identificador}</span>
                                                   <span>-</span>
@@ -428,7 +428,7 @@ export default function Projeto() {
                                       
                                       return (
                                         <div className="mt-3 sm:mt-4">
-                                          <h5 className="text-xs sm:text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2">
+                                          <h5 className="text-xs sm:text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
                                             <KeySquare className="h-3 w-3 sm:h-4 sm:w-4 text-violet-600" />
                                             Keypads
                                           </h5>
@@ -446,13 +446,13 @@ export default function Projeto() {
                                                 statusClass = "bg-green-100 text-green-700";
                                               }
                                               return (
-                                                <li key={k.id} className="text-xs sm:text-sm text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                                                <li key={k.id} className="text-xs sm:text-sm text-muted-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
                                                   <div className="flex items-center gap-2 flex-wrap">
                                                     <span className="h-2 w-2 rounded-full bg-violet-400"></span>
-                                                    <span className="font-medium text-slate-800">{k.nome}</span>
-                                                    <span className="text-xs text-slate-500">HSNET {k.hsnet}</span>
-                                                    <span className="text-xs text-slate-500">• {total} tecla(s)</span>
-                                                    <span className="text-xs text-slate-500 flex items-center gap-1">
+                                                    <span className="font-medium text-foreground">{k.nome}</span>
+                                                    <span className="text-xs text-muted-foreground/90">HSNET {k.hsnet}</span>
+                                                    <span className="text-xs text-muted-foreground/90">• {total} tecla(s)</span>
+                                                    <span className="text-xs text-muted-foreground/90 flex items-center gap-1">
                                                       <Link2 className="h-3 w-3" /> {linked}/{total} vinculadas
                                                     </span>
                                                   </div>
@@ -495,7 +495,7 @@ export default function Projeto() {
                   initial={{ y: -50, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   exit={{ y: -50, opacity: 0 }}
-                  className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+                  className="bg-card rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
                 >
                   <div className="p-4 sm:p-6 md:p-8">
                     <h3 className="text-xl sm:text-2xl font-bold mb-4">Gerar Arquivo de Configuração (.rwp)</h3>

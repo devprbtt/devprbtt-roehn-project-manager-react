@@ -26,10 +26,10 @@ const ProjectGrid: React.FC<Props> = ({
   if (isLoading) {
     return (
       <div className="mb-12">
-        <h3 className="text-2xl font-bold text-slate-900 mb-6">Seus Projetos</h3>
+        <h3 className="text-2xl font-bold text-foreground mb-6">Seus Projetos</h3>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {Array(6).fill(0).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl p-6 shadow-sm">
+            <div key={i} className="bg-card border border-border rounded-2xl p-6 shadow-sm">
               <Skeleton className="h-6 w-3/4 mb-3" />
               <Skeleton className="h-4 w-full mb-2" />
               <Skeleton className="h-4 w-2/3 mb-4" />
@@ -46,18 +46,18 @@ const ProjectGrid: React.FC<Props> = ({
 
   return (
     <div className="mb-12">
-      <h3 className="text-2xl font-bold text-slate-900 mb-6">Seus Projetos</h3>
+      <h3 className="text-2xl font-bold text-foreground mb-6">Seus Projetos</h3>
       {projects.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center py-16"
         >
-          <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <span className="text-3xl text-slate-400">📁</span>
+          <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+            <span className="text-3xl text-muted-foreground">📁</span>
           </div>
-          <h4 className="text-xl font-semibold text-slate-900 mb-2">Nenhum projeto encontrado</h4>
-          <p className="text-slate-600 max-w-md mx-auto">
+          <h4 className="text-xl font-semibold text-foreground mb-2">Nenhum projeto encontrado</h4>
+          <p className="text-muted-foreground max-w-md mx-auto">
             Comece criando seu primeiro projeto. Clique no botão "Novo Projeto" para começar.
           </p>
         </motion.div>

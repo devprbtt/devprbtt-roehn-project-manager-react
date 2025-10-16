@@ -294,7 +294,7 @@ export default function QuadrosEletricos() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:from-background dark:via-background/40 dark:to-primary/25">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
             <div>
@@ -303,10 +303,10 @@ export default function QuadrosEletricos() {
                   <CircuitBoard className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-slate-900 mb-2">
+                  <h1 className="text-4xl font-bold text-foreground mb-2">
                     Gerenciar Quadros Elétricos
                   </h1>
-                  <p className="text-lg text-slate-600 max-w-2xl">
+                  <p className="text-lg text-muted-foreground max-w-2xl">
                     Adicione ou edite quadros elétricos para organizar seus
                     módulos.
                   </p>
@@ -338,17 +338,17 @@ export default function QuadrosEletricos() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-6">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
                       <FolderPlus className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-2xl font-bold text-slate-900">
+                      <CardTitle className="text-2xl font-bold text-foreground">
                         Adicionar Novo Quadro
                       </CardTitle>
-                      <p className="text-slate-600 mt-1">
+                      <p className="text-muted-foreground mt-1">
                         Preencha as informações do quadro elétrico
                       </p>
                     </div>
@@ -370,7 +370,7 @@ export default function QuadrosEletricos() {
                         onChange={(e) => setNome(e.target.value)}
                         required
                         disabled={isLocked || loading || ambientes.length === 0}
-                        className="h-12 px-4 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                        className="h-12 px-4 rounded-xl border-border focus:border-blue-500 focus:ring-blue-500/20"
                       />
                     </div>
 
@@ -383,7 +383,7 @@ export default function QuadrosEletricos() {
                       </Label>
                       <select
                         id="ambienteId"
-                        className="h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        className="h-12 w-full px-4 rounded-xl border border-border bg-background focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                         value={ambienteId as any}
                         onChange={(e) => setAmbienteId(Number(e.target.value))}
                         required
@@ -420,7 +420,7 @@ export default function QuadrosEletricos() {
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         disabled={isLocked || loading || ambientes.length === 0}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
+                        className="w-full px-4 py-3 rounded-xl border border-border bg-background focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none"
                         rows={3}
                       />
                     </div>
@@ -443,7 +443,7 @@ export default function QuadrosEletricos() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -451,10 +451,10 @@ export default function QuadrosEletricos() {
                         <CircuitBoard className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-2xl font-bold text-slate-900">
+                        <CardTitle className="text-2xl font-bold text-foreground">
                           Quadros Cadastrados
                         </CardTitle>
-                        <p className="text-slate-600 mt-1">
+                        <p className="text-muted-foreground mt-1">
                           Lista de todos os quadros elétricos
                         </p>
                       </div>
@@ -469,7 +469,7 @@ export default function QuadrosEletricos() {
                   {loading ? (
                     <div className="flex flex-col justify-center items-center py-12">
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
-                      <p className="text-slate-600 font-medium">
+                      <p className="text-muted-foreground font-medium">
                         Carregando quadros elétricos...
                       </p>
                     </div>
@@ -479,15 +479,15 @@ export default function QuadrosEletricos() {
                       animate={{ opacity: 1, y: 0 }}
                       className="text-center py-12"
                     >
-                      <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Cpu className="h-10 w-10 text-slate-400" />
+                      <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Cpu className="h-10 w-10 text-muted-foreground/80" />
                       </div>
-                      <h4 className="text-xl font-semibold text-slate-900 mb-2">
+                      <h4 className="text-xl font-semibold text-foreground mb-2">
                         {projetoSelecionado
                           ? "Nenhum quadro elétrico cadastrado"
                           : "Selecione um projeto"}
                       </h4>
-                      <p className="text-slate-600 max-w-sm mx-auto">
+                      <p className="text-muted-foreground max-w-sm mx-auto">
                         {projetoSelecionado
                           ? "Comece adicionando seu primeiro quadro elétrico usando o formulário ao lado."
                           : "Selecione um projeto para visualizar e gerenciar os quadros elétricos."}
@@ -503,12 +503,12 @@ export default function QuadrosEletricos() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ delay: index * 0.05 }}
-                            className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
+                            className="group relative overflow-hidden rounded-2xl border border-border bg-card/85 backdrop-blur-sm p-4 hover:bg-card/90 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300"
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1 mr-4">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <h4 className="font-bold text-slate-900 text-lg">
+                                  <h4 className="font-bold text-foreground text-lg">
                                     {quadro.nome}
                                   </h4>
                                   <Badge
@@ -523,14 +523,14 @@ export default function QuadrosEletricos() {
                                 </div>
 
                                 <div className="space-y-1">
-                                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                                    <Building2 className="h-4 w-4 text-slate-400" />
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Building2 className="h-4 w-4 text-muted-foreground/80" />
                                     <span className="font-medium">
                                       Ambiente: {quadro.ambiente.nome}
                                     </span>
                                   </div>
-                                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                                    <Wrench className="h-4 w-4 text-slate-400" />
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Wrench className="h-4 w-4 text-muted-foreground/80" />
                                     <span className="font-medium">
                                       Área:{" "}
                                       {quadro.ambiente.area?.nome || "—"}
@@ -540,7 +540,7 @@ export default function QuadrosEletricos() {
 
                                 {quadro.notes && (
                                   <div className="mt-2">
-                                    <p className="text-sm text-slate-500 italic">
+                                    <p className="text-sm text-muted-foreground/90 italic">
                                       {quadro.notes}
                                     </p>
                                   </div>

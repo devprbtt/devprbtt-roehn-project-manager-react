@@ -150,8 +150,8 @@ const CustomActionsArray = ({ actionIndex, control, getValues, projectCircuits, 
     if (!targetAmbienteId) return null;
 
     return (
-      <div className="mt-4 space-y-3 p-3 bg-slate-100 rounded-lg">
-        <h4 className="text-sm font-semibold text-slate-600">Configurações Individuais do Grupo</h4>
+      <div className="mt-4 space-y-3 p-3 bg-muted rounded-lg">
+        <h4 className="text-sm font-semibold text-muted-foreground">Configurações Individuais do Grupo</h4>
         {fields.map((field, customIndex) => {
           const customAction = getValues(`acoes.${actionIndex}.custom_acoes.${customIndex}`);
           const circuit = projectCircuits.find(c => String(c.id) === customAction.target_guid);
@@ -463,17 +463,17 @@ export const SceneForm = ({
   };
 
   return (
-    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5 w-full">
+    <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20 w-full">
         <CardHeader className="pb-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
               <FolderPlus className="w-6 h-6 text-white" />
             </div>
             <div>
-              <CardTitle className="text-2xl font-bold text-slate-900">
+              <CardTitle className="text-2xl font-bold text-foreground">
                 {isEditing ? "Editar Cena" : "Adicionar Nova Cena"}
               </CardTitle>
-              <p className="text-slate-600 mt-1">
+              <p className="text-muted-foreground mt-1">
                 {isEditing ? `Editando "${scene?.nome}"` : "Preencha as informações da nova cena"}
               </p>
             </div>

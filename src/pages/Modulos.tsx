@@ -263,7 +263,7 @@ export default function Modulos() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:from-background dark:via-background/40 dark:to-primary/25">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
             <div>
@@ -272,8 +272,8 @@ export default function Modulos() {
                   <Boxes className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold text-slate-900 mb-2">Gerenciar Módulos</h1>
-                  <p className="text-lg text-slate-600 max-w-2xl">
+                  <h1 className="text-4xl font-bold text-foreground mb-2">Gerenciar Módulos</h1>
+                  <p className="text-lg text-muted-foreground max-w-2xl">
                     Cadastre os módulos de automação e associe a quadros elétricos.
                   </p>
                 </div>
@@ -295,21 +295,21 @@ export default function Modulos() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-6">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
                       <PlusCircle className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-2xl font-bold text-slate-900">Adicionar Novo Módulo</CardTitle>
-                      <p className="text-slate-600 mt-1">Preencha as informações do módulo físico</p>
+                      <CardTitle className="text-2xl font-bold text-foreground">Adicionar Novo Módulo</CardTitle>
+                      <p className="text-muted-foreground mt-1">Preencha as informações do módulo físico</p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   {loadingMeta ? (
-                    <div className="flex items-center justify-center py-8 text-slate-600">
+                    <div className="flex items-center justify-center py-8 text-muted-foreground">
                       <div className="animate-spin rounded-full h-8 w-8 border-4 border-purple-500 border-t-transparent mr-4"></div>
                       Carregando metadados...
                     </div>
@@ -319,7 +319,7 @@ export default function Modulos() {
                         <Label htmlFor="tipo" className="text-sm font-semibold text-slate-700">Tipo *</Label>
                         <select
                           id="tipo"
-                          className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                          className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                           value={tipo}
                           onChange={(e) => setTipo(e.target.value)}
                           required
@@ -333,7 +333,7 @@ export default function Modulos() {
                           ))}
                         </select>
                         {!!tipo && meta[tipo] && (
-                          <p className="text-xs text-slate-500 mt-1">
+                          <p className="text-xs text-muted-foreground/90 mt-1">
                             Canais: {meta[tipo].canais} • Tipos permitidos: {meta[tipo].tipos_permitidos.join(", ")}
                           </p>
                         )}
@@ -348,7 +348,7 @@ export default function Modulos() {
                           placeholder={tipo && meta[tipo]?.nome_completo ? meta[tipo].nome_completo : ""}
                           required
                           disabled={isLocked}
-                          className="mt-2 h-12 px-4 rounded-xl border-slate-200 focus:border-purple-500 focus:ring-purple-500/20"
+                          className="mt-2 h-12 px-4 rounded-xl border-border focus:border-purple-500 focus:ring-purple-500/20"
                         />
                       </div>
 
@@ -356,7 +356,7 @@ export default function Modulos() {
                         <Label htmlFor="quadroEletrico" className="text-sm font-semibold text-slate-700">Quadro Elétrico (Opcional)</Label>
                         <select
                           id="quadroEletrico"
-                          className="mt-2 h-12 w-full px-4 rounded-xl border border-slate-200 bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                          className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                           value={quadroEletricoId}
                           onChange={(e) => setQuadroEletricoId(Number(e.target.value))}
                           disabled={isLocked || loadingQuadros}
@@ -369,7 +369,7 @@ export default function Modulos() {
                           ))}
                         </select>
                         {loadingQuadros && (
-                          <p className="text-xs text-slate-500 mt-1">Carregando quadros...</p>
+                          <p className="text-xs text-muted-foreground/90 mt-1">Carregando quadros...</p>
                         )}
                       </div>
 
@@ -384,7 +384,7 @@ export default function Modulos() {
             </motion.div>
 
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -392,8 +392,8 @@ export default function Modulos() {
                         <Boxes className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-2xl font-bold text-slate-900">Módulos Cadastrados</CardTitle>
-                        <p className="text-slate-600 mt-1">Lista de todos os módulos do projeto</p>
+                        <CardTitle className="text-2xl font-bold text-foreground">Módulos Cadastrados</CardTitle>
+                        <p className="text-muted-foreground mt-1">Lista de todos os módulos do projeto</p>
                       </div>
                     </div>
                     <Badge className="bg-gradient-to-r from-purple-500 to-violet-500 text-white text-sm font-medium px-3 py-1">
@@ -405,7 +405,7 @@ export default function Modulos() {
                   {loading ? (
                     <div className="flex flex-col justify-center items-center py-12">
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-4"></div>
-                      <p className="text-slate-600 font-medium">Carregando módulos...</p>
+                      <p className="text-muted-foreground font-medium">Carregando módulos...</p>
                     </div>
                   ) : modulos.length === 0 ? (
                     <motion.div
@@ -413,13 +413,13 @@ export default function Modulos() {
                       animate={{ opacity: 1, y: 0 }}
                       className="text-center py-12"
                     >
-                      <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Boxes className="h-10 w-10 text-slate-400" />
+                      <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Boxes className="h-10 w-10 text-muted-foreground/80" />
                       </div>
-                      <h4 className="text-xl font-semibold text-slate-900 mb-2">
+                      <h4 className="text-xl font-semibold text-foreground mb-2">
                         {projetoSelecionado === true ? "Nenhum módulo cadastrado" : "Selecione um projeto"}
                       </h4>
-                      <p className="text-slate-600 max-w-sm mx-auto">
+                      <p className="text-muted-foreground max-w-sm mx-auto">
                         {projetoSelecionado === true
                           ? "Comece adicionando seu primeiro módulo usando o formulário ao lado."
                           : "Selecione um projeto para visualizar e gerenciar os módulos."}
@@ -435,11 +435,11 @@ export default function Modulos() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ delay: index * 0.05 }}
-                            className="group relative overflow-hidden rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur-sm p-4 hover:bg-white/80 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300 flex items-center justify-between"
+                            className="group relative overflow-hidden rounded-2xl border border-border bg-card/85 backdrop-blur-sm p-4 hover:bg-card/90 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300 flex items-center justify-between"
                           >
                             <div className="flex-1 mr-4">
                               <div className="flex items-center gap-3 mb-2">
-                                <span className="text-sm font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+                                <span className="text-sm font-mono text-muted-foreground/90 bg-muted px-2 py-1 rounded-lg">
                                   {m.tipo}
                                 </span>
                                 {m.quadro_eletrico && (
@@ -449,9 +449,9 @@ export default function Modulos() {
                                   </Badge>
                                 )}
                               </div>
-                              <h4 className="font-bold text-slate-900 text-lg mb-1">{m.nome}</h4>
-                              <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
-                                <Server className="h-4 w-4 text-slate-400" />
+                              <h4 className="font-bold text-foreground text-lg mb-1">{m.nome}</h4>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                                <Server className="h-4 w-4 text-muted-foreground/80" />
                                 <span className="font-medium">Canais: {m.quantidade_canais}</span>
                               </div>
                               {m.vinc_count && m.vinc_count > 0 && (

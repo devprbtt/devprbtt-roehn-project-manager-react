@@ -40,7 +40,7 @@ const CreateProjectForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
       animate={{ opacity: 1, y: 0 }}
       className="mb-8"
     >
-      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl shadow-slate-900/5">
+      <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
         <CardHeader className="pb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -48,15 +48,15 @@ const CreateProjectForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
                 <FolderPlus className="w-6 h-6 text-white" />
               </div>
               <div>
-                <CardTitle className="text-2xl font-bold text-slate-900">Criar Novo Projeto</CardTitle>
-                <p className="text-slate-600 mt-1">Preencha as informações do seu projeto</p>
+                <CardTitle className="text-2xl font-bold text-foreground">Criar Novo Projeto</CardTitle>
+                <p className="text-muted-foreground mt-1">Preencha as informações do seu projeto</p>
               </div>
             </div>
             <Button
               variant="ghost"
               size="icon"
               onClick={onCancel}
-              className="rounded-full hover:bg-slate-100"
+              className="rounded-full hover:bg-muted"
               type="button"
             >
               <X className="w-5 h-5" />
@@ -76,7 +76,7 @@ const CreateProjectForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
                   placeholder="Digite o nome do projeto..."
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="h-12 px-4 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  className="h-12 px-4 rounded-xl border-border focus:border-blue-500 focus:ring-blue-500/20"
                   required
                 />
               </div>
@@ -89,7 +89,7 @@ const CreateProjectForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
                   value={formData.status} 
                   onValueChange={(value: "active" | "inactive" | "completed") => setFormData({ ...formData, status: value })}
                 >
-                  <SelectTrigger className="h-12 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20">
+                  <SelectTrigger className="h-12 rounded-xl border-border focus:border-blue-500 focus:ring-blue-500/20">
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -110,7 +110,7 @@ const CreateProjectForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
                 placeholder="Descreva o projeto (opcional)..."
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="min-h-[100px] px-4 py-3 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500/20 resize-none"
+                className="min-h-[100px] px-4 py-3 rounded-xl border-border focus:border-blue-500 focus:ring-blue-500/20 resize-none"
               />
             </div>
             
@@ -119,7 +119,7 @@ const CreateProjectForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
                 type="button"
                 variant="outline"
                 onClick={onCancel}
-                className="flex-1 h-12 rounded-xl border-slate-200 hover:bg-slate-50"
+                className="flex-1 h-12 rounded-xl border-border hover:bg-muted"
               >
                 Cancelar
               </Button>

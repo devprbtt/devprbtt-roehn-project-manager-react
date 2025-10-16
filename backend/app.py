@@ -2273,7 +2273,7 @@ def exportar_projeto(projeto_id):
 
     # Estrutura de dados para exportação
     export_data = {
-        'version': '1.0',
+        'version': '1.1',
         'exported_at': datetime.utcnow().isoformat(),
         'projeto': {},
         'areas': [],
@@ -2364,6 +2364,8 @@ def exportar_projeto(projeto_id):
                     'dev_id': keypad.dev_id,
                     'ambiente_id': keypad.ambiente_id,
                     'notes': keypad.notes,
+                    'created_at': keypad.created_at.isoformat() if getattr(keypad, "created_at", None) else None,
+                    'updated_at': keypad.updated_at.isoformat() if getattr(keypad, "updated_at", None) else None,
                 })
                 for button in keypad.buttons:
                     export_data['keypad_buttons'].append({
@@ -2381,6 +2383,12 @@ def exportar_projeto(projeto_id):
                         'command_double_press': button.command_double_press,
                         'target_object_guid': button.target_object_guid,
                         'notes': button.notes,
+                        'engraver_text': button.engraver_text,
+                        'icon': button.icon,
+                        'rocker_style': button.rocker_style,
+                        'is_rocker': button.is_rocker,
+                        'created_at': button.created_at.isoformat() if getattr(button, "created_at", None) else None,
+                        'updated_at': button.updated_at.isoformat() if getattr(button, "updated_at", None) else None,
                     })
 
             # Cenas
@@ -2614,6 +2622,17 @@ def importar_projeto():
                 except (ValueError, TypeError):
                     return None
 
+            def remap_numeric_guid(value, mapping):
+                if value is None:
+                    return None
+                value_str = str(value).strip()
+                try:
+                    original_id = int(value_str)
+                except (ValueError, TypeError):
+                    return value_str
+                mapped_id = mapping.get(original_id)
+                return str(mapped_id) if mapped_id is not None else value_str
+
             projeto_data = data['projeto']
             novo_projeto = Projeto(
                 nome=novo_nome,
@@ -2707,6 +2726,8 @@ def importar_projeto():
             for keypad_data in data.get('keypads', []):
                 novo_ambiente_id = id_map['ambientes'].get(keypad_data['ambiente_id'])
                 if not novo_ambiente_id: continue
+                created_at = parse_iso_date(keypad_data.get('created_at'))
+                updated_at = parse_iso_date(keypad_data.get('updated_at'))
                 novo_keypad = Keypad(
                     nome=keypad_data['nome'],
                     modelo=keypad_data.get('modelo', 'RQR-K'),
@@ -2719,6 +2740,10 @@ def importar_projeto():
                     ambiente_id=novo_ambiente_id,
                     projeto_id=novo_projeto.id
                 )
+                if created_at:
+                    novo_keypad.created_at = created_at
+                if updated_at:
+                    novo_keypad.updated_at = updated_at
                 db.session.add(novo_keypad)
                 db.session.flush()
                 id_map['keypads'][keypad_data['id']] = novo_keypad.id
@@ -2728,10 +2753,25 @@ def importar_projeto():
                 novo_circuito_id = id_map['circuitos'].get(btn_data['circuito_id'])
                 # Cenas ainda não foram mapeadas, faremos isso depois
                 if not novo_keypad_id: continue
+                created_at = parse_iso_date(btn_data.get('created_at'))
+                updated_at = parse_iso_date(btn_data.get('updated_at'))
+                is_rocker_value = btn_data.get('is_rocker', False)
+                if isinstance(is_rocker_value, str):
+                    is_rocker = is_rocker_value.lower() in ("true", "1", "yes", "y")
+                else:
+                    is_rocker = bool(is_rocker_value)
+                original_target_object = btn_data.get('target_object_guid')
+                mapped_target_object = remap_numeric_guid(original_target_object, id_map['circuitos'])
+                if mapped_target_object is None:
+                    mapped_target_object = original_target_object or "00000000-0000-0000-0000-000000000000"
                 novo_btn = KeypadButton(
                     keypad_id=novo_keypad_id,
                     ordem=btn_data['ordem'],
                     guid=btn_data.get('guid', str(uuid.uuid4())),
+                    engraver_text=btn_data.get('engraver_text'),
+                    icon=btn_data.get('icon'),
+                    rocker_style=btn_data.get('rocker_style'),
+                    is_rocker=is_rocker,
                     circuito_id=novo_circuito_id,
                     # cena_id será atualizado depois
                     modo=btn_data.get('modo', 3),
@@ -2740,9 +2780,13 @@ def importar_projeto():
                     can_hold=btn_data.get('can_hold', False),
                     modo_double_press=btn_data.get('modo_double_press', 3),
                     command_double_press=btn_data.get('command_double_press', 0),
-                    target_object_guid=btn_data.get('target_object_guid'),
+                    target_object_guid=mapped_target_object,
                     notes=btn_data.get('notes')
                 )
+                if created_at:
+                    novo_btn.created_at = created_at
+                if updated_at:
+                    novo_btn.updated_at = updated_at
                 db.session.add(novo_btn)
             
             # 9. Criar Cenas, Ações e CustomAcoes
@@ -2762,11 +2806,19 @@ def importar_projeto():
             for acao_data in data.get('acoes', []):
                 nova_cena_id = id_map['cenas'].get(acao_data['cena_id'])
                 if not nova_cena_id: continue
+                action_type = acao_data.get('action_type', 0)
+                old_target = acao_data.get('target_guid')
+                if action_type == 0:
+                    new_target = remap_numeric_guid(old_target, id_map['circuitos'])
+                elif action_type == 7:
+                    new_target = remap_numeric_guid(old_target, id_map['ambientes'])
+                else:
+                    new_target = old_target
                 nova_acao = Acao(
                     cena_id=nova_cena_id,
                     level=acao_data.get('level', 100),
                     action_type=acao_data.get('action_type', 0),
-                    target_guid=acao_data['target_guid'] # Mantemos o GUID por enquanto
+                    target_guid=new_target
                 )
                 db.session.add(nova_acao)
                 db.session.flush()
@@ -2775,9 +2827,10 @@ def importar_projeto():
             for custom_acao_data in data.get('custom_acoes', []):
                 nova_acao_id = id_map['acoes'].get(custom_acao_data['acao_id'])
                 if not nova_acao_id: continue
+                custom_target = remap_numeric_guid(custom_acao_data.get('target_guid'), id_map['circuitos'])
                 nova_custom_acao = CustomAcao(
                     acao_id=nova_acao_id,
-                    target_guid=custom_acao_data['target_guid'],
+                    target_guid=custom_target,
                     enable=custom_acao_data.get('enable', True),
                     level=custom_acao_data.get('level', 50)
                 )

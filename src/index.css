@@ -116,4 +116,48 @@
   * {
     transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
   }
+
+  /* Dark mode fallbacks for common utility colors */
+  .dark .bg-white,
+  .dark .bg-slate-50,
+  .dark .bg-slate-100 {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  .dark [class*="bg-white/"] {
+    background-color: hsl(var(--card) / 0.85) !important;
+  }
+
+  .dark [class*="bg-slate-50"],
+  .dark [class*="bg-slate-100"],
+  .dark [class*="bg-slate-200"] {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  .dark [class*="bg-slate-50/"],
+  .dark [class*="bg-slate-100/"],
+  .dark [class*="bg-slate-200/"] {
+    background-color: hsl(var(--muted) / 0.85) !important;
+  }
+
+  .dark .bg-slate-900 {
+    background-color: hsl(var(--primary)) !important;
+  }
+
+  .dark .text-slate-900,
+  .dark .text-slate-800 {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark .text-slate-600,
+  .dark .text-slate-500,
+  .dark .text-slate-400 {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .dark .border-slate-200,
+  .dark .border-slate-200\/60,
+  .dark .border-slate-300 {
+    border-color: hsl(var(--border)) !important;
+  }
 }

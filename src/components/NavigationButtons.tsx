@@ -17,7 +17,7 @@ export default function NavigationButtons({ previousPath, nextPath }: Navigation
           <Button
             variant="outline"
             onClick={() => navigate(previousPath)}
-            className="h-11 px-6 rounded-xl bg-white/80 backdrop-blur-sm border-slate-200/80 shadow-lg shadow-slate-900/5 hover:bg-white"
+            className="h-11 px-6 rounded-xl bg-card/90 backdrop-blur-sm border border-border shadow-lg shadow-primary/10 hover:bg-card"
           >
             <ChevronLeft className="h-5 w-5 mr-2" />
             Anterior

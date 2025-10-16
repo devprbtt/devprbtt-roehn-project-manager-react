@@ -95,22 +95,22 @@ const ImportProjectSection: React.FC<Props> = ({ onProjectImported }) => {
       animate={{ opacity: 1, y: 0 }}
       className="mb-12"
     >
-      <Card className="bg-white/60 backdrop-blur-sm border-slate-200/60 shadow-lg shadow-slate-900/5">
+      <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-lg shadow-primary/5 dark:bg-card/90 dark:shadow-primary/20">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <Upload className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-700/30">
+              <Upload className="w-5 h-5 text-purple-50" />
             </div>
             <div>
-              <CardTitle className="text-xl font-bold text-slate-900">Importar Projeto</CardTitle>
-              <p className="text-slate-600 text-sm mt-1">Restaure um projeto a partir de um arquivo exportado</p>
+              <CardTitle className="text-xl font-bold text-foreground">Importar Projeto</CardTitle>
+              <p className="text-muted-foreground text-sm mt-1">Restaure um projeto a partir de um arquivo exportado</p>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Alert className="bg-amber-50 border-amber-200">
-            <Info className="h-4 w-4 text-amber-600" />
-            <AlertDescription className="text-amber-800">
+          <Alert className="bg-amber-500/10 border border-amber-400/40 text-amber-100 dark:text-amber-50">
+            <Info className="h-4 w-4 text-amber-400" />
+            <AlertDescription className="text-amber-900 dark:text-amber-100">
               <strong>Importante:</strong> Use apenas arquivos JSON exportados pelo sistema.
               Arquivos CSV são para documentação e não podem ser importados.
             </AlertDescription>
@@ -119,7 +119,7 @@ const ImportProjectSection: React.FC<Props> = ({ onProjectImported }) => {
           <div 
             className={`
               p-4 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all duration-300
-              ${isDragOver ? 'border-purple-500 bg-purple-50' : 'border-slate-300 hover:border-purple-400'}
+              ${isDragOver ? 'border-purple-500 bg-purple-500/10' : 'border-border hover:border-purple-400 dark:hover:border-purple-300'}
             `}
             onClick={() => fileInputRef.current?.click()}
             onDragOver={onDragOver}
@@ -138,8 +138,8 @@ const ImportProjectSection: React.FC<Props> = ({ onProjectImported }) => {
                 <div className="flex items-center gap-3">
                   <FileJson className="w-8 h-8 text-purple-600" />
                   <div>
-                    <p className="font-semibold text-slate-800">{importFile.name}</p>
-                    <p className="text-xs text-slate-500">{(importFile.size / 1024).toFixed(2)} KB</p>
+                    <p className="font-semibold text-foreground">{importFile.name}</p>
+                    <p className="text-xs text-muted-foreground">{(importFile.size / 1024).toFixed(2)} KB</p>
                   </div>
                 </div>
                 <Button 
@@ -152,10 +152,10 @@ const ImportProjectSection: React.FC<Props> = ({ onProjectImported }) => {
                 </Button>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-2 text-slate-600">
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <Upload className="w-8 h-8" />
                 <p className="font-semibold">Clique para selecionar ou arraste o arquivo</p>
-                <p className="text-sm text-slate-500">Apenas arquivos .json são permitidos</p>
+                <p className="text-sm text-muted-foreground/80">Apenas arquivos .json são permitidos</p>
               </div>
             )}
           </div>

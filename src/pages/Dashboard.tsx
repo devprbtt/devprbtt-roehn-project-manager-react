@@ -292,8 +292,8 @@ const Dashboard: React.FC = () => {
     return (
       <Layout>
         <div className="min-h-[60vh] grid place-items-center">
-          <div className="flex items-center gap-3 text-slate-600">
-            <span className="animate-spin inline-block h-5 w-5 rounded-full border-2 border-slate-300 border-t-slate-600" />
+          <div className="flex items-center gap-3 text-muted-foreground">
+            <span className="animate-spin inline-block h-5 w-5 rounded-full border-2 border-border border-t-slate-600" />
             Verificando sessão...
           </div>
         </div>
@@ -310,10 +310,10 @@ const Dashboard: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-10">
           <div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-2">
+            <h1 className="text-4xl font-bold text-foreground mb-2">
               Gerenciador de Projetos
             </h1>
-            <p className="text-lg text-slate-600 max-w-2xl">
+            <p className="text-lg text-muted-foreground max-w-2xl">
               Gerencie seus projetos com automação ROEHN. Cadastre ambientes, areas, circuitos e módulos e gere um relatório completo.
             </p>
           </div>
@@ -342,7 +342,7 @@ const Dashboard: React.FC = () => {
             </label>
             <button
               onClick={() => setShowCreateForm(true)}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3"
+              className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-3"
             >
               <Plus className="w-5 h-5" />
               Novo Projeto
@@ -362,27 +362,27 @@ const Dashboard: React.FC = () => {
         )}
 
         {/* Search and Filter Bar */}
-        <div className="mb-8 bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+        <div className="mb-8 bg-card rounded-2xl p-6 shadow-sm border border-border">
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search Input */}
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
               <input
                 type="text"
                 placeholder="Buscar projetos por nome..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-3 border border-border bg-background/80 text-foreground rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-transparent"
               />
             </div>
             
             {/* Status Filter */}
             <div className="flex gap-2 items-center">
-              <Filter className="text-slate-400 w-5 h-5" />
+              <Filter className="text-muted-foreground w-5 h-5" />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | "TODOS")}
-                className="px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="px-4 py-3 border border-border bg-background/80 text-foreground rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-transparent"
               >
                 <option value="TODOS">Todos os status</option>
                 <option value="ATIVO">Ativo</option>
@@ -393,7 +393,7 @@ const Dashboard: React.FC = () => {
           </div>
           
           {/* Results Counter */}
-          <div className="mt-4 text-sm text-slate-600">
+          <div className="mt-4 text-sm text-muted-foreground">
             {filteredProjects.length} de {projects.length} projetos encontrados
             {searchTerm && (
               <span> para "{searchTerm}"</span>
