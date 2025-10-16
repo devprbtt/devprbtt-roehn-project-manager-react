@@ -369,8 +369,19 @@ class RoehnProjectConverter:
                             if not success:
                                 print(f"⚠️  Aviso: Não foi possível adicionar o módulo {modulo_nome} ao quadro específico")
 
-        # Reposicionar o módulo M4 no quadro selecionado, se necessário
-        self._move_m4_to_selected_board()
+        # Encontrar o controlador no projeto
+        controller_module_db = self.db_session.query(Modulo).filter_by(projeto_id=projeto.id, is_controller=True).first()
+        if controller_module_db:
+            controller_info = {
+                'm4_ip': controller_module_db.ip_address,
+                'm4_hsnet': controller_module_db.hsnet,
+                'm4_devid': controller_module_db.dev_id,
+            }
+            m4_module = self._create_controller_module(controller_module_db.tipo, controller_info)
+
+            # Substituir o M4 padrão pelo controlador do projeto
+            self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"][0] = m4_module
+
 
         # Processar módulos que não estão em quadros específicos (ficam no quadro padrão)
         for modulo in projeto.modulos:
@@ -525,7 +536,7 @@ class RoehnProjectConverter:
                             guid = module.get("Guid")
                             if guid and guid != self.zero_guid:
                                 # Não incluir o próprio M4
-                                if module.get("Name") != "AQL-GV-M4":
+                                if not module.get("Logicserver", False):
                                     all_module_guids.add(guid)
             
             # Atualizar o ACNET
@@ -596,8 +607,7 @@ class RoehnProjectConverter:
         
         # No método create_project, substitua a definição do m4_module por:
 
-        controlador = project_info.get('controlador', 'AQL-GV-M4')
-        m4_module = self._create_controller_module(controlador, project_info)
+        m4_module = self._create_controller_module("AQL-GV-M4", project_info)
 
         # SpecialActions padrão
         def default_special_actions():

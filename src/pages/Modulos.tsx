@@ -73,7 +73,23 @@ export default function Modulos() {
   const [editingModulo, setEditingModulo] = useState<Modulo | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // controller state
+  const [controller, setController] = useState<Modulo | null>(null);
+  const [controllerType, setControllerType] = useState<string>("");
+  const [controllerName, setControllerName] = useState("");
+  const [controllerIp, setControllerIp] = useState("");
+
   const tipoOptions = useMemo(() => Object.keys(meta), [meta]);
+  const regularModules = useMemo(() => modulos.filter(m => !m.is_controller), [modulos]);
+
+  useEffect(() => {
+    const foundController = modulos.find(m => m.is_controller);
+    setController(foundController || null);
+    if (foundController) {
+      setControllerName(foundController.nome);
+      setControllerIp(foundController.ip_address || "");
+    }
+  }, [modulos]);
 
   // Mantém em sincronia com o store quando ele hidratar
   useEffect(() => {
@@ -178,6 +194,60 @@ export default function Modulos() {
         toast({ title: "Sucesso!", description: "Módulo adicionado." });
       } else {
         toast({ variant: "destructive", title: "Erro", description: data?.error || data?.message || "Falha ao adicionar módulo." });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao se conectar ao servidor." });
+    }
+  }
+
+  async function handleCreateController(e: React.FormEvent) {
+    e.preventDefault();
+    if (!controllerType || !controllerName.trim() || !controllerIp.trim()) {
+      toast({ variant: "destructive", title: "Erro", description: "Preencha todos os campos do controlador." });
+      return;
+    }
+    try {
+      const res = await fetch("/api/modulos", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          tipo: controllerType,
+          nome: controllerName.trim(),
+          ip_address: controllerIp.trim(),
+          is_controller: true,
+        }),
+      });
+      let data: any = null; try { data = await res.json(); } catch {}
+      if (res.ok && (data?.ok || data?.success)) {
+        await fetchModulos();
+        toast({ title: "Sucesso!", description: "Controlador adicionado." });
+      } else {
+        toast({ variant: "destructive", title: "Erro", description: data?.error || "Falha ao adicionar controlador." });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Erro", description: "Falha ao se conectar ao servidor." });
+    }
+  }
+
+  async function handleUpdateController() {
+    if (!controller) return;
+    try {
+      const res = await fetch(`/api/modulos/${controller.id}`, {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          nome: controller.nome.trim(),
+          ip_address: controller.ip_address?.trim(),
+        }),
+      });
+      let data: any = null; try { data = await res.json(); } catch {}
+      if (res.ok && (data?.ok || data?.success)) {
+        await fetchModulos();
+        toast({ title: "Sucesso!", description: "Controlador atualizado." });
+      } else {
+        toast({ variant: "destructive", title: "Erro", description: data?.error || "Falha ao atualizar controlador." });
       }
     } catch {
       toast({ variant: "destructive", title: "Erro", description: "Falha ao se conectar ao servidor." });
@@ -298,6 +368,86 @@ export default function Modulos() {
               <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-6">
                   <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
+                      <CircuitBoard className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-2xl font-bold text-foreground">Controlador</CardTitle>
+                      <p className="text-muted-foreground mt-1">Adicione ou edite o controlador do projeto</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {controller ? (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="controller-name">Nome do Controlador</Label>
+                        <Input
+                          id="controller-name"
+                          value={controller.nome}
+                          onChange={(e) => setController({ ...controller, nome: e.target.value })}
+                          className="mt-2 h-12 px-4 rounded-xl border-border"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="controller-ip">Endereço IP</Label>
+                        <Input
+                          id="controller-ip"
+                          value={controller.ip_address || ""}
+                          onChange={(e) => setController({ ...controller, ip_address: e.target.value })}
+                          className="mt-2 h-12 px-4 rounded-xl border-border"
+                        />
+                      </div>
+                      <Button onClick={handleUpdateController} className="w-full h-12">Salvar Controlador</Button>
+                    </div>
+                  ) : (
+                    <form className="space-y-6" onSubmit={handleCreateController}>
+                      <div>
+                        <Label htmlFor="controller-type">Tipo de Controlador *</Label>
+                        <select
+                          id="controller-type"
+                          className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background"
+                          value={controllerType}
+                          onChange={(e) => setControllerType(e.target.value)}
+                          required
+                        >
+                          <option value="">Selecione o tipo</option>
+                          <option value="AQL-GV-M4">AQL-GV-M4</option>
+                          <option value="ADP-M8">ADP-M8</option>
+                          <option value="ADP-M16">ADP-M16</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label htmlFor="controller-name-new">Nome do Controlador *</Label>
+                        <Input
+                          id="controller-name-new"
+                          value={controllerName}
+                          onChange={(e) => setControllerName(e.target.value)}
+                          required
+                          className="mt-2 h-12 px-4 rounded-xl border-border"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="controller-ip-new">Endereço IP *</Label>
+                        <Input
+                          id="controller-ip-new"
+                          value={controllerIp}
+                          onChange={(e) => setControllerIp(e.target.value)}
+                          required
+                          className="mt-2 h-12 px-4 rounded-xl border-border"
+                        />
+                      </div>
+                      <Button type="submit" className="w-full h-12">Adicionar Controlador</Button>
+                    </form>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
+                <CardHeader className="pb-6">
+                  <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
                       <PlusCircle className="w-6 h-6 text-white" />
                     </div>
@@ -407,7 +557,7 @@ export default function Modulos() {
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-4"></div>
                       <p className="text-muted-foreground font-medium">Carregando módulos...</p>
                     </div>
-                  ) : modulos.length === 0 ? (
+                  ) : regularModules.length === 0 ? (
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -428,7 +578,7 @@ export default function Modulos() {
                   ) : (
                     <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                       <AnimatePresence>
-                        {modulos.map((m, index) => (
+                        {regularModules.map((m, index) => (
                           <motion.li
                             key={m.id}
                             initial={{ opacity: 0, y: 20 }}

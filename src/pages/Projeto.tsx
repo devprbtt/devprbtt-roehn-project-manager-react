@@ -67,7 +67,6 @@ export default function Projeto() {
   const [boardName, setBoardName] = useState("Quadro Elétrico");
   const [m4ip, setM4ip] = useState("192.168.5.30");
   const [m4QuadroId, setM4QuadroId] = useState<string>("");
-  const [controlador, setControlador] = useState("AQL-GV-M4");
   
   const m4hsnet = "245";
   const m4devid = "1";
@@ -515,7 +514,6 @@ export default function Projeto() {
                       <input type="hidden" name="m4_devid" value={m4devid} />
                       <input type="hidden" name="software_version" value={softwareVersion} />
                       <input type="hidden" name="m4_quadro_id" value={m4QuadroId} />
-                      <input type="hidden" name="controlador" value={controlador} />
 
                       <section>
                         <h4 className="text-primary text-sm font-semibold mb-2 border-b pb-1">Informações do Projeto</h4>
@@ -607,19 +605,6 @@ export default function Projeto() {
                           <div className="md:col-span-1">
                             <Label htmlFor="m4_ip">IP do Módulo M4</Label>
                             <Input id="m4_ip" name="m4_ip" value={m4ip} onChange={(e) => setM4ip(e.target.value)} required className="text-sm" />
-                          </div>
-                           <div className="md:col-span-2">
-                            <Label htmlFor="controlador">Controlador</Label>
-                            <Select value={controlador} onValueChange={setControlador}>
-                              <SelectTrigger id="controlador" className="text-sm">
-                                <SelectValue placeholder="Selecione o controlador" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="AQL-GV-M4">AQL-GV-M4</SelectItem>
-                                <SelectItem value="ADP-M8">ADP-M8</SelectItem>
-                                <SelectItem value="ADP-M16">ADP-M16</SelectItem>
-                              </SelectContent>
-                            </Select>
                           </div>
                         </div>
                       </section>

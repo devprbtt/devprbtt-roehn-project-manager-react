@@ -351,7 +351,6 @@ def roehn_import():
         'programmer_name': request.form.get('programmer_name', current_user.username),
         'programmer_email': request.form.get('programmer_email', current_user.email),
         'programmer_guid': str(uuid.uuid4()),
-        'controlador': projeto.controlador,
     }
     raw_m4_quadro = request.form.get('m4_quadro_id')
     m4_quadro_id = None
@@ -635,7 +634,6 @@ def api_projetos_list():
         "id": p.id,
         "nome": p.nome,
         "status": (p.status or "ATIVO"),
-        "controlador": p.controlador,
         "selected": (p.id == selected_id),
         "data_criacao": p.data_criacao.isoformat() if p.data_criacao else None,
         "data_ativo": p.data_ativo.isoformat() if p.data_ativo else None,
@@ -678,12 +676,6 @@ def api_projetos_update(projeto_id):
             return jsonify({"ok": False, "error": "Nome é obrigatório."}), 400
         p.nome = nome
 
-    if "controlador" in data:
-        controlador = (data.get("controlador") or "").strip()
-        if controlador not in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]:
-            return jsonify({"ok": False, "error": "Controlador inválido."}), 400
-        p.controlador = controlador
-
     if "status" in data:
         status = (data.get("status") or "").strip().upper()
         if status not in {"ATIVO", "INATIVO", "CONCLUIDO"}:
@@ -710,7 +702,6 @@ def api_projetos_update(projeto_id):
             "id": p.id,
             "nome": p.nome,
             "status": p.status,
-            "controlador": p.controlador,
             "data_criacao": p.data_criacao.isoformat(),
             "data_ativo": p.data_ativo.isoformat() if p.data_ativo else None,
             "data_inativo": p.data_inativo.isoformat() if p.data_inativo else None,
@@ -739,15 +730,11 @@ def api_projetos_create():
         return jsonify({"ok": False, "error": "Status inválido (use ATIVO, INATIVO ou CONCLUIDO)."}), 400
 
     now = datetime.utcnow()
-    controlador = (data.get("controlador") or "AQL-GV-M4").strip()
-    if controlador not in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]:
-        return jsonify({"ok": False, "error": "Controlador inválido."}), 400
 
     p = Projeto(
         nome=nome,
         user_id=current_user.id,
         status=status,
-        controlador=controlador,
         data_criacao=now,
         data_ativo=now if status == 'ATIVO' else None,
         data_inativo=now if status == 'INATIVO' else None,
@@ -770,7 +757,6 @@ def api_projetos_create():
         "id": p.id,
         "nome": p.nome,
         "status": p.status,
-        "controlador": p.controlador,
         "data_criacao": p.data_criacao.isoformat(),
         "data_ativo": p.data_ativo.isoformat() if p.data_ativo else None,
         "data_inativo": p.data_inativo.isoformat() if p.data_inativo else None,
@@ -1433,11 +1419,13 @@ def api_modulos_list():
             "nome": m.nome,
             "tipo": m.tipo,
             "quantidade_canais": m.quantidade_canais,
+            "is_controller": m.is_controller,
+            "ip_address": m.ip_address,
             "vinc_count": vinc_count_by_mod.get(m.id, 0),
             "quadro_eletrico": {
                 "id": m.quadro_eletrico.id,
                 "nome": m.quadro_eletrico.nome,
-            } if m.quadro_eletrico else None,  # NOVO
+            } if m.quadro_eletrico else None,
         }
         for m in modulos
     ]
@@ -1531,14 +1519,27 @@ def api_modulos_create():
     else:
         dev_id = hsnet
 
+    is_controller = data.get("is_controller", False)
+    ip_address = data.get("ip_address", None)
+
+    if is_controller:
+        if tipo not in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]:
+            return jsonify({"ok": False, "error": "Tipo de controlador inválido."}), 400
+
+        existing_controller = Modulo.query.filter_by(projeto_id=projeto_id, is_controller=True).first()
+        if existing_controller:
+            return jsonify({"ok": False, "error": "Já existe um controlador neste projeto."}), 409
+
     m = Modulo(
         nome=nome,
         tipo=tipo,
-        quantidade_canais=info["canais"],
+        quantidade_canais=info.get("canais", 0),
         projeto_id=projeto_id,
         hsnet=hsnet,
         dev_id=dev_id,
-        quadro_eletrico_id=quadro_eletrico.id if quadro_eletrico else None,  # NOVO
+        is_controller=is_controller,
+        ip_address=ip_address,
+        quadro_eletrico_id=quadro_eletrico.id if quadro_eletrico else None,
     )
     db.session.add(m)
     db.session.commit()
@@ -1559,6 +1560,9 @@ def api_modulos_update(modulo_id):
         if not nome:
             return jsonify({"ok": False, "error": "Nome é obrigatório."}), 400
         m.nome = nome
+
+    if "ip_address" in data:
+        m.ip_address = data.get("ip_address")
     
     if "quadro_eletrico_id" in data:
         quadro_id = data.get("quadro_eletrico_id")

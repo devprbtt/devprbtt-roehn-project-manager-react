@@ -33,7 +33,6 @@ class Projeto(db.Model):
     data_ativo = db.Column(db.DateTime, nullable=True)
     data_inativo = db.Column(db.DateTime, nullable=True)
     data_concluido = db.Column(db.DateTime, nullable=True)
-    controlador = db.Column(db.String(50), nullable=False, default='AQL-GV-M4')
 
     areas = db.relationship('Area', backref='projeto', lazy=True, cascade='all, delete-orphan')
     modulos = db.relationship('Modulo', backref='projeto', lazy=True, cascade='all, delete-orphan')
@@ -98,6 +97,8 @@ class Modulo(db.Model):
     projeto_id = db.Column(db.Integer, db.ForeignKey('projeto.id'), nullable=False)
     hsnet = db.Column(db.Integer, nullable=True)
     dev_id = db.Column(db.Integer, nullable=True)
+    is_controller = db.Column(db.Boolean, default=False, nullable=False)
+    ip_address = db.Column(db.String(50), nullable=True)
     quadro_eletrico_id = db.Column(db.Integer, db.ForeignKey('quadro_eletrico.id'), nullable=True)  # NOVO CAMPO
     vinculacoes = db.relationship('Vinculacao', backref='modulo', lazy=True, cascade='all, delete-orphan')
 
