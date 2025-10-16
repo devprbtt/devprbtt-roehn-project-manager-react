@@ -101,15 +101,15 @@ class RoehnProjectConverter:
                 "DevID": 1,
                 "ACNET_SlotCapacity": 24,
                 "Scene_SlotCapacity": 96,
-                "StartUnitId": 39
+                "UnitIds": [39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57]
             },
             "ADP-M8": {
                 "Name": "ADP-M8",
                 "DriverGuid": "80000000-0000-0000-0000-000000000018",
-                "DevID": 4,
+                "DevID": 3,
                 "ACNET_SlotCapacity": 250,
                 "Scene_SlotCapacity": 256,
-                "StartUnitId": 85
+                "UnitIds": [59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77]
             },
             "ADP-M16": {
                 "Name": "ADP-M16",
@@ -117,13 +117,12 @@ class RoehnProjectConverter:
                 "DevID": 5,
                 "ACNET_SlotCapacity": 250,
                 "Scene_SlotCapacity": 256,
-                "StartUnitId": 104
+                "UnitIds": [104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122]
             }
         }
 
         config = controller_configs.get(controller_type, controller_configs["AQL-GV-M4"])
 
-        # UnitComposers are the same for all controllers, only the start ID changes
         unit_composers_data = [
             {"Name": "Ativo", "PortNumber": 1, "PortType": 0, "IO": 0, "Kind": 0, "NotProgrammable": False},
             {"Name": "Modulos HSNET ativos", "PortNumber": 1, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
@@ -147,8 +146,7 @@ class RoehnProjectConverter:
         ]
 
         unit_composers = []
-        next_unit_id = config["StartUnitId"]
-        for composer_data in unit_composers_data:
+        for i, composer_data in enumerate(unit_composers_data):
             unit_composers.append({
                 "$type": "UnitComposer",
                 "Name": composer_data["Name"],
@@ -158,12 +156,11 @@ class RoehnProjectConverter:
                 "Kind": composer_data["Kind"],
                 "NotProgrammable": composer_data["NotProgrammable"],
                 "Unit": {
-                    "$type": "Unit", "Id": next_unit_id, "Event": 0, "Scene": 0,
+                    "$type": "Unit", "Id": config["UnitIds"][i], "Event": 0, "Scene": 0,
                     "Disabled": False, "Logged": False, "Memo": False, "Increment": False
                 },
                 "Value": 0
             })
-            next_unit_id += 1
 
         controller_module = {
             "$type": "Module",
@@ -175,7 +172,7 @@ class RoehnProjectConverter:
             "PollTiming": 0,
             "Disabled": False,
             "RemotePort": 0,
-            "RemoteIpAddress": None,
+            "RemoteIpAddress": project_info.get('m4_ip'),
             "Notes": None,
             "Logicserver": True,
             "DevID": config["DevID"],
@@ -190,7 +187,7 @@ class RoehnProjectConverter:
                     "IO": 0,
                     "UnitComposers": None,
                     "SubItemsGuid": [self.zero_guid],
-                    "Name": "ACNET",
+                    "Name": "ACNET/RNET",
                 },
                 {
                     "$type": "Slot",

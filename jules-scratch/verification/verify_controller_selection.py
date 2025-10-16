@@ -7,7 +7,7 @@ def run(playwright):
     page = context.new_page()
 
     # Wait for server to start
-    time.sleep(30)
+    time.sleep(10)
 
     # Login
     page.goto("http://localhost:8080/login")
