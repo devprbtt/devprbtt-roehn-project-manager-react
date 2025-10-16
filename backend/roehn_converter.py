@@ -21,6 +21,7 @@ class RoehnProjectConverter:
             'DIM8': {'driver_guid': '80000000-0000-0000-0000-000000000001', 'slots': {'Load Dim': 8}}
         }
         self.zero_guid = "00000000-0000-0000-0000-000000000000"
+        self.m4_target_quadro_id = None
         self.keypad_driver_guid = "90000000-0000-0000-0000-000000000004"
         self.keypad_profile_guid = "40000000-0000-0000-0000-000000000001"
         self.rocker_icon_guid_up_down = "11000000-0000-0000-0000-000000000001"
@@ -199,40 +200,15 @@ class RoehnProjectConverter:
                 current_board["ModulesList"] = [m for m in current_board.get("ModulesList", []) if m.get("Name") != module_name]
                 print(f"Módulo {module_name} removido do quadro {current_board.get('Name')}")
             
-            # Adicionar ao quadro de destino (se ainda não estiver lá)
-            if target_module not in target_board.get("ModulesList", []):
-                target_board.setdefault("ModulesList", []).append(target_module)
+            # Adicionar ao quadro de destino (garantindo estrutura)
+            module_guid = target_module.get("Guid")
+            target_board.setdefault("ModulesList", [])
+            if not any(m.get("Guid") == module_guid for m in target_board["ModulesList"]):
+                target_board["ModulesList"].append(target_module)
                 print(f"Módulo {module_name} movido para o quadro {target_board.get('Name')}")
             
-            # ⭐⭐⭐ CORREÇÃO: Garantir que o módulo está no ACNET do M4
-            default_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
-            if default_board and default_board.get("ModulesList"):
-                m4_module = default_board["ModulesList"][0]
-                for slot in m4_module.get("Slots", []):
-                    if slot.get("Name") == "ACNET":
-                        # Encontrar o GUID do módulo
-                        module_guid = target_module.get("Guid")
-                        if module_guid and module_guid not in slot["SubItemsGuid"]:
-                            # Adicionar ao ACNET se não estiver presente
-                            for i, guid in enumerate(slot["SubItemsGuid"]):
-                                if guid == "00000000-0000-0000-0000-000000000000":
-                                    slot["SubItemsGuid"][i] = module_guid
-                                    print(f"Módulo {module_name} ({module_guid}) adicionado ao ACNET na posição {i}")
-                                    break
-                            else:
-                                # Se não encontrou posição vazia, adiciona ao final
-                                slot["SubItemsGuid"].append(module_guid)
-                                print(f"Módulo {module_name} ({module_guid}) adicionado ao final do ACNET")
-                            
-                            # Garantir que há pelo menos um item vazio no final
-                            if slot["SubItemsGuid"] and slot["SubItemsGuid"][-1] != "00000000-0000-0000-0000-000000000000":
-                                slot["SubItemsGuid"].append("00000000-0000-0000-0000-000000000000")
-                        
-                        # Verificar se o módulo já está no ACNET mas em posição diferente
-                        elif module_guid and module_guid in slot["SubItemsGuid"]:
-                            print(f"Módulo {module_name} já está no ACNET")
-                        
-                        break
+            # Garantir que o módulo esteja registrado no ACNET do M4
+            self._ensure_module_guid_registered_in_acnet(module_guid)
             
             return True
             
@@ -277,6 +253,9 @@ class RoehnProjectConverter:
                             success = self._add_module_to_specific_board(modulo_nome, quadro_guid)
                             if not success:
                                 print(f"⚠️  Aviso: Não foi possível adicionar o módulo {modulo_nome} ao quadro específico")
+
+        # Reposicionar o módulo M4 no quadro selecionado, se necessário
+        self._move_m4_to_selected_board()
 
         # Processar módulos que não estão em quadros específicos (ficam no quadro padrão)
         for modulo in projeto.modulos:
@@ -367,33 +346,25 @@ class RoehnProjectConverter:
     def _log_acnet_status(self):
         """Log do estado atual do ACNET para debugging"""
         try:
-            default_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
-            if not default_board or not default_board.get("ModulesList"):
+            _, _, acnet_slot = self._get_m4_module_components()
+            if not acnet_slot:
                 return
             
-            m4_module = default_board["ModulesList"][0]
-            acnet_slot = None
-            for slot in m4_module.get("Slots", []):
-                if slot.get("Name") == "ACNET":
-                    acnet_slot = slot
-                    break
+            acnet_guids = [guid for guid in acnet_slot.get("SubItemsGuid", []) if guid != self.zero_guid]
+            print(f"📊 Status do ACNET: {len(acnet_guids)} módulos registrados")
             
-            if acnet_slot:
-                acnet_guids = [guid for guid in acnet_slot.get("SubItemsGuid", []) if guid != "00000000-0000-0000-0000-000000000000"]
-                print(f"📊 Status do ACNET: {len(acnet_guids)} módulos registrados")
-                
-                # Mapear GUIDs para nomes de módulos
-                for i, guid in enumerate(acnet_slot.get("SubItemsGuid", [])):
-                    if guid != "00000000-0000-0000-0000-000000000000":
-                        module_name = "Desconhecido"
-                        for area in self.project_data["Areas"]:
-                            for room in area.get("SubItems", []):
-                                for board in room.get("AutomationBoards", []):
-                                    for module in board.get("ModulesList", []):
-                                        if module.get("Guid") == guid:
-                                            module_name = module.get("Name", "Sem nome")
-                                            break
-                        print(f"  {i+1}. {guid} -> {module_name}")
+            # Mapear GUIDs para nomes de módulos
+            for i, guid in enumerate(acnet_slot.get("SubItemsGuid", [])):
+                if guid != self.zero_guid:
+                    module_name = "Desconhecido"
+                    for area in self.project_data["Areas"]:
+                        for room in area.get("SubItems", []):
+                            for board in room.get("AutomationBoards", []):
+                                for module in board.get("ModulesList", []):
+                                    if module.get("Guid") == guid:
+                                        module_name = module.get("Name", "Sem nome")
+                                        break
+                    print(f"  {i+1}. {guid} -> {module_name}")
         except Exception as e:
             print(f"Erro ao logar status do ACNET: {e}")
 
@@ -426,17 +397,7 @@ class RoehnProjectConverter:
     def _verify_and_fix_acnet(self):
         """Verifica e corrige o ACNET do M4 para incluir todos os módulos"""
         try:
-            default_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
-            if not default_board or not default_board.get("ModulesList"):
-                return
-            
-            m4_module = default_board["ModulesList"][0]
-            acnet_slot = None
-            for slot in m4_module.get("Slots", []):
-                if slot.get("Name") == "ACNET":
-                    acnet_slot = slot
-                    break
-            
+            _, _, acnet_slot = self._get_m4_module_components()
             if not acnet_slot:
                 return
             
@@ -447,14 +408,14 @@ class RoehnProjectConverter:
                     for board in room.get("AutomationBoards", []):
                         for module in board.get("ModulesList", []):
                             guid = module.get("Guid")
-                            if guid and guid != "00000000-0000-0000-0000-000000000000":
+                            if guid and guid != self.zero_guid:
                                 # Não incluir o próprio M4
                                 if module.get("Name") != "AQL-GV-M4":
                                     all_module_guids.add(guid)
             
             # Atualizar o ACNET
             current_acnet_guids = set(acnet_slot.get("SubItemsGuid", []))
-            current_acnet_guids.discard("00000000-0000-0000-0000-000000000000")
+            current_acnet_guids.discard(self.zero_guid)
             
             # Adicionar módulos que estão faltando
             missing_guids = all_module_guids - current_acnet_guids
@@ -464,7 +425,7 @@ class RoehnProjectConverter:
                 # Substituir os zeros pelos GUIDs faltantes
                 new_acnet_list = []
                 for guid in acnet_slot["SubItemsGuid"]:
-                    if guid == "00000000-0000-0000-0000-000000000000" and missing_guids:
+                    if guid == self.zero_guid and missing_guids:
                         new_guid = missing_guids.pop()
                         new_acnet_list.append(new_guid)
                         # Log do módulo sendo adicionado
@@ -495,8 +456,8 @@ class RoehnProjectConverter:
                     print(f"  ✅ Adicionado (final): {module_name} ({remaining_guid})")
                 
                 # Garantir que termina com um zero
-                if new_acnet_list and new_acnet_list[-1] != "00000000-0000-0000-0000-000000000000":
-                    new_acnet_list.append("00000000-0000-0000-0000-000000000000")
+                if new_acnet_list and new_acnet_list[-1] != self.zero_guid:
+                    new_acnet_list.append(self.zero_guid)
                 
                 acnet_slot["SubItemsGuid"] = new_acnet_list
                 print(f"✅ ACNET corrigido com sucesso!")
@@ -512,6 +473,11 @@ class RoehnProjectConverter:
         """Cria um projeto base compatível com o ROEHN Wizard"""
         project_guid = str(uuid.uuid4())
         now_iso = datetime.now().isoformat()
+        raw_target_board = project_info.get('m4_quadro_id')
+        try:
+            self.m4_target_quadro_id = int(raw_target_board) if raw_target_board not in (None, "", False) else None
+        except (TypeError, ValueError):
+            self.m4_target_quadro_id = None
         
         # No método create_project, substitua a definição do m4_module por:
 
@@ -1232,41 +1198,81 @@ class RoehnProjectConverter:
                             return module, board
         return None, None
 
+    def _get_m4_module_components(self):
+        """Retorna o módulo M4, o quadro em que ele está e o slot ACNET associado."""
+        module, board = self._find_module_in_any_board("AQL-GV-M4")
+        if not module:
+            return None, None, None
+        acnet_slot = None
+        for slot in module.get("Slots", []):
+            if slot.get("Name") == "ACNET":
+                acnet_slot = slot
+                break
+        return module, board, acnet_slot
+
+    def _ensure_module_guid_registered_in_acnet(self, module_guid):
+        """Garante que um GUID de módulo esteja registrado no ACNET do M4."""
+        if not module_guid or module_guid == self.zero_guid:
+            return
+        _, _, acnet_slot = self._get_m4_module_components()
+        if not acnet_slot:
+            return
+        subitems = acnet_slot.setdefault("SubItemsGuid", [])
+        if module_guid in subitems:
+            return
+        for idx, guid in enumerate(subitems):
+            if guid == self.zero_guid:
+                subitems[idx] = module_guid
+                return
+        subitems.append(module_guid)
+        if subitems[-1] != self.zero_guid:
+            subitems.append(self.zero_guid)
+
+    def _move_m4_to_selected_board(self):
+        """Move o módulo M4 para o quadro elétrico selecionado, caso indicado pelo usuário."""
+        target_id = getattr(self, "m4_target_quadro_id", None)
+        if not target_id:
+            return
+        board_guid = self._quadro_guid_map.get(target_id)
+        if not board_guid:
+            print(f"⚠️  Quadro selecionado para o M4 (ID {target_id}) não encontrado no mapa de GUIDs.")
+            return
+        target_board = self._find_automation_board_by_guid(board_guid)
+        if not target_board:
+            print(f"⚠️  Quadro GUID {board_guid} não encontrado na estrutura do projeto.")
+            return
+        m4_module, current_board, _ = self._get_m4_module_components()
+        if not m4_module:
+            print("⚠️  Módulo M4 não encontrado no projeto Roehn.")
+            return
+        if current_board == target_board:
+            return
+
+        # Remover do quadro atual
+        if current_board:
+            current_board["ModulesList"] = [
+                m for m in current_board.get("ModulesList", [])
+                if m.get("Guid") != m4_module.get("Guid")
+            ]
+
+        # Adicionar ao quadro de destino
+        target_board.setdefault("ModulesList", [])
+        if not any(m.get("Guid") == m4_module.get("Guid") for m in target_board["ModulesList"]):
+            target_board["ModulesList"].insert(0, m4_module)
+            print(f"✅ Módulo M4 movido para o quadro {target_board.get('Name')}")
+
     def _add_module_to_project(self, new_module, new_module_guid, target_board=None):
         """Adiciona um módulo ao AutomationBoard especificado e ao ACNET do M4"""
         # Adicionar o módulo ao quadro especificado (ou ao padrão se nenhum for especificado)
         if target_board is None:
             target_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
         
+        target_board.setdefault("ModulesList", [])
         modules_list = target_board["ModulesList"]
         modules_list.append(new_module)
 
-        # ⭐⭐⭐ CORREÇÃO: SEMPRE adicionar ao ACNET do M4, independentemente do quadro
-        # Encontrar o quadro padrão (sala técnica) que contém o M4
-        default_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
-        if default_board and default_board.get("ModulesList"):
-            m4_module = default_board["ModulesList"][0]
-            for slot in m4_module.get("Slots", []):
-                if slot.get("Name") == "ACNET":
-                    # Verificar se o GUID já está na lista para evitar duplicatas
-                    if new_module_guid not in slot["SubItemsGuid"]:
-                        # Encontrar a primeira posição vazia e substituir pelo novo GUID
-                        for i, guid in enumerate(slot["SubItemsGuid"]):
-                            if guid == "00000000-0000-0000-0000-000000000000":
-                                slot["SubItemsGuid"][i] = new_module_guid
-                                print(f"Módulo {new_module_guid} adicionado ao ACNET na posição {i}")
-                                break
-                        else:
-                            # Se não encontrou posição vazia, adiciona ao final
-                            slot["SubItemsGuid"].append(new_module_guid)
-                            print(f"Módulo {new_module_guid} adicionado ao final do ACNET")
-                        
-                        # Garantir que há pelo menos um item vazio no final
-                        if slot["SubItemsGuid"] and slot["SubItemsGuid"][-1] != "00000000-0000-0000-0000-000000000000":
-                            slot["SubItemsGuid"].append("00000000-0000-0000-0000-000000000000")
-                    else:
-                        print(f"Módulo {new_module_guid} já está no ACNET")
-                    break
+        # Garantir que o módulo esteja registrado no ACNET do M4
+        self._ensure_module_guid_registered_in_acnet(new_module_guid)
 
     def _add_keypads_for_room(self, area_name, ambiente):
         keypads = getattr(ambiente, "keypads", None)

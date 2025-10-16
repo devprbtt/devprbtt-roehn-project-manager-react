@@ -20,6 +20,17 @@ export interface Modulo {
   tipo: string;
 }
 
+export interface QuadroEletrico {
+  id: number;
+  nome: string;
+  modulos: {
+    id: number;
+    nome: string;
+    tipo: string;
+    quantidade_canais: number;
+  }[];
+}
+
 export interface Area {
   id: number;
   nome: string;
@@ -29,9 +40,10 @@ export interface Area {
 export interface Ambiente {
   id: number;
   nome: string;
-  area: Area;
+  area?: Area;
   circuitos: Circuito[];
   cenas: Cena[];
+  quadros_eletricos?: QuadroEletrico[];
 }
 
 export interface Circuito {

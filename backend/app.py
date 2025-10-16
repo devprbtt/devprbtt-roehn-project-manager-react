@@ -352,6 +352,18 @@ def roehn_import():
         'programmer_email': request.form.get('programmer_email', current_user.email),
         'programmer_guid': str(uuid.uuid4()),
     }
+    raw_m4_quadro = request.form.get('m4_quadro_id')
+    m4_quadro_id = None
+    if raw_m4_quadro:
+        try:
+            m4_quadro_id = int(raw_m4_quadro)
+        except (TypeError, ValueError):
+            m4_quadro_id = None
+    if m4_quadro_id:
+        quadro = db.session.get(QuadroEletrico, m4_quadro_id)
+        if not quadro or quadro.projeto_id != projeto.id:
+            m4_quadro_id = None
+    project_info['m4_quadro_id'] = m4_quadro_id
     
     try:
         # Converter dados do projeto para Roehn
