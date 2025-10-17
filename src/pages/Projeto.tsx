@@ -65,27 +65,10 @@ export default function Projeto() {
   const [techArea, setTechArea] = useState("Área Técnica");
   const [techRoom, setTechRoom] = useState("Sala Técnica");
   const [boardName, setBoardName] = useState("Quadro Elétrico");
-  const [m4ip, setM4ip] = useState("192.168.5.30");
-  const [m4QuadroId, setM4QuadroId] = useState<string>("");
   
   const m4hsnet = "245";
   const m4devid = "1";
   const softwareVersion = "1.0.8.67";
-
-  const quadroOptions = useMemo<QuadroOption[]>(() => {
-    const options: QuadroOption[] = [];
-    (data?.areas || []).forEach((area: Area) => {
-      (area?.ambientes || []).forEach((ambiente) => {
-        (ambiente?.quadros_eletricos || []).forEach((quadro) => {
-          options.push({
-            id: quadro.id,
-            label: `${area.nome} • ${ambiente.nome} • ${quadro.nome}`,
-          });
-        });
-      });
-    });
-    return options.sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-  }, [data]);
 
   const countKeypads = (all: Keypad[]) => all.length;
   const keypadCount = countKeypads(keypads);
@@ -132,17 +115,6 @@ export default function Projeto() {
     fetchProjectData();
   }, [projetoSelecionado]);
 
-  useEffect(() => {
-    if (!quadroOptions.length) {
-      if (m4QuadroId !== "") setM4QuadroId("");
-      return;
-    }
-    const hasSelection = quadroOptions.some((option) => String(option.id) === m4QuadroId);
-    if (!hasSelection) {
-      setM4QuadroId(String(quadroOptions[0].id));
-    }
-  }, [quadroOptions, m4QuadroId]);
-
   const stats = useMemo(() => {
     const newStats = { luz: 0, persiana: 0, hvac: 0, cenas: 0, modulos: 0 };
     if (!data || !data.areas) return newStats;
@@ -164,27 +136,13 @@ export default function Projeto() {
   }, [data]);
 
   const validateAndSubmitRwp = (e: React.FormEvent<HTMLFormElement>) => {
-    if (quadroOptions.length > 0 && !m4QuadroId) {
-      e.preventDefault();
-      toast({
-        variant: "destructive",
-        title: "Selecione um quadro",
-        description: "Escolha em qual quadro elétrico o módulo M4 será colocado.",
-      });
-      return;
-    }
     const numbers = clientPhone.replace(/\D/g, "");
     if (numbers.length < 10) {
       e.preventDefault();
       toast({ variant: "destructive", title: "Telefone inválido", description: "Use DDD + número (mínimo 10 dígitos)." });
       return;
     }
-    const ipPattern = /^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-    if (!ipPattern.test(m4ip)) {
-      e.preventDefault();
-      toast({ variant: "destructive", title: "IP inválido", description: "Insira um endereço IP válido para o Módulo M4." });
-      return;
-    }
+
     const hidden = document.createElement("input");
     hidden.type = "hidden";
     hidden.name = "client_phone_clean";
@@ -513,7 +471,6 @@ export default function Projeto() {
                       <input type="hidden" name="m4_hsnet" value={m4hsnet} />
                       <input type="hidden" name="m4_devid" value={m4devid} />
                       <input type="hidden" name="software_version" value={softwareVersion} />
-                      <input type="hidden" name="m4_quadro_id" value={m4QuadroId} />
 
                       <section>
                         <h4 className="text-primary text-sm font-semibold mb-2 border-b pb-1">Informações do Projeto</h4>
@@ -571,40 +528,6 @@ export default function Projeto() {
                           <div>
                             <Label htmlFor="board_name">Nome do Quadro</Label>
                             <Input id="board_name" name="board_name" value={boardName} onChange={(e) => setBoardName(e.target.value)} required className="text-sm" />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                          <div className="md:col-span-3">
-                            <Label htmlFor="m4_quadro_id">Quadro do Módulo M4</Label>
-                            {quadroOptions.length > 0 ? (
-                              <div className="space-y-2">
-                                <Select value={m4QuadroId} onValueChange={setM4QuadroId}>
-                                  <SelectTrigger id="m4_quadro_id" className="text-sm">
-                                    <SelectValue placeholder="Selecione um quadro" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {quadroOptions.map((option) => (
-                                      <SelectItem key={option.id} value={String(option.id)}>
-                                        {option.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <p className="text-xs text-muted-foreground">
-                                  O módulo M4 será configurado dentro do quadro escolhido.
-                                </p>
-                              </div>
-                            ) : (
-                              <p className="text-sm text-muted-foreground">
-                                Nenhum quadro cadastrado. O M4 permanecerá no quadro técnico padrão.
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                          <div className="md:col-span-1">
-                            <Label htmlFor="m4_ip">IP do Módulo M4</Label>
-                            <Input id="m4_ip" name="m4_ip" value={m4ip} onChange={(e) => setM4ip(e.target.value)} required className="text-sm" />
                           </div>
                         </div>
                       </section>

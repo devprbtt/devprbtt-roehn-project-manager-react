@@ -1540,9 +1540,9 @@ def api_modulos_create():
         if tipo not in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]:
             return jsonify({"ok": False, "error": "Tipo de controlador inválido."}), 400
 
-        existing_controller = Modulo.query.filter_by(projeto_id=projeto_id, is_controller=True).first()
-        if existing_controller:
-            return jsonify({"ok": False, "error": "Já existe um controlador neste projeto."}), 409
+        # Controller must be assigned to a panel
+        if not quadro_eletrico:
+            return jsonify({"ok": False, "error": "Controladores devem ser associados a um quadro elétrico."}), 400
 
     m = Modulo(
         nome=nome,
@@ -1604,9 +1604,6 @@ def api_modulos_update(modulo_id):
                 return jsonify({"ok": False, "error": "HSNET ja esta em uso."}), 409
             m.hsnet = hsnet
         else:
-            # Do not allow setting hsnet to null if it's already set
-            if m.hsnet is not None:
-                return jsonify({"ok": False, "error": "HSNET não pode ser vazio."}), 400
             m.hsnet = None
             
     db.session.commit()

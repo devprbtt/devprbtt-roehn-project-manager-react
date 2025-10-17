@@ -162,22 +162,40 @@ export default function Modulos() {
       toast({ variant: "destructive", title: "Erro", description: "Selecione o tipo e informe o nome." });
       return;
     }
+
+    const isController = meta[tipo]?.canais === 0;
+    const payload: any = {
+      tipo,
+      nome: nome.trim(),
+      is_controller: isController,
+      quadro_eletrico_id: quadroEletricoId || undefined,
+    };
+
+    if (isController) {
+      if (!quadroEletricoId) {
+        toast({ variant: "destructive", title: "Erro", description: "Controladores devem ser associados a um quadro elétrico." });
+        return;
+      }
+      payload.ip_address = controllerIp.trim();
+      if (payload.ip_address && !/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(payload.ip_address)) {
+        toast({ variant: "destructive", title: "Erro de Validação", description: "O formato do endereço IP é inválido." });
+        return;
+      }
+    }
+
     try {
       const res = await fetch("/api/modulos", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ 
-          tipo, 
-          nome: nome.trim(),
-          quadro_eletrico_id: quadroEletricoId || undefined 
-        }),
+        body: JSON.stringify(payload),
       });
-      let data: any = null; try { data = await res.json(); } catch {}
+      const data = await res.json().catch(() => null);
       if (res.ok && (data?.ok || data?.success)) {
         setTipo("");
         setNome("");
         setQuadroEletricoId("");
+        setControllerIp("");
         await fetchModulos();
         toast({ title: "Sucesso!", description: "Módulo adicionado." });
       } else {
@@ -359,88 +377,7 @@ export default function Modulos() {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
-                <CardHeader className="pb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
-                      <CircuitBoard className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-2xl font-bold text-foreground">Controlador</CardTitle>
-                      <p className="text-muted-foreground mt-1">Adicione ou edite o controlador do projeto</p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {controller ? (
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="controller-name">Nome do Controlador</Label>
-                        <Input
-                          id="controller-name"
-                          value={controller.nome}
-                          onChange={(e) => setController({ ...controller, nome: e.target.value })}
-                          className="mt-2 h-12 px-4 rounded-xl border-border"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="controller-ip">Endereço IP</Label>
-                        <Input
-                          id="controller-ip"
-                          value={controller.ip_address || ""}
-                          onChange={(e) => setController({ ...controller, ip_address: e.target.value })}
-                          className="mt-2 h-12 px-4 rounded-xl border-border"
-                        />
-                      </div>
-                      <Button onClick={handleUpdateController} className="w-full h-12">Salvar Controlador</Button>
-                    </div>
-                  ) : (
-                    <form className="space-y-6" onSubmit={handleCreateController}>
-                      <div>
-                        <Label htmlFor="controller-type">Tipo de Controlador *</Label>
-                        <select
-                          id="controller-type"
-                          className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background"
-                          value={controllerType}
-                          onChange={(e) => setControllerType(e.target.value)}
-                          required
-                        >
-                          <option value="">Selecione o tipo</option>
-                          <option value="AQL-GV-M4">AQL-GV-M4</option>
-                          <option value="ADP-M8">ADP-M8</option>
-                          <option value="ADP-M16">ADP-M16</option>
-                        </select>
-                      </div>
-                      <div>
-                        <Label htmlFor="controller-name-new">Nome do Controlador *</Label>
-                        <Input
-                          id="controller-name-new"
-                          value={controllerName}
-                          onChange={(e) => setControllerName(e.target.value)}
-                          required
-                          className="mt-2 h-12 px-4 rounded-xl border-border"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="controller-ip-new">Endereço IP *</Label>
-                        <Input
-                          id="controller-ip-new"
-                          value={controllerIp}
-                          onChange={(e) => setControllerIp(e.target.value)}
-                          required
-                          className="mt-2 h-12 px-4 rounded-xl border-border"
-                          pattern="((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
-                          title="Por favor, insira um endereço IP válido (ex: 192.168.0.1)."
-                        />
-                      </div>
-                      <Button type="submit" className="w-full h-12">Adicionar Controlador</Button>
-                    </form>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-
+            {/* Formulário de Adicionar Módulo */}
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
               <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-6">
@@ -450,7 +387,7 @@ export default function Modulos() {
                     </div>
                     <div>
                       <CardTitle className="text-2xl font-bold text-foreground">Adicionar Novo Módulo</CardTitle>
-                      <p className="text-muted-foreground mt-1">Preencha as informações do módulo físico</p>
+                      <p className="text-muted-foreground mt-1">Incluindo módulos físicos e controladores</p>
                     </div>
                   </div>
                 </CardHeader>
@@ -458,15 +395,15 @@ export default function Modulos() {
                   {loadingMeta ? (
                     <div className="flex items-center justify-center py-8 text-muted-foreground">
                       <div className="animate-spin rounded-full h-8 w-8 border-4 border-purple-500 border-t-transparent mr-4"></div>
-                      Carregando metadados...
+                      Carregando...
                     </div>
                   ) : (
                     <form className="space-y-6" onSubmit={handleCreate}>
                       <div>
-                        <Label htmlFor="tipo" className="text-sm font-semibold text-slate-700">Tipo *</Label>
+                        <Label htmlFor="tipo" className="text-sm font-semibold">Tipo *</Label>
                         <select
                           id="tipo"
-                          className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                          className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background"
                           value={tipo}
                           onChange={(e) => setTipo(e.target.value)}
                           required
@@ -481,13 +418,15 @@ export default function Modulos() {
                         </select>
                         {!!tipo && meta[tipo] && (
                           <p className="text-xs text-muted-foreground/90 mt-1">
-                            Canais: {meta[tipo].canais} • Tipos permitidos: {meta[tipo].tipos_permitidos.join(", ")}
+                            {meta[tipo].canais > 0 
+                              ? `Canais: ${meta[tipo].canais} • Tipos permitidos: ${meta[tipo].tipos_permitidos.join(", ")}`
+                              : "Controlador do Sistema"}
                           </p>
                         )}
                       </div>
 
                       <div>
-                        <Label htmlFor="nome" className="text-sm font-semibold text-slate-700">Nome do Módulo *</Label>
+                        <Label htmlFor="nome" className="text-sm font-semibold">Nome do Módulo *</Label>
                         <Input
                           id="nome"
                           value={nome}
@@ -495,33 +434,68 @@ export default function Modulos() {
                           placeholder={tipo && meta[tipo]?.nome_completo ? meta[tipo].nome_completo : ""}
                           required
                           disabled={isLocked}
-                          className="mt-2 h-12 px-4 rounded-xl border-border focus:border-purple-500 focus:ring-purple-500/20"
+                          className="mt-2 h-12 px-4 rounded-xl border-border"
                         />
                       </div>
+                      
+                      {/* Campos condicionais para Controladores */}
+                      {tipo && meta[tipo]?.canais === 0 && (
+                        <>
+                          <div>
+                            <Label htmlFor="controller-ip-new">Endereço IP (Opcional)</Label>
+                            <Input
+                              id="controller-ip-new"
+                              value={controllerIp}
+                              onChange={(e) => setControllerIp(e.target.value)}
+                              className="mt-2 h-12 px-4 rounded-xl border-border"
+                              pattern="((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
+                              title="Por favor, insira um endereço IP válido (ex: 192.168.0.1)."
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="quadroEletricoController" className="text-sm font-semibold">Quadro Elétrico *</Label>
+                            <select
+                              id="quadroEletricoController"
+                              className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background"
+                              value={quadroEletricoId}
+                              onChange={(e) => setQuadroEletricoId(Number(e.target.value))}
+                              disabled={isLocked || loadingQuadros}
+                              required
+                            >
+                              <option value="">Selecione um quadro</option>
+                              {quadros.map(quadro => (
+                                <option key={quadro.id} value={quadro.id}>
+                                  {quadro.nome} ({quadro.ambiente.nome})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </>
+                      )}
 
-                      <div>
-                        <Label htmlFor="quadroEletrico" className="text-sm font-semibold text-slate-700">Quadro Elétrico (Opcional)</Label>
-                        <select
-                          id="quadroEletrico"
-                          className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
-                          value={quadroEletricoId}
-                          onChange={(e) => setQuadroEletricoId(Number(e.target.value))}
-                          disabled={isLocked || loadingQuadros}
-                        >
-                          <option value="">Selecione um quadro elétrico (opcional)</option>
-                          {quadros.map(quadro => (
-                            <option key={quadro.id} value={quadro.id}>
-                              {quadro.nome} ({quadro.ambiente.nome} - {quadro.ambiente.area.nome})
-                            </option>
-                          ))}
-                        </select>
-                        {loadingQuadros && (
-                          <p className="text-xs text-muted-foreground/90 mt-1">Carregando quadros...</p>
-                        )}
-                      </div>
+                      {/* Campo de quadro para Módulos Normais */}
+                      {tipo && meta[tipo]?.canais > 0 && (
+                        <div>
+                          <Label htmlFor="quadroEletrico" className="text-sm font-semibold">Quadro Elétrico (Opcional)</Label>
+                          <select
+                            id="quadroEletrico"
+                            className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background"
+                            value={quadroEletricoId}
+                            onChange={(e) => setQuadroEletricoId(Number(e.target.value))}
+                            disabled={isLocked || loadingQuadros}
+                          >
+                            <option value="">Nenhum (ficará no quadro padrão)</option>
+                            {quadros.map(quadro => (
+                              <option key={quadro.id} value={quadro.id}>
+                                {quadro.nome} ({quadro.ambiente.nome})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
 
-                      <Button type="submit" className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2" disabled={isLocked}>
-                        <PlusCircle className="h-5 w-5" />
+                      <Button type="submit" className="w-full h-12" disabled={isLocked}>
+                        <PlusCircle className="h-5 w-5 mr-2" />
                         Adicionar Módulo
                       </Button>
                     </form>
@@ -530,8 +504,9 @@ export default function Modulos() {
               </Card>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-              <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
+            {/* Lista de Módulos */}
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="lg:col-span-1">
+              <Card className="bg-card/95 backdrop-blur-sm border-border shadow-xl shadow-primary/10">
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -539,7 +514,7 @@ export default function Modulos() {
                         <Boxes className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-2xl font-bold text-foreground">Módulos Cadastrados</CardTitle>
+                        <CardTitle className="text-2xl font-bold">Módulos Cadastrados</CardTitle>
                         <p className="text-muted-foreground mt-1">Lista de todos os módulos do projeto</p>
                       </div>
                     </div>
@@ -550,41 +525,46 @@ export default function Modulos() {
                 </CardHeader>
                 <CardContent>
                   {loading ? (
-                    <div className="flex flex-col justify-center items-center py-12">
-                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-4"></div>
-                      <p className="text-muted-foreground font-medium">Carregando módulos...</p>
+                    <div className="flex justify-center items-center py-12"><div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div></div>
+                  ) : modulos.length === 0 ? (
+                     <div className="text-center py-12">
+                      <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6"><Boxes className="h-10 w-10 text-muted-foreground/80" /></div>
+                      <h4 className="text-xl font-semibold mb-2">{projetoSelecionado ? "Nenhum módulo" : "Selecione um projeto"}</h4>
+                      <p className="text-muted-foreground max-w-sm mx-auto">{projetoSelecionado ? "Adicione seu primeiro módulo ou controlador." : "Selecione um projeto para ver os módulos."}</p>
                     </div>
-                  ) : regularModules.length === 0 ? (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-center py-12"
-                    >
-                      <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Boxes className="h-10 w-10 text-muted-foreground/80" />
-                      </div>
-                      <h4 className="text-xl font-semibold text-foreground mb-2">
-                        {projetoSelecionado === true ? "Nenhum módulo cadastrado" : "Selecione um projeto"}
-                      </h4>
-                      <p className="text-muted-foreground max-w-sm mx-auto">
-                        {projetoSelecionado === true
-                          ? "Comece adicionando seu primeiro módulo usando o formulário ao lado."
-                          : "Selecione um projeto para visualizar e gerenciar os módulos."}
-                      </p>
-                    </motion.div>
                   ) : (
-                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                      <AnimatePresence>
-                        {regularModules.map((m, index) => (
-                          <motion.li
-                            key={m.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ delay: index * 0.05 }}
-                            className="group relative overflow-hidden rounded-2xl border border-border bg-card/85 backdrop-blur-sm p-4 hover:bg-card/90 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300 flex items-center justify-between"
-                          >
-                            <div className="flex-1 mr-4">
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                      {modulos.filter(m => m.is_controller).map((m, index) => (
+                        <motion.div key={m.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ delay: index * 0.05 }} className="group relative overflow-hidden rounded-2xl border-2 border-amber-400 bg-amber-50/50 p-4">
+                          {/* Conteúdo do Módulo Controlador */}
+                           <div className="flex-1 mr-4">
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className="text-sm font-mono text-amber-800 bg-amber-200 px-2 py-1 rounded-lg">
+                                  {m.tipo}
+                                </span>
+                                {m.quadro_eletrico && (
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-700 flex items-center gap-1">
+                                    <CircuitBoard className="h-3 w-3" />
+                                    {m.quadro_eletrico.nome}
+                                  </Badge>
+                                )}
+                              </div>
+                              <h4 className="font-bold text-amber-900 text-lg mb-1">{m.nome}</h4>
+                              <div className="flex items-center gap-2 text-sm text-amber-800 mb-2">
+                                <Server className="h-4 w-4" />
+                                <span className="font-medium">IP: {m.ip_address || "Não definido"}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="icon" onClick={() => handleEdit(m)} className="h-8 w-8 hover:bg-blue-100"><Pencil className="h-4 w-4 text-blue-600" /></Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleDelete(m.id)} className="h-8 w-8 hover:bg-red-100"><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                              </div>
+                        </motion.div>
+                      ))}
+                      {regularModules.map((m, index) => (
+                         <motion.div key={m.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ delay: index * 0.05 }} className="group relative overflow-hidden rounded-2xl border border-border bg-card/85 p-4 flex items-center justify-between">
+                          {/* Conteúdo do Módulo Normal */}
+                           <div className="flex-1 mr-4">
                               <div className="flex items-center gap-3 mb-2">
                                 <span className="text-sm font-mono text-muted-foreground/90 bg-muted px-2 py-1 rounded-lg">
                                   {m.tipo}
@@ -601,35 +581,18 @@ export default function Modulos() {
                                 <Server className="h-4 w-4 text-muted-foreground/80" />
                                 <span className="font-medium">Canais: {m.quantidade_canais}</span>
                               </div>
-                              {m.vinc_count && m.vinc_count > 0 && (
+                              {m.vinc_count > 0 && (
                                 <Badge className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 mt-1 w-fit">
                                   Em uso ({m.vinc_count} vinculações)
                                 </Badge>
                               )}
                             </div>
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEdit(m)}
-                                  className="h-8 w-8 hover:bg-blue-100"
-                                >
-                                  <Pencil className="h-4 w-4 text-blue-600" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDelete(m.id)}
-                                  disabled={!!m.vinc_count && m.vinc_count > 0}
-                                  className="h-8 w-8 hover:bg-red-100"
-                                  title={m.vinc_count && m.vinc_count > 0 ? "Exclua as vinculações antes de remover este módulo." : undefined}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-600" />
-                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleEdit(m)} className="h-8 w-8 hover:bg-blue-100"><Pencil className="h-4 w-4 text-blue-600" /></Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleDelete(m.id)} disabled={m.vinc_count > 0} className="h-8 w-8 hover:bg-red-100"><Trash2 className="h-4 w-4 text-red-600" /></Button>
                               </div>
-                          </motion.li>
-                        ))}
-                      </AnimatePresence>
+                        </motion.div>
+                      ))}
                     </div>
                   )}
                 </CardContent>
