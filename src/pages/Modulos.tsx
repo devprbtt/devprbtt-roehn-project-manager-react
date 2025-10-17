@@ -21,6 +21,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import NavigationButtons from "@/components/NavigationButtons";
 import { Modulo } from "@/types/project";
 
+const CONTROLLER_TYPES = ["AQL-GV-M4", "ADP-M8", "ADP-M16"];
+
 type MetaModulo = {
   nome_completo: string;
   canais: number;
@@ -235,6 +237,7 @@ export default function Modulos() {
         body: JSON.stringify({
           nome: controller.nome.trim(),
           ip_address: controller.ip_address?.trim(),
+          quadro_eletrico_id: controller.quadro_eletrico?.id || null,
         }),
       });
       let data: any = null; try { data = await res.json(); } catch {}
@@ -271,6 +274,7 @@ export default function Modulos() {
           nome: editingModulo.nome.trim(),
           quadro_eletrico_id: editingModulo.quadro_eletrico?.id || null,
           hsnet: editingModulo.hsnet,
+          ip_address: CONTROLLER_TYPES.includes(editingModulo.tipo) ? editingModulo.ip_address : undefined,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -392,6 +396,31 @@ export default function Modulos() {
                           onChange={(e) => setController({ ...controller, ip_address: e.target.value })}
                           className="mt-2 h-12 px-4 rounded-xl border-border"
                         />
+                      </div>
+                      <div>
+                        <Label htmlFor="controller-quadro">Quadro Elétrico</Label>
+                        <select
+                          id="controller-quadro"
+                          value={controller.quadro_eletrico?.id || ""}
+                          onChange={(e) => {
+                            const newQuadroId = Number(e.target.value);
+                            const newQuadro = quadros.find(
+                              (q) => q.id === newQuadroId
+                            );
+                            setController({
+                              ...controller,
+                              quadro_eletrico: newQuadro ? { id: newQuadro.id, nome: newQuadro.nome } : undefined,
+                            });
+                          }}
+                          className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background"
+                        >
+                          <option value="">Nenhum</option>
+                          {quadros.map((quadro) => (
+                            <option key={quadro.id} value={quadro.id}>
+                              {quadro.nome} ({quadro.ambiente.nome})
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <Button onClick={handleUpdateController} className="w-full h-12">Salvar Controlador</Button>
                     </div>
@@ -656,17 +685,18 @@ export default function Modulos() {
                       }
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="edit-hsnet">HSNET</Label>
-                    <Input
-                      id="edit-hsnet"
-                      type="number"
-                      value={editingModulo.hsnet || ""}
-                      onChange={(e) =>
-                        setEditingModulo({ ...editingModulo, hsnet: Number(e.target.value) })
-                      }
-                    />
-                  </div>
+                  {CONTROLLER_TYPES.includes(editingModulo.tipo) && (
+                    <div>
+                      <Label htmlFor="edit-ip_address">Endereço IP</Label>
+                      <Input
+                        id="edit-ip_address"
+                        value={editingModulo.ip_address || ""}
+                        onChange={(e) =>
+                          setEditingModulo({ ...editingModulo, ip_address: e.target.value })
+                        }
+                      />
+                    </div>
+                  )}
                   <div>
                     <Label htmlFor="edit-quadro">Quadro Elétrico</Label>
                     <select

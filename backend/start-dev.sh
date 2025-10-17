@@ -3,7 +3,10 @@
 # Script para iniciar o ambiente de desenvolvimento
 # Uso: ./start-dev.sh ou bash start-dev.sh
 
-set -e  # Para em caso de erro
+# Script para iniciar o ambiente de desenvolvimento
+# Uso: ./start-dev.sh ou bash start-dev.sh
+
+set -e # Para em caso de erro
 
 echo "🚀 Iniciando ambiente de desenvolvimento Roehn..."
 
@@ -25,8 +28,10 @@ source venv/bin/activate
 
 # Instalar/atualizar dependências
 echo "📚 Instalando dependências..."
+set +e # Desativa o modo de erro para o pip
 pip install --upgrade pip
 pip install -r requirements.txt
+set -e # Reativa o modo de erro
 
 # Executar seed do banco de dados
 echo "🌱 Populando banco de dados com dados de exemplo..."

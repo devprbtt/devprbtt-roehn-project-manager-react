@@ -341,68 +341,85 @@ class RoehnProjectConverter:
         self._circuit_guid_map = {}
         self._quadro_guid_map = {}
         self._room_guid_map = {}
+        main_controller_id = None
 
-        # Primeiro, processar quadros elétricos e seus módulos
+        # Etapa PRE-1: Criar toda a estrutura de Areas, Ambientes e Quadros primeiro
+        # para que possamos encontrar o quadro da controladora pelo seu GUID.
         for area in projeto.areas:
-            print(f"Processando area: {area.nome}")
             self._ensure_area_exists(area.nome)
-
             for ambiente in area.ambientes:
-                print(f"Processando ambiente: {ambiente.nome}")
                 self._ensure_room_exists(area.nome, ambiente.nome, ambiente.id)
-                
-                # Processar quadros elétricos do ambiente
                 for quadro in ambiente.quadros_eletricos:
-                    print(f"Processando quadro elétrico: {quadro.nome}")
                     quadro_guid = self._ensure_automation_board_exists(area.nome, ambiente.nome, quadro.nome)
                     self._quadro_guid_map[quadro.id] = quadro_guid
-                    
-                    # Processar módulos do quadro elétrico
-                    for modulo in quadro.modulos:
-                        print(f"Processando modulo no quadro: {modulo.nome} ({modulo.tipo})")
-                        # ⭐⭐⭐ CORREÇÃO: Passar o quadro_guid para garantir que o módulo seja criado no quadro correto
-                        modulo_nome = self._ensure_module_exists(modulo, automation_board_guid=quadro_guid)
-                        
-                        # ⭐⭐⭐ NOVO: Registrar o módulo no quadro específico
-                        if modulo_nome:
-                            success = self._add_module_to_specific_board(modulo_nome, quadro_guid)
-                            if not success:
-                                print(f"⚠️  Aviso: Não foi possível adicionar o módulo {modulo_nome} ao quadro específico")
 
-        # Encontrar o controlador no projeto
+        # Etapa 1: Encontrar o controlador principal e colocá-lo no quadro correto
         controller_module_db = self.db_session.query(Modulo).filter_by(projeto_id=projeto.id, is_controller=True).first()
         if controller_module_db:
+            print(f"Controlador principal encontrado: {controller_module_db.nome} ({controller_module_db.tipo})")
+            main_controller_id = controller_module_db.id
             controller_info = {
                 'm4_ip': controller_module_db.ip_address,
                 'm4_hsnet': controller_module_db.hsnet,
                 'm4_devid': controller_module_db.dev_id,
             }
-            m4_module = self._create_controller_module(controller_module_db.tipo, controller_info)
+            controller_module_json = self._create_controller_module(controller_module_db.tipo, controller_info)
 
-            # Substituir o M4 padrão pelo controlador do projeto
-            self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"][0] = m4_module
+            # Remover a controladora padrão que vem na criação do projeto
+            default_board_modules = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"]
+            self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"] = [
+                m for m in default_board_modules if m.get("Logicserver") is not True
+            ]
 
+            # Encontrar o quadro elétrico associado ao controlador
+            target_board_db = controller_module_db.quadro_eletrico
+            if target_board_db and target_board_db.id in self._quadro_guid_map:
+                target_board_guid = self._quadro_guid_map[target_board_db.id]
+                target_board_json = self._find_automation_board_by_guid(target_board_guid)
+                if target_board_json:
+                    print(f"Controlador alocado no quadro: {target_board_db.nome}")
+                    target_board_json.setdefault("ModulesList", []).insert(0, controller_module_json)
+                else:
+                    # Fallback para o quadro padrão se o GUID não for encontrado (improvável)
+                    print(f"AVISO: Quadro com GUID {target_board_guid} não encontrado. Alocando no quadro padrão.")
+                    self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"].insert(0, controller_module_json)
+            else:
+                # Fallback para o quadro padrão se não estiver associado a um quadro
+                print("Controlador não associado a um quadro. Alocando no quadro padrão.")
+                self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"].insert(0, controller_module_json)
+        else:
+            print("Nenhum controlador principal definido, usando AQL-GV-M4 padrão.")
+            # O M4 padrão já está no local correto, então não fazemos nada.
 
-        # Processar módulos que não estão em quadros específicos (ficam no quadro padrão)
+        # Etapa 2: Processar módulos (exceto a controladora principal) em seus respectivos quadros
+        for area in projeto.areas:
+            for ambiente in area.ambientes:
+                for quadro in ambiente.quadros_eletricos:
+                    quadro_guid = self._quadro_guid_map.get(quadro.id)
+                    if not quadro_guid: continue
+
+                    for modulo in quadro.modulos:
+                        if modulo.id == main_controller_id:
+                            continue # Já processado
+
+                        print(f"Processando modulo no quadro '{quadro.nome}': {modulo.nome} ({modulo.tipo})")
+                        modulo_nome = self._ensure_module_exists(modulo, automation_board_guid=quadro_guid)
+
+                        if modulo_nome:
+                            self._add_module_to_specific_board(modulo_nome, quadro_guid)
+
+        # Etapa 3: Processar módulos órfãos (sem quadro)
         for modulo in projeto.modulos:
-            # Verificar se o módulo já foi processado (está em algum quadro)
-            modulo_em_quadro = False
-            for area in projeto.areas:
-                for ambiente in area.ambientes:
-                    for quadro in ambiente.quadros_eletricos:
-                        if modulo in quadro.modulos:
-                            modulo_em_quadro = True
-                            break
-                    if modulo_em_quadro:
-                        break
-                if modulo_em_quadro:
-                    break
+            if modulo.id == main_controller_id:
+                continue
+
+            modulo_em_quadro = getattr(modulo, 'quadro_eletrico_id', None) is not None
             
             if not modulo_em_quadro:
-                print(f"Processando modulo (quadro padrão): {modulo.nome} ({modulo.tipo})")
+                print(f"Processando modulo órfão (quadro padrão): {modulo.nome} ({modulo.tipo})")
                 self._ensure_module_exists(modulo)
 
-        # Etapa 1: Processar todos os circuitos e criar seus GUIDs e links físicos
+        # Etapa 4: Processar todos os circuitos e criar seus GUIDs e links físicos
         for area in projeto.areas:
             for ambiente in area.ambientes:
                 for circuito in ambiente.circuitos:
@@ -925,10 +942,33 @@ class RoehnProjectConverter:
             self._create_sa1_module(module_name, hsnet, dev_id, target_board)
         elif "DIM8" in key or "ADP-DIM8" in key:
             self._create_dim8_module(module_name, hsnet, dev_id, target_board)
+        elif "AQL-GV-M4" in key:
+            self._create_controller_as_module("AQL-GV-M4", module_name, hsnet, dev_id, target_board)
+        elif "ADP-M8" in key:
+            self._create_controller_as_module("ADP-M8", module_name, hsnet, dev_id, target_board)
+        elif "ADP-M16" in key:
+            self._create_controller_as_module("ADP-M16", module_name, hsnet, dev_id, target_board)
         else:
+            print(f"Tipo de módulo desconhecido '{key}', criando como ADP-RL12 por padrão.")
             self._create_rl12_module(module_name, hsnet, dev_id, target_board)
 
         return module_name
+
+    def _create_controller_as_module(self, controller_type, name, hsnet_address, dev_id, target_board=None):
+        """Cria um módulo que é um tipo de controlador, mas com Logicserver=False."""
+        controller_info = {
+            'm4_ip': '0.0.0.0',
+            'm4_hsnet': hsnet_address,
+            'm4_devid': dev_id,
+        }
+
+        module_json = self._create_controller_module(controller_type, controller_info)
+
+        module_json["Logicserver"] = False
+        module_json["Name"] = name
+        module_json["Guid"] = str(uuid.uuid4())
+
+        self._add_module_to_project(module_json, module_json["Guid"], target_board)
 
     def _create_rl4_module(self, name, hsnet_address, dev_id, target_board=None):
         """Cria um módulo RL4"""
