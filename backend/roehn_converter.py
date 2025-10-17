@@ -168,7 +168,7 @@ class RoehnProjectConverter:
             "DriverGuid": config["DriverGuid"],
             "Guid": str(uuid.uuid4()),
             "IpAddress": project_info.get('m4_ip'),
-            "HsnetAddress": int(project_info.get('m4_hsnet', 245)),
+            "HsnetAddress": int(project_info.get('m4_hsnet') or 245),
             "PollTiming": 0,
             "Disabled": False,
             "RemotePort": 0,
