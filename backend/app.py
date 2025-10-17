@@ -53,7 +53,11 @@ MODULO_INFO = {
     'RL4': {'nome_completo': 'AQL-GV-RL4', 'canais': 4, 'tipos_permitidos': ['luz']},
     'LX4': {'nome_completo': 'ADP-LX4', 'canais': 4, 'tipos_permitidos': ['persiana']},
     'SA1': {'nome_completo': 'AQL-GV-SA1', 'canais': 1, 'tipos_permitidos': ['hvac']},
-    'DIM8': {'nome_completo': 'ADP-DIM8', 'canais': 8, 'tipos_permitidos': ['luz']}
+    'DIM8': {'nome_completo': 'ADP-DIM8', 'canais': 8, 'tipos_permitidos': ['luz']},
+    # Controladores
+    'AQL-GV-M4': {'nome_completo': 'AQL-GV-M4', 'canais': 0, 'tipos_permitidos': []},
+    'ADP-M8': {'nome_completo': 'ADP-M8', 'canais': 0, 'tipos_permitidos': []},
+    'ADP-M16': {'nome_completo': 'ADP-M16', 'canais': 0, 'tipos_permitidos': []},
 }
 
 # Keypad metadata (RQR-K)
@@ -223,6 +227,13 @@ def is_hsnet_in_use(hsnet, projeto_id, exclude_keypad_id=None, exclude_modulo_id
     if exclude_modulo_id is not None:
         modulo_query = modulo_query.filter(Modulo.id != exclude_modulo_id)
     return modulo_query.first() is not None
+
+def is_valid_ip(ip):
+    if not ip:
+        return True  # Permite IP vazio
+    # Regex para validar endereço IPv4
+    pattern = re.compile(r"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$")
+    return pattern.match(ip) is not None
 
 
 @event.listens_for(Engine, "connect")
@@ -1522,6 +1533,9 @@ def api_modulos_create():
     is_controller = data.get("is_controller", False)
     ip_address = data.get("ip_address", None)
 
+    if ip_address and not is_valid_ip(ip_address):
+        return jsonify({"ok": False, "error": "Formato de endereço IP inválido."}), 400
+
     if is_controller:
         if tipo not in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]:
             return jsonify({"ok": False, "error": "Tipo de controlador inválido."}), 400
@@ -1562,7 +1576,10 @@ def api_modulos_update(modulo_id):
         m.nome = nome
 
     if "ip_address" in data:
-        m.ip_address = data.get("ip_address")
+        ip_address = data.get("ip_address")
+        if ip_address and not is_valid_ip(ip_address):
+            return jsonify({"ok": False, "error": "Formato de endereço IP inválido."}), 400
+        m.ip_address = ip_address
     
     if "quadro_eletrico_id" in data:
         quadro_id = data.get("quadro_eletrico_id")

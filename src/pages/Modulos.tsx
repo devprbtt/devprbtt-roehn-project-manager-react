@@ -206,6 +206,13 @@ export default function Modulos() {
       toast({ variant: "destructive", title: "Erro", description: "Preencha todos os campos do controlador." });
       return;
     }
+
+    const ipRegex = /^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    if (!ipRegex.test(controllerIp.trim())) {
+        toast({ variant: "destructive", title: "Erro de Validação", description: "O formato do endereço IP é inválido." });
+        return;
+    }
+
     try {
       const res = await fetch("/api/modulos", {
         method: "POST",
@@ -435,6 +442,8 @@ export default function Modulos() {
                           onChange={(e) => setControllerIp(e.target.value)}
                           required
                           className="mt-2 h-12 px-4 rounded-xl border-border"
+                          pattern="((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
+                          title="Por favor, insira um endereço IP válido (ex: 192.168.0.1)."
                         />
                       </div>
                       <Button type="submit" className="w-full h-12">Adicionar Controlador</Button>

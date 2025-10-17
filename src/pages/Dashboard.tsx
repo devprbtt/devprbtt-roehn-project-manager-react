@@ -193,10 +193,24 @@ const Dashboard: React.FC = () => {
         // Isso é mais simples e confiável, e garante que o projeto recém-criado
         // (que o backend já define como atual) seja refletido corretamente na UI.
         await loadProjects();
+        toast({
+          title: `Projeto '${formData.name}' criado com sucesso!`,
+          description: "Agora você pode começar a adicionar áreas e ambientes.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erro ao criar projeto",
+          description: data.error || "Ocorreu um erro desconhecido.",
+        });
       }
     } catch (error) {
       console.error("Erro ao criar projeto:", error);
-      // Adicionar feedback para o usuário, ex: toast
+      toast({
+        variant: "destructive",
+        title: "Erro de Conexão",
+        description: "Não foi possível conectar ao servidor para criar o projeto.",
+      });
     } finally {
       setShowCreateForm(false);
       setIsLoading(false);
