@@ -18,6 +18,8 @@ export interface Modulo {
   id: number;
   nome: string;
   tipo: string;
+  is_controller: boolean;
+  ip_address?: string;
 }
 
 export interface QuadroEletrico {
