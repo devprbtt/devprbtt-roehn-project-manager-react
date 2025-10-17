@@ -19,6 +19,7 @@ import { useProject } from "@/store/project";
 import { PlusCircle, Trash2, Boxes, Server, Sparkles, CircuitBoard, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import NavigationButtons from "@/components/NavigationButtons";
+import { Modulo } from "@/types/project";
 
 type MetaModulo = {
   nome_completo: string;
@@ -35,19 +36,6 @@ type QuadroEletrico = {
     area: {
       nome: string;
     };
-  };
-};
-
-type Modulo = {
-  id: number;
-  nome: string;
-  tipo: string;
-  hsnet?: number;
-  quantidade_canais: number;
-  vinc_count?: number;
-  quadro_eletrico?: {
-    id: number;
-    nome: string;
   };
 };
 

@@ -18,6 +18,13 @@ export interface Modulo {
   id: number;
   nome: string;
   tipo: string;
+  hsnet?: number;
+  quantidade_canais: number;
+  vinc_count?: number;
+  quadro_eletrico?: {
+    id: number;
+    nome: string;
+  };
   is_controller: boolean;
   ip_address?: string;
 }
