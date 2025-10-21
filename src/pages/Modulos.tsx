@@ -149,6 +149,16 @@ export default function Modulos() {
     else setNome("");
   }, [tipo, meta]);
 
+  useEffect(() => {
+    // Se não houver nenhum controlador, o próximo a ser adicionado DEVE ser o logic server.
+    const hasControllers = modulos.some(m => m.is_controller);
+    if (!hasControllers) {
+      setIsLogicServer(true);
+    } else {
+      setIsLogicServer(false);
+    }
+  }, [modulos]);
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!tipo || !nome.trim()) {
@@ -392,6 +402,7 @@ export default function Modulos() {
                           id="is-logic-server"
                           checked={isLogicServer}
                           onCheckedChange={(checked) => setIsLogicServer(!!checked)}
+                          disabled={modulos.filter(m => m.is_controller).length === 0}
                         />
                         <Label htmlFor="is-logic-server" className="font-medium">
                           Definir como Logic Server
@@ -651,6 +662,7 @@ export default function Modulos() {
                               is_logic_server: !!checked,
                             })
                           }
+                          disabled={editingModulo.is_logic_server && modulos.filter(m => m.is_controller).length === 1}
                         />
                         <Label htmlFor="edit-is-logic-server">
                           Definir como Logic Server

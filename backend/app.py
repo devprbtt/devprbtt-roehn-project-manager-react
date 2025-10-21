@@ -1461,6 +1461,16 @@ def api_modulos_delete(modulo_id):
                      "Exclua as vinculações antes de remover o módulo."
         }), 409
 
+    # Se o módulo a ser deletado é o logic server, promove outro a sê-lo
+    if m.is_logic_server:
+        outro_controller = Modulo.query.filter(
+            Modulo.projeto_id == projeto_id,
+            Modulo.is_controller == True,
+            Modulo.id != m.id
+        ).first()
+        if outro_controller:
+            outro_controller.is_logic_server = True
+
     db.session.delete(m)
     db.session.commit()
     return jsonify({"ok": True})
@@ -1542,6 +1552,12 @@ def api_modulos_create():
         if tipo not in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]:
             return jsonify({"ok": False, "error": "Tipo de controlador inválido."}), 400
 
+        # Checar se já existem outros controladores no projeto
+        existing_controllers = Modulo.query.filter_by(projeto_id=projeto_id, is_controller=True).count()
+        if existing_controllers == 0:
+            # Se for o primeiro, forçar a ser o logic server
+            is_logic_server = True
+
     # Se este módulo está sendo definido como o logic server, desmarque qualquer outro
     if is_logic_server:
         Modulo.query.filter_by(projeto_id=projeto_id, is_logic_server=True).update({"is_logic_server": False})
@@ -1587,6 +1603,19 @@ def api_modulos_update(modulo_id):
 
     if "is_logic_server" in data:
         is_logic_server = data.get("is_logic_server", False)
+
+        # Se o usuário está tentando desmarcar o logic server
+        if not is_logic_server and m.is_logic_server:
+            # Verificar se existem outros controladores no projeto
+            outros_controllers = Modulo.query.filter(
+                Modulo.projeto_id == projeto_id,
+                Modulo.is_controller == True,
+                Modulo.id != modulo_id
+            ).count()
+
+            if outros_controllers > 0:
+                return jsonify({"ok": False, "error": "Não é possível desmarcar o único Logic Server. Promova outro controlador primeiro."}), 400
+
         if is_logic_server:
             # Desmarcar qualquer outro logic server no mesmo projeto
             Modulo.query.filter(
@@ -1594,6 +1623,7 @@ def api_modulos_update(modulo_id):
                 Modulo.id != modulo_id,
                 Modulo.is_logic_server == True
             ).update({"is_logic_server": False})
+
         m.is_logic_server = is_logic_server
     
     if "quadro_eletrico_id" in data:
