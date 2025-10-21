@@ -128,7 +128,7 @@ const BarraProgressoGrupo = ({ utilizacao, index, canalSelecionado }: BarraProgr
       transition={{ delay: index * 0.1 }}
       className={`p-4 rounded-xl border-2 transition-all duration-300 ${
         canalNoGrupo 
-          ? 'border-blue-300 bg-blue-50 shadow-sm' 
+          ? 'border-blue-300 bg-blue-50 dark:bg-blue-900/20 shadow-sm'
           : 'border-border bg-background'
       }`}
     >
@@ -622,10 +622,10 @@ export default function Vinculacao() {
     
     return (
       <SecaoUtilizacaoAnimada visivel={true}>
-        <div className="mt-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm">
+        <div className="mt-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-200 dark:border-blue-800/30 rounded-xl shadow-sm">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Zap className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+              <Zap className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
               <h4 className="font-semibold text-primary">Limites Elétricos</h4>

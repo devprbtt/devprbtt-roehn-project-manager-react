@@ -435,8 +435,8 @@ const Dashboard: React.FC = () => {
         {/* Import Section */}
         <ImportProjectSection onProjectImported={loadProjects} />
 
-        {/* Navigation Guide */}
-        {currentProject && <NavigationGuide />}
+        {/* Navigation Guide - REMOVED */}
+        {/* {currentProject && <NavigationGuide />} */}
       </div>
     </Layout>
   );
