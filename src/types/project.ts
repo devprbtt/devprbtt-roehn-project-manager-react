@@ -26,7 +26,13 @@ export interface Modulo {
     nome: string;
   };
   is_controller: boolean;
+  is_logic_server: boolean;
   ip_address?: string;
+  parent_controller_id?: number | null;
+  parent_controller?: {
+    id: number;
+    nome: string;
+  } | null;
 }
 
 export interface QuadroEletrico {

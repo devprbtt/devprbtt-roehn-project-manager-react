@@ -35,6 +35,7 @@ type QuadroEletrico = {
   id: number;
   nome: string;
   ambiente: {
+    id: number;
     nome: string;
     area: {
       nome: string;
@@ -67,7 +68,7 @@ export default function Modulos() {
   const [controllerIp, setControllerIp] = useState("");
   const [controllerQuadroId, setControllerQuadroId] = useState<number | "">("");
   const [isLogicServer, setIsLogicServer] = useState(false);
-
+  
   // edit state
   const [editingModulo, setEditingModulo] = useState<Modulo | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -350,13 +351,6 @@ export default function Modulos() {
                         <select id="controller-quadro" className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background" value={controllerQuadroId} onChange={(e) => setControllerQuadroId(Number(e.target.value))} required>
                           <option value="">Selecione um quadro</option>
                           {quadros.map((quadro) => <option key={quadro.id} value={quadro.id}>{quadro.nome} ({quadro.ambiente.nome})</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <Label htmlFor="controller-ambiente">Ambiente *</Label>
-                        <select id="controller-ambiente" className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background" value={controllerQuadroId} onChange={(e) => setControllerQuadroId(Number(e.target.value))} required>
-                          <option value="">Selecione um ambiente</option>
-                          {quadros.map((quadro) => <option key={quadro.id} value={quadro.ambiente.id}>{quadro.ambiente.nome} ({quadro.ambiente.area.nome})</option>)}
                         </select>
                       </div>
                       <div>
