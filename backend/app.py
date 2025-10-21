@@ -2386,7 +2386,11 @@ def exportar_projeto(projeto_id):
             'quantidade_canais': modulo.quantidade_canais,
             'hsnet': modulo.hsnet,
             'dev_id': modulo.dev_id,
+            'is_controller': modulo.is_controller,
+            'is_logic_server': modulo.is_logic_server,
+            'ip_address': modulo.ip_address,
             'quadro_eletrico_id': modulo.quadro_eletrico_id,
+            'parent_controller_id': modulo.parent_controller_id,
         })
         # Coletar vinculações associadas
         for vinc in modulo.vinculacoes:
@@ -2754,13 +2758,16 @@ def importar_projeto():
 
             # 5. Criar Módulos
             for modulo_data in data.get('modulos', []):
-                novo_quadro_id = id_map['quadros_eletricos'].get(modulo_data['quadro_eletrico_id'])
+                novo_quadro_id = id_map['quadros_eletricos'].get(modulo_data.get('quadro_eletrico_id'))
                 novo_modulo = Modulo(
                     nome=modulo_data['nome'],
                     tipo=modulo_data['tipo'],
                     quantidade_canais=modulo_data['quantidade_canais'],
                     hsnet=modulo_data.get('hsnet'),
                     dev_id=modulo_data.get('dev_id'),
+                    is_controller=modulo_data.get('is_controller', False),
+                    is_logic_server=modulo_data.get('is_logic_server', False),
+                    ip_address=modulo_data.get('ip_address'),
                     quadro_eletrico_id=novo_quadro_id,
                     projeto_id=novo_projeto.id
                 )
@@ -2914,6 +2921,16 @@ def importar_projeto():
 
             # 10. Pós-processamento para atualizar referências
             db.session.flush()
+
+            # Atualizar parent_controller_id nos módulos
+            for modulo_data in data.get('modulos', []):
+                if modulo_data.get('parent_controller_id'):
+                    novo_modulo_id = id_map['modulos'].get(modulo_data['id'])
+                    novo_parent_id = id_map['modulos'].get(modulo_data['parent_controller_id'])
+                    if novo_modulo_id and novo_parent_id:
+                        module_to_update = db.session.get(Modulo, novo_modulo_id)
+                        if module_to_update:
+                            module_to_update.parent_controller_id = novo_parent_id
             # Atualizar KeypadButton.cena_id
             for btn_data in data.get('keypad_buttons', []):
                 if btn_data.get('cena_id'):
