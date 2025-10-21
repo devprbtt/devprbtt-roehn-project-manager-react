@@ -91,6 +91,121 @@ class RoehnProjectConverter:
         }
         self._quadro_guid_map = {}
 
+    def _create_controller_module(self, controller_type, project_info):
+        """Creates the main controller module based on its type."""
+
+        controller_configs = {
+            "AQL-GV-M4": {
+                "Name": "AQL-GV-M4",
+                "DriverGuid": "80000000-0000-0000-0000-000000000016",
+                "DevID": 1,
+                "ACNET_SlotCapacity": 24,
+                "Scene_SlotCapacity": 96,
+                "UnitIds": [39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57]
+            },
+            "ADP-M8": {
+                "Name": "ADP-M8",
+                "DriverGuid": "80000000-0000-0000-0000-000000000018",
+                "DevID": 3,
+                "ACNET_SlotCapacity": 250,
+                "Scene_SlotCapacity": 256,
+                "UnitIds": [59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77]
+            },
+            "ADP-M16": {
+                "Name": "ADP-M16",
+                "DriverGuid": "80000000-0000-0000-0000-000000000004",
+                "DevID": 5,
+                "ACNET_SlotCapacity": 250,
+                "Scene_SlotCapacity": 256,
+                "UnitIds": [104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122]
+            }
+        }
+
+        config = controller_configs.get(controller_type, controller_configs["AQL-GV-M4"])
+
+        unit_composers_data = [
+            {"Name": "Ativo", "PortNumber": 1, "PortType": 0, "IO": 0, "Kind": 0, "NotProgrammable": False},
+            {"Name": "Modulos HSNET ativos", "PortNumber": 1, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Modulos HSNET registrados", "PortNumber": 2, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Data", "PortNumber": 3, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
+            {"Name": "Hora", "PortNumber": 4, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
+            {"Name": "DST", "PortNumber": 2, "PortType": 0, "IO": 0, "Kind": 0, "NotProgrammable": False},
+            {"Name": "Nascer do Sol", "PortNumber": 5, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
+            {"Name": "Por do sol", "PortNumber": 6, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
+            {"Name": "Posição Solar", "PortNumber": 7, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Flag RTC", "PortNumber": 8, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Flag SNTP", "PortNumber": 9, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Flag MYIP", "PortNumber": 10, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Flag DDNS", "PortNumber": 11, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Web IP", "PortNumber": 1, "PortType": 1100, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Ultima inicializacao", "PortNumber": 2, "PortType": 1100, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Tensao", "PortNumber": 12, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Corrente", "PortNumber": 13, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Power", "PortNumber": 14, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Temperatura", "PortNumber": 15, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+        ]
+
+        unit_composers = []
+        for i, composer_data in enumerate(unit_composers_data):
+            unit_composers.append({
+                "$type": "UnitComposer",
+                "Name": composer_data["Name"],
+                "PortNumber": composer_data["PortNumber"],
+                "PortType": composer_data["PortType"],
+                "IO": composer_data["IO"],
+                "Kind": composer_data["Kind"],
+                "NotProgrammable": composer_data["NotProgrammable"],
+                "Unit": {
+                    "$type": "Unit", "Id": config["UnitIds"][i], "Event": 0, "Scene": 0,
+                    "Disabled": False, "Logged": False, "Memo": False, "Increment": False
+                },
+                "Value": 0
+            })
+
+        controller_module = {
+            "$type": "Module",
+            "Name": config["Name"],
+            "DriverGuid": config["DriverGuid"],
+            "Guid": str(uuid.uuid4()),
+            "IpAddress": project_info.get('m4_ip'),
+            "HsnetAddress": int(project_info.get('m4_hsnet') or 245),
+            "PollTiming": 0,
+            "Disabled": False,
+            "RemotePort": 0,
+            "RemoteIpAddress": project_info.get('m4_ip'),
+            "Notes": None,
+            "Logicserver": True,
+            "DevID": config["DevID"],
+            "DevIDSlave": 0,
+            "UnitComposers": unit_composers,
+            "Slots": [
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": config["ACNET_SlotCapacity"],
+                    "SlotType": 0,
+                    "InitialPort": 1,
+                    "IO": 0,
+                    "UnitComposers": None,
+                    "SubItemsGuid": [self.zero_guid],
+                    "Name": "ACNET/RNET",
+                },
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": config["Scene_SlotCapacity"],
+                    "SlotType": 8,
+                    "InitialPort": 1,
+                    "IO": 1,
+                    "UnitComposers": None,
+                    "SubItemsGuid": [self.zero_guid] * config["Scene_SlotCapacity"],
+                    "Name": "Scene",
+                },
+            ],
+            "SmartGroup": 1,
+            "UserInterfaceGuid": self.zero_guid,
+            "PIRSensorReportEnable": False,
+            "PIRSensorReportID": 0,
+        }
+        return controller_module
 
     def process_json_project(self):
         try:
@@ -226,57 +341,67 @@ class RoehnProjectConverter:
         self._circuit_guid_map = {}
         self._quadro_guid_map = {}
         self._room_guid_map = {}
+        main_controller_id = None
 
-        # Primeiro, processar quadros elétricos e seus módulos
+        # Etapa PRE-1: Criar toda a estrutura de Areas, Ambientes e Quadros primeiro
+        # para que possamos encontrar o quadro da controladora pelo seu GUID.
         for area in projeto.areas:
-            print(f"Processando area: {area.nome}")
             self._ensure_area_exists(area.nome)
-
             for ambiente in area.ambientes:
-                print(f"Processando ambiente: {ambiente.nome}")
                 self._ensure_room_exists(area.nome, ambiente.nome, ambiente.id)
-                
-                # Processar quadros elétricos do ambiente
                 for quadro in ambiente.quadros_eletricos:
-                    print(f"Processando quadro elétrico: {quadro.nome}")
                     quadro_guid = self._ensure_automation_board_exists(area.nome, ambiente.nome, quadro.nome)
                     self._quadro_guid_map[quadro.id] = quadro_guid
-                    
-                    # Processar módulos do quadro elétrico
-                    for modulo in quadro.modulos:
-                        print(f"Processando modulo no quadro: {modulo.nome} ({modulo.tipo})")
-                        # ⭐⭐⭐ CORREÇÃO: Passar o quadro_guid para garantir que o módulo seja criado no quadro correto
-                        modulo_nome = self._ensure_module_exists(modulo, automation_board_guid=quadro_guid)
-                        
-                        # ⭐⭐⭐ NOVO: Registrar o módulo no quadro específico
-                        if modulo_nome:
-                            success = self._add_module_to_specific_board(modulo_nome, quadro_guid)
-                            if not success:
-                                print(f"⚠️  Aviso: Não foi possível adicionar o módulo {modulo_nome} ao quadro específico")
 
-        # Reposicionar o módulo M4 no quadro selecionado, se necessário
-        self._move_m4_to_selected_board()
+        # Etapa 1: Encontrar o controlador "Logic Server" e colocá-lo no quadro correto
+        logic_server_module_db = self.db_session.query(Modulo).filter_by(
+            projeto_id=projeto.id,
+            is_logic_server=True
+        ).first()
 
-        # Processar módulos que não estão em quadros específicos (ficam no quadro padrão)
-        for modulo in projeto.modulos:
-            # Verificar se o módulo já foi processado (está em algum quadro)
-            modulo_em_quadro = False
-            for area in projeto.areas:
-                for ambiente in area.ambientes:
-                    for quadro in ambiente.quadros_eletricos:
-                        if modulo in quadro.modulos:
-                            modulo_em_quadro = True
-                            break
-                    if modulo_em_quadro:
-                        break
-                if modulo_em_quadro:
-                    break
-            
-            if not modulo_em_quadro:
-                print(f"Processando modulo (quadro padrão): {modulo.nome} ({modulo.tipo})")
-                self._ensure_module_exists(modulo)
+        if logic_server_module_db:
+            print(f"Logic Server encontrado: {logic_server_module_db.nome} ({logic_server_module_db.tipo})")
+            main_controller_id = logic_server_module_db.id
+            controller_info = {
+                'm4_ip': logic_server_module_db.ip_address,
+                'm4_hsnet': logic_server_module_db.hsnet,
+                'm4_devid': logic_server_module_db.dev_id,
+            }
+            controller_module_json = self._create_controller_module(logic_server_module_db.tipo, controller_info)
 
-        # Etapa 1: Processar todos os circuitos e criar seus GUIDs e links físicos
+            # Remover a controladora padrão que vem na criação do projeto
+            default_board_modules = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"]
+            self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"] = [
+                m for m in default_board_modules if m.get("Logicserver") is not True
+            ]
+
+            # Encontrar o quadro elétrico associado ao controlador
+            target_board_db = logic_server_module_db.quadro_eletrico
+            if target_board_db and target_board_db.id in self._quadro_guid_map:
+                target_board_guid = self._quadro_guid_map[target_board_db.id]
+                target_board_json = self._find_automation_board_by_guid(target_board_guid)
+                if target_board_json:
+                    print(f"Logic Server alocado no quadro: {target_board_db.nome}")
+                    target_board_json.setdefault("ModulesList", []).insert(0, controller_module_json)
+                else:
+                    print(f"AVISO: Quadro com GUID {target_board_guid} não encontrado. Alocando no quadro padrão.")
+                    self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"].insert(0, controller_module_json)
+            else:
+                print("Logic Server não associado a um quadro. Alocando no quadro padrão.")
+                self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"].insert(0, controller_module_json)
+        else:
+            # Se nenhum logic server for encontrado, o que não deveria acontecer, loga um erro.
+            # A controladora padrão M4 do template inicial será usada.
+            print("ERRO CRÍTICO: Nenhum Logic Server encontrado no projeto. O arquivo RWP pode estar incompleto.")
+
+        # Etapa 2: Processar todos os outros módulos (controladores ou não)
+        all_modules_db = self.db_session.query(Modulo).filter(Modulo.id != main_controller_id).all()
+
+        for modulo_db in all_modules_db:
+            quadro_guid = self._quadro_guid_map.get(modulo_db.quadro_eletrico_id)
+            self._ensure_module_exists(modulo_db, automation_board_guid=quadro_guid)
+
+        # Etapa 3: Processar todos os circuitos e criar seus GUIDs e links físicos
         for area in projeto.areas:
             for ambiente in area.ambientes:
                 for circuito in ambiente.circuitos:
@@ -395,75 +520,49 @@ class RoehnProjectConverter:
         return new_board_guid
 
     def _verify_and_fix_acnet(self):
-        """Verifica e corrige o ACNET do M4 para incluir todos os módulos"""
+        """Verifica e corrige o ACNET de cada controlador para incluir seus módulos filhos."""
         try:
-            _, _, acnet_slot = self._get_m4_module_components()
-            if not acnet_slot:
-                return
-            
-            # Coletar todos os GUIDs de módulos do projeto (exceto o M4)
-            all_module_guids = set()
+            # Encontrar todos os controladores no projeto JSON
+            controllers_json = []
             for area in self.project_data["Areas"]:
                 for room in area.get("SubItems", []):
                     for board in room.get("AutomationBoards", []):
                         for module in board.get("ModulesList", []):
-                            guid = module.get("Guid")
-                            if guid and guid != self.zero_guid:
-                                # Não incluir o próprio M4
-                                if module.get("Name") != "AQL-GV-M4":
-                                    all_module_guids.add(guid)
+                            if module.get("DriverGuid") in ["80000000-0000-0000-0000-000000000016", "80000000-0000-0000-0000-000000000018", "80000000-0000-0000-0000-000000000004"]:
+                                controllers_json.append(module)
             
-            # Atualizar o ACNET
-            current_acnet_guids = set(acnet_slot.get("SubItemsGuid", []))
-            current_acnet_guids.discard(self.zero_guid)
-            
-            # Adicionar módulos que estão faltando
-            missing_guids = all_module_guids - current_acnet_guids
-            if missing_guids:
-                print(f"🔧 Corrigindo ACNET: Adicionando {len(missing_guids)} módulos faltantes")
+            # Mapear Nomes para GUIDs JSON
+            module_name_to_guid = {m.get("Name"): m.get("Guid") for area in self.project_data["Areas"] for room in area.get("SubItems", []) for board in room.get("AutomationBoards", []) for m in board.get("ModulesList", [])}
+
+            for controller_json in controllers_json:
+                controller_name = controller_json.get("Name")
+                print(f"🔧 Verificando ACNET para o controlador: {controller_name}")
                 
-                # Substituir os zeros pelos GUIDs faltantes
-                new_acnet_list = []
-                for guid in acnet_slot["SubItemsGuid"]:
-                    if guid == self.zero_guid and missing_guids:
-                        new_guid = missing_guids.pop()
-                        new_acnet_list.append(new_guid)
-                        # Log do módulo sendo adicionado
-                        module_name = "Desconhecido"
-                        for area in self.project_data["Areas"]:
-                            for room in area.get("SubItems", []):
-                                for board in room.get("AutomationBoards", []):
-                                    for module in board.get("ModulesList", []):
-                                        if module.get("Guid") == new_guid:
-                                            module_name = module.get("Name", "Sem nome")
-                                            break
-                        print(f"  ✅ Adicionado: {module_name} ({new_guid})")
-                    else:
-                        new_acnet_list.append(guid)
+                # Encontrar o controlador no DB para pegar os filhos
+                controller_db = self.db_session.query(Modulo).filter_by(nome=controller_name, projeto_id=self.project_data.get('id')).first()
+                if not controller_db:
+                    print(f"  AVISO: Controlador '{controller_name}' não encontrado no DB.")
+                    continue
+
+                # Coletar GUIDs dos módulos filhos
+                child_module_guids = set()
+                for child_db in controller_db.child_modules:
+                    child_guid = module_name_to_guid.get(child_db.nome)
+                    if child_guid:
+                        child_module_guids.add(child_guid)
+
+                acnet_slot = next((s for s in controller_json.get("Slots", []) if s.get("Name") == "ACNET/RNET"), None)
+                if not acnet_slot:
+                    print(f"  ERRO: Slot ACNET/RNET não encontrado para {controller_name}.")
+                    continue
+
+                # Limpar e preencher o ACNET
+                acnet_slot["SubItemsGuid"] = list(child_module_guids)
+                if len(acnet_slot["SubItemsGuid"]) < acnet_slot.get("SlotCapacity", 1):
+                    acnet_slot["SubItemsGuid"].append(self.zero_guid)
                 
-                # Adicionar quaisquer GUIDs restantes no final
-                for remaining_guid in missing_guids:
-                    new_acnet_list.append(remaining_guid)
-                    # Log do módulo sendo adicionado
-                    module_name = "Desconhecido"
-                    for area in self.project_data["Areas"]:
-                        for room in area.get("SubItems", []):
-                            for board in room.get("AutomationBoards", []):
-                                for module in board.get("ModulesList", []):
-                                    if module.get("Guid") == remaining_guid:
-                                        module_name = module.get("Name", "Sem nome")
-                                        break
-                    print(f"  ✅ Adicionado (final): {module_name} ({remaining_guid})")
-                
-                # Garantir que termina com um zero
-                if new_acnet_list and new_acnet_list[-1] != self.zero_guid:
-                    new_acnet_list.append(self.zero_guid)
-                
-                acnet_slot["SubItemsGuid"] = new_acnet_list
-                print(f"✅ ACNET corrigido com sucesso!")
-            else:
-                print(f"✅ ACNET já está correto - todos os {len(all_module_guids)} módulos estão registrados")
-                
+                print(f"  ✅ ACNET para '{controller_name}' atualizado com {len(child_module_guids)} módulos.")
+
         except Exception as e:
             print(f"❌ Erro ao verificar/corrigir ACNET: {e}")
             import traceback
@@ -481,103 +580,7 @@ class RoehnProjectConverter:
         
         # No método create_project, substitua a definição do m4_module por:
 
-        # Módulo base M4 (obrigatório) com UnitComposers
-        m4_module_guid = str(uuid.uuid4())
-        m4_unit_composers = []
-
-        # Lista de UnitComposers para o M4 baseada no exemplo do Roehn Wizard
-        m4_composers_data = [
-            {"Name": "Ativo", "PortNumber": 1, "PortType": 0, "IO": 0, "Kind": 0, "NotProgrammable": False},
-            {"Name": "Modulos HSNET ativos", "PortNumber": 1, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Modulos HSNET registrados", "PortNumber": 2, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Data", "PortNumber": 3, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
-            {"Name": "Hora", "PortNumber": 4, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
-            {"Name": "DST", "PortNumber": 2, "PortType": 0, "IO": 0, "Kind": 0, "NotProgrammable": False},
-            {"Name": "Nascer do Sol", "PortNumber": 5, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
-            {"Name": "Por do sol", "PortNumber": 6, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
-            {"Name": "Posição Solar", "PortNumber": 7, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Flag RTC", "PortNumber": 8, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Flag SNTP", "PortNumber": 9, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Flag MYIP", "PortNumber": 10, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Flag DDNS", "PortNumber": 11, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Web IP", "PortNumber": 1, "PortType": 1100, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Ultima inicializacao", "PortNumber": 2, "PortType": 1100, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Tensao", "PortNumber": 12, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Corrente", "PortNumber": 13, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Power", "PortNumber": 14, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-            {"Name": "Temperatura", "PortNumber": 15, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
-        ]
-
-        # Iniciar IDs a partir de 39, conforme o exemplo
-        next_unit_id = 39
-
-        for composer in m4_composers_data:
-            unit_composer = {
-                "$type": "UnitComposer",
-                "Name": composer["Name"],
-                "PortNumber": composer["PortNumber"],
-                "PortType": composer["PortType"],
-                "IO": composer["IO"],
-                "Kind": composer["Kind"],
-                "NotProgrammable": composer["NotProgrammable"],
-                "Unit": {
-                    "$type": "Unit",
-                    "Id": next_unit_id,
-                    "Event": 0,
-                    "Scene": 0,
-                    "Disabled": False,
-                    "Logged": False,
-                    "Memo": False,
-                    "Increment": False
-                },
-                "Value": 0
-            }
-            m4_unit_composers.append(unit_composer)
-            next_unit_id += 1
-
-        m4_module = {
-            "$type": "Module",
-            "Name": "AQL-GV-M4",
-            "DriverGuid": "80000000-0000-0000-0000-000000000016",
-            "Guid": m4_module_guid,
-            "IpAddress": project_info.get('m4_ip'),
-            "HsnetAddress": int(project_info.get('m4_hsnet', 245)),
-            "PollTiming": 0,
-            "Disabled": False,
-            "RemotePort": 0,
-            "RemoteIpAddress": None,
-            "Notes": None,
-            "Logicserver": True,
-            "DevID": int(project_info.get('m4_devid', 1)),
-            "DevIDSlave": 0,
-            "UnitComposers": m4_unit_composers,  # Adicionando os UnitComposers
-            "Slots": [
-                {
-                    "$type": "Slot",
-                    "SlotCapacity": 24,
-                    "SlotType": 0,
-                    "InitialPort": 1,
-                    "IO": 0,
-                    "UnitComposers": None,
-                    "SubItemsGuid": ["00000000-0000-0000-0000-000000000000"],
-                    "Name": "ACNET",
-                },
-                {
-                    "$type": "Slot",
-                    "SlotCapacity": 96,
-                    "SlotType": 8,
-                    "InitialPort": 1,
-                    "IO": 1,
-                    "UnitComposers": None,
-                    "SubItemsGuid": ["00000000-0000-0000-0000-000000000000"] * 96,
-                    "Name": "Scene",
-                },
-            ],
-            "SmartGroup": 1,
-            "UserInterfaceGuid": "00000000-0000-0000-0000-000000000000",
-            "PIRSensorReportEnable": False,
-            "PIRSensorReportID": 0,
-        }
+        m4_module = self._create_controller_module("AQL-GV-M4", project_info)
 
         # SpecialActions padrão
         def default_special_actions():
@@ -895,10 +898,33 @@ class RoehnProjectConverter:
             self._create_sa1_module(module_name, hsnet, dev_id, target_board)
         elif "DIM8" in key or "ADP-DIM8" in key:
             self._create_dim8_module(module_name, hsnet, dev_id, target_board)
+        elif "AQL-GV-M4" in key:
+            self._create_controller_as_module("AQL-GV-M4", module_name, hsnet, dev_id, target_board)
+        elif "ADP-M8" in key:
+            self._create_controller_as_module("ADP-M8", module_name, hsnet, dev_id, target_board)
+        elif "ADP-M16" in key:
+            self._create_controller_as_module("ADP-M16", module_name, hsnet, dev_id, target_board)
         else:
+            print(f"Tipo de módulo desconhecido '{key}', criando como ADP-RL12 por padrão.")
             self._create_rl12_module(module_name, hsnet, dev_id, target_board)
 
         return module_name
+
+    def _create_controller_as_module(self, controller_type, name, hsnet_address, dev_id, target_board=None):
+        """Cria um módulo que é um tipo de controlador, mas com Logicserver=False."""
+        controller_info = {
+            'm4_ip': '0.0.0.0',
+            'm4_hsnet': hsnet_address,
+            'm4_devid': dev_id,
+        }
+
+        module_json = self._create_controller_module(controller_type, controller_info)
+
+        module_json["Logicserver"] = False
+        module_json["Name"] = name
+        module_json["Guid"] = str(uuid.uuid4())
+
+        self._add_module_to_project(module_json, module_json["Guid"], target_board)
 
     def _create_rl4_module(self, name, hsnet_address, dev_id, target_board=None):
         """Cria um módulo RL4"""
@@ -1200,7 +1226,13 @@ class RoehnProjectConverter:
 
     def _get_m4_module_components(self):
         """Retorna o módulo M4, o quadro em que ele está e o slot ACNET associado."""
-        module, board = self._find_module_in_any_board("AQL-GV-M4")
+        for controller_name in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]:
+            module, board = self._find_module_in_any_board(controller_name)
+            if module:
+                break
+        else:
+            return None, None, None
+
         if not module:
             return None, None, None
         acnet_slot = None

@@ -53,7 +53,11 @@ MODULO_INFO = {
     'RL4': {'nome_completo': 'AQL-GV-RL4', 'canais': 4, 'tipos_permitidos': ['luz']},
     'LX4': {'nome_completo': 'ADP-LX4', 'canais': 4, 'tipos_permitidos': ['persiana']},
     'SA1': {'nome_completo': 'AQL-GV-SA1', 'canais': 1, 'tipos_permitidos': ['hvac']},
-    'DIM8': {'nome_completo': 'ADP-DIM8', 'canais': 8, 'tipos_permitidos': ['luz']}
+    'DIM8': {'nome_completo': 'ADP-DIM8', 'canais': 8, 'tipos_permitidos': ['luz']},
+    # Controladores
+    'AQL-GV-M4': {'nome_completo': 'AQL-GV-M4', 'canais': 0, 'tipos_permitidos': []},
+    'ADP-M8': {'nome_completo': 'ADP-M8', 'canais': 0, 'tipos_permitidos': []},
+    'ADP-M16': {'nome_completo': 'ADP-M16', 'canais': 0, 'tipos_permitidos': []},
 }
 
 # Keypad metadata (RQR-K)
@@ -223,6 +227,13 @@ def is_hsnet_in_use(hsnet, projeto_id, exclude_keypad_id=None, exclude_modulo_id
     if exclude_modulo_id is not None:
         modulo_query = modulo_query.filter(Modulo.id != exclude_modulo_id)
     return modulo_query.first() is not None
+
+def is_valid_ip(ip):
+    if not ip:
+        return True  # Permite IP vazio
+    # Regex para validar endereço IPv4
+    pattern = re.compile(r"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$")
+    return pattern.match(ip) is not None
 
 
 @event.listens_for(Engine, "connect")
@@ -730,6 +741,7 @@ def api_projetos_create():
         return jsonify({"ok": False, "error": "Status inválido (use ATIVO, INATIVO ou CONCLUIDO)."}), 400
 
     now = datetime.utcnow()
+
     p = Projeto(
         nome=nome,
         user_id=current_user.id,
@@ -1412,20 +1424,30 @@ def api_modulos_list():
     for v in vincs:
         vinc_count_by_mod[v.modulo_id] = vinc_count_by_mod.get(v.modulo_id, 0) + 1
 
-    out = [
-        {
+    out = []
+    for m in modulos:
+        parent_info = None
+        if m.parent_controller:
+            parent_info = {
+                "id": m.parent_controller.id,
+                "nome": m.parent_controller.nome,
+            }
+
+        out.append({
             "id": m.id,
             "nome": m.nome,
             "tipo": m.tipo,
             "quantidade_canais": m.quantidade_canais,
+            "is_controller": m.is_controller,
+            "is_logic_server": m.is_logic_server,
+            "ip_address": m.ip_address,
             "vinc_count": vinc_count_by_mod.get(m.id, 0),
             "quadro_eletrico": {
                 "id": m.quadro_eletrico.id,
                 "nome": m.quadro_eletrico.nome,
-            } if m.quadro_eletrico else None,  # NOVO
-        }
-        for m in modulos
-    ]
+            } if m.quadro_eletrico else None,
+            "parent_controller": parent_info,
+        })
     return jsonify({"ok": True, "modulos": out})
 
 @app.delete("/api/modulos/<int:modulo_id>")
@@ -1446,6 +1468,16 @@ def api_modulos_delete(modulo_id):
                      "Exclua as vinculações antes de remover o módulo."
         }), 409
 
+    # Se o módulo a ser deletado é o logic server, promove outro a sê-lo
+    if m.is_logic_server:
+        outro_controller = Modulo.query.filter(
+            Modulo.projeto_id == projeto_id,
+            Modulo.is_controller == True,
+            Modulo.id != m.id
+        ).first()
+        if outro_controller:
+            outro_controller.is_logic_server = True
+
     db.session.delete(m)
     db.session.commit()
     return jsonify({"ok": True})
@@ -1462,7 +1494,8 @@ def api_modulos_create():
     data = request.get_json(silent=True) or request.form or {}
     tipo = (data.get("tipo") or "").strip().upper()
     nome = (data.get("nome") or "").strip()
-    quadro_eletrico_id = data.get("quadro_eletrico_id")  # NOVO CAMPO
+    quadro_eletrico_id = data.get("quadro_eletrico_id")
+    parent_controller_id = data.get("parent_controller_id")
     projeto_id = session.get("projeto_atual_id")
 
     if not projeto_id:
@@ -1477,53 +1510,57 @@ def api_modulos_create():
     if not nome:
         nome = info["nome_completo"]
 
-    # Verificar se o quadro elétrico pertence ao projeto
+    is_controller = tipo in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]
+
+    # Validações
+    if is_controller and not quadro_eletrico_id:
+        return jsonify({"ok": False, "error": "Controladores devem ser associados a um Quadro Elétrico."}), 400
+
+    if not is_controller and not parent_controller_id:
+        return jsonify({"ok": False, "error": "Módulos devem ser vinculados a um Controlador."}), 400
+
+    # Validação do quadro elétrico
     quadro_eletrico = None
     if quadro_eletrico_id:
-        quadro_eletrico = QuadroEletrico.query.filter_by(
-            id=quadro_eletrico_id, 
-            projeto_id=projeto_id
-        ).first()
+        quadro_eletrico = QuadroEletrico.query.filter_by(id=quadro_eletrico_id, projeto_id=projeto_id).first()
         if not quadro_eletrico:
             return jsonify({"ok": False, "error": "Quadro elétrico não encontrado no projeto."}), 400
 
-    # (opcional) evitar nome duplicado dentro do projeto
-    exists = Modulo.query.filter_by(projeto_id=projeto_id, nome=nome).first()
-    if exists:
+    # Validação do controlador pai
+    if parent_controller_id:
+        parent = Modulo.query.filter_by(id=parent_controller_id, projeto_id=projeto_id, is_controller=True).first()
+        if not parent:
+            return jsonify({"ok": False, "error": "Controlador pai não encontrado ou inválido."}), 400
+
+    # Evitar nome duplicado
+    if Modulo.query.filter_by(projeto_id=projeto_id, nome=nome).first():
         return jsonify({"ok": False, "error": "Já existe um módulo com esse nome no projeto."}), 409
 
-    hsnet_val = data.get("hsnet")
-    if hsnet_val not in (None, ""):
-        try:
-            hsnet = int(hsnet_val)
-        except (TypeError, ValueError):
-            return jsonify({"ok": False, "error": "hsnet invalido."}), 400
-        if hsnet <= 0:
-            return jsonify({"ok": False, "error": "hsnet deve ser positivo."}), 400
-        if is_hsnet_in_use(hsnet, projeto_id):
-            return jsonify({"ok": False, "error": "HSNET ja esta em uso."}), 409
-    else:
-        hsnet = None
+    # Lógica para HSNET e DevID (simplificada, pode precisar de mais detalhes)
+    hsnet = data.get("hsnet") or None
+    dev_id = data.get("dev_id") or hsnet
 
-    dev_id_val = data.get("dev_id")
-    if dev_id_val not in (None, ""):
-        try:
-            dev_id = int(dev_id_val)
-        except (TypeError, ValueError):
-            return jsonify({"ok": False, "error": "dev_id invalido."}), 400
-        if dev_id <= 0:
-            return jsonify({"ok": False, "error": "dev_id deve ser positivo."}), 400
-    else:
-        dev_id = hsnet
+    # Lógica para Logic Server
+    is_logic_server = data.get("is_logic_server", False)
+    if is_controller:
+        if Modulo.query.filter_by(projeto_id=projeto_id, is_controller=True).count() == 0:
+            is_logic_server = True
+
+    if is_logic_server:
+        Modulo.query.filter_by(projeto_id=projeto_id, is_logic_server=True).update({"is_logic_server": False})
 
     m = Modulo(
         nome=nome,
         tipo=tipo,
-        quantidade_canais=info["canais"],
+        quantidade_canais=info.get("canais", 0),
         projeto_id=projeto_id,
         hsnet=hsnet,
         dev_id=dev_id,
-        quadro_eletrico_id=quadro_eletrico.id if quadro_eletrico else None,  # NOVO
+        is_controller=is_controller,
+        is_logic_server=is_logic_server,
+        ip_address=data.get("ip_address"),
+        quadro_eletrico_id=quadro_eletrico.id if quadro_eletrico else None,
+        parent_controller_id=parent_controller_id
     )
     db.session.add(m)
     db.session.commit()
@@ -1544,6 +1581,45 @@ def api_modulos_update(modulo_id):
         if not nome:
             return jsonify({"ok": False, "error": "Nome é obrigatório."}), 400
         m.nome = nome
+
+    if "ip_address" in data:
+        ip_address = data.get("ip_address")
+        if ip_address and not is_valid_ip(ip_address):
+            return jsonify({"ok": False, "error": "Formato de endereço IP inválido."}), 400
+        m.ip_address = ip_address
+
+    if "is_logic_server" in data:
+        is_logic_server = data.get("is_logic_server", False)
+
+        # Se o usuário está tentando desmarcar o logic server
+        if not is_logic_server and m.is_logic_server:
+            # Verificar se existem outros controladores no projeto
+            outros_controllers = Modulo.query.filter(
+                Modulo.projeto_id == projeto_id,
+                Modulo.is_controller == True,
+                Modulo.id != modulo_id
+            ).count()
+
+            if outros_controllers == 0:
+                return jsonify({"ok": False, "error": "Não é possível desmarcar o único Logic Server. Adicione e promova outro controlador primeiro."}), 400
+            else:
+                # Promover outro controlador para ser o logic server
+                novo_logic_server = Modulo.query.filter(
+                    Modulo.projeto_id == projeto_id,
+                    Modulo.is_controller == True,
+                    Modulo.id != modulo_id
+                ).first()
+                novo_logic_server.is_logic_server = True
+
+        if is_logic_server:
+            # Desmarcar qualquer outro logic server no mesmo projeto
+            Modulo.query.filter(
+                Modulo.projeto_id == projeto_id,
+                Modulo.id != modulo_id,
+                Modulo.is_logic_server == True
+            ).update({"is_logic_server": False})
+
+        m.is_logic_server = is_logic_server
     
     if "quadro_eletrico_id" in data:
         quadro_id = data.get("quadro_eletrico_id")
