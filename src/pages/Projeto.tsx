@@ -65,7 +65,6 @@ export default function Projeto() {
   const [techArea, setTechArea] = useState("Área Técnica");
   const [techRoom, setTechRoom] = useState("Sala Técnica");
   const [boardName, setBoardName] = useState("Quadro Elétrico");
-  const [m4ip, setM4ip] = useState("192.168.5.30");
   const [m4QuadroId, setM4QuadroId] = useState<string>("");
   
   const m4hsnet = "245";
@@ -177,12 +176,6 @@ export default function Projeto() {
     if (numbers.length < 10) {
       e.preventDefault();
       toast({ variant: "destructive", title: "Telefone inválido", description: "Use DDD + número (mínimo 10 dígitos)." });
-      return;
-    }
-    const ipPattern = /^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-    if (!ipPattern.test(m4ip)) {
-      e.preventDefault();
-      toast({ variant: "destructive", title: "IP inválido", description: "Insira um endereço IP válido para o Módulo M4." });
       return;
     }
     const hidden = document.createElement("input");
@@ -599,12 +592,6 @@ export default function Projeto() {
                                 Nenhum quadro cadastrado. O M4 permanecerá no quadro técnico padrão.
                               </p>
                             )}
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                          <div className="md:col-span-1">
-                            <Label htmlFor="m4_ip">IP do Módulo M4</Label>
-                            <Input id="m4_ip" name="m4_ip" value={m4ip} onChange={(e) => setM4ip(e.target.value)} required className="text-sm" />
                           </div>
                         </div>
                       </section>

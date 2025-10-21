@@ -1431,6 +1431,7 @@ def api_modulos_list():
             "tipo": m.tipo,
             "quantidade_canais": m.quantidade_canais,
             "is_controller": m.is_controller,
+            "is_logic_server": m.is_logic_server,
             "ip_address": m.ip_address,
             "vinc_count": vinc_count_by_mod.get(m.id, 0),
             "quadro_eletrico": {
@@ -1531,6 +1532,7 @@ def api_modulos_create():
         dev_id = hsnet
 
     is_controller = data.get("is_controller", False)
+    is_logic_server = data.get("is_logic_server", False)
     ip_address = data.get("ip_address", None)
 
     if ip_address and not is_valid_ip(ip_address):
@@ -1540,9 +1542,10 @@ def api_modulos_create():
         if tipo not in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]:
             return jsonify({"ok": False, "error": "Tipo de controlador inválido."}), 400
 
-        existing_controller = Modulo.query.filter_by(projeto_id=projeto_id, is_controller=True).first()
-        if existing_controller:
-            return jsonify({"ok": False, "error": "Já existe um controlador neste projeto."}), 409
+    # Se este módulo está sendo definido como o logic server, desmarque qualquer outro
+    if is_logic_server:
+        Modulo.query.filter_by(projeto_id=projeto_id, is_logic_server=True).update({"is_logic_server": False})
+
 
     m = Modulo(
         nome=nome,
@@ -1552,6 +1555,7 @@ def api_modulos_create():
         hsnet=hsnet,
         dev_id=dev_id,
         is_controller=is_controller,
+        is_logic_server=is_logic_server,
         ip_address=ip_address,
         quadro_eletrico_id=quadro_eletrico.id if quadro_eletrico else None,
     )
@@ -1580,6 +1584,17 @@ def api_modulos_update(modulo_id):
         if ip_address and not is_valid_ip(ip_address):
             return jsonify({"ok": False, "error": "Formato de endereço IP inválido."}), 400
         m.ip_address = ip_address
+
+    if "is_logic_server" in data:
+        is_logic_server = data.get("is_logic_server", False)
+        if is_logic_server:
+            # Desmarcar qualquer outro logic server no mesmo projeto
+            Modulo.query.filter(
+                Modulo.projeto_id == projeto_id,
+                Modulo.id != modulo_id,
+                Modulo.is_logic_server == True
+            ).update({"is_logic_server": False})
+        m.is_logic_server = is_logic_server
     
     if "quadro_eletrico_id" in data:
         quadro_id = data.get("quadro_eletrico_id")

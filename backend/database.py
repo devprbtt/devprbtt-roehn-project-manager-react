@@ -98,6 +98,7 @@ class Modulo(db.Model):
     hsnet = db.Column(db.Integer, nullable=True)
     dev_id = db.Column(db.Integer, nullable=True)
     is_controller = db.Column(db.Boolean, default=False, nullable=False)
+    is_logic_server = db.Column(db.Boolean, default=False, nullable=False)
     ip_address = db.Column(db.String(50), nullable=True)
     quadro_eletrico_id = db.Column(db.Integer, db.ForeignKey('quadro_eletrico.id'), nullable=True)  # NOVO CAMPO
     vinculacoes = db.relationship('Vinculacao', backref='modulo', lazy=True, cascade='all, delete-orphan')

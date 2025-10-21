@@ -14,12 +14,15 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useProject } from "@/store/project";
 import { PlusCircle, Trash2, Boxes, Server, Sparkles, CircuitBoard, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import NavigationButtons from "@/components/NavigationButtons";
 import { Modulo } from "@/types/project";
+
+const CONTROLLER_TYPES = ["AQL-GV-M4", "ADP-M8", "ADP-M16"];
 
 type MetaModulo = {
   nome_completo: string;
@@ -61,23 +64,13 @@ export default function Modulos() {
   const [editingModulo, setEditingModulo] = useState<Modulo | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  // controller state
-  const [controller, setController] = useState<Modulo | null>(null);
+  // controller create state
   const [controllerType, setControllerType] = useState<string>("");
   const [controllerName, setControllerName] = useState("");
   const [controllerIp, setControllerIp] = useState("");
+  const [isLogicServer, setIsLogicServer] = useState(false);
 
-  const tipoOptions = useMemo(() => Object.keys(meta), [meta]);
-  const regularModules = useMemo(() => modulos.filter(m => !m.is_controller), [modulos]);
-
-  useEffect(() => {
-    const foundController = modulos.find(m => m.is_controller);
-    setController(foundController || null);
-    if (foundController) {
-      setControllerName(foundController.nome);
-      setControllerIp(foundController.ip_address || "");
-    }
-  }, [modulos]);
+  const tipoOptions = useMemo(() => Object.keys(meta).filter(t => !CONTROLLER_TYPES.includes(t)), [meta]);
 
   // Mantém em sincronia com o store quando ele hidratar
   useEffect(() => {
@@ -211,10 +204,15 @@ export default function Modulos() {
           nome: controllerName.trim(),
           ip_address: controllerIp.trim(),
           is_controller: true,
+          is_logic_server: isLogicServer,
         }),
       });
       let data: any = null; try { data = await res.json(); } catch {}
       if (res.ok && (data?.ok || data?.success)) {
+        setControllerType("");
+        setControllerName("");
+        setControllerIp("");
+        setIsLogicServer(false);
         await fetchModulos();
         toast({ title: "Sucesso!", description: "Controlador adicionado." });
       } else {
@@ -225,32 +223,8 @@ export default function Modulos() {
     }
   }
 
-  async function handleUpdateController() {
-    if (!controller) return;
-    try {
-      const res = await fetch(`/api/modulos/${controller.id}`, {
-        method: "PUT",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          nome: controller.nome.trim(),
-          ip_address: controller.ip_address?.trim(),
-        }),
-      });
-      let data: any = null; try { data = await res.json(); } catch {}
-      if (res.ok && (data?.ok || data?.success)) {
-        await fetchModulos();
-        toast({ title: "Sucesso!", description: "Controlador atualizado." });
-      } else {
-        toast({ variant: "destructive", title: "Erro", description: data?.error || "Falha ao atualizar controlador." });
-      }
-    } catch {
-      toast({ variant: "destructive", title: "Erro", description: "Falha ao se conectar ao servidor." });
-    }
-  }
-
   const handleEdit = (modulo: Modulo) => {
-    setEditingModulo(modulo);
+    setEditingModulo({ ...modulo });
     setIsEditModalOpen(true);
   };
 
@@ -271,6 +245,8 @@ export default function Modulos() {
           nome: editingModulo.nome.trim(),
           quadro_eletrico_id: editingModulo.quadro_eletrico?.id || null,
           hsnet: editingModulo.hsnet,
+          ip_address: CONTROLLER_TYPES.includes(editingModulo.tipo) ? editingModulo.ip_address : undefined,
+          is_logic_server: CONTROLLER_TYPES.includes(editingModulo.tipo) ? editingModulo.is_logic_server : undefined,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -367,35 +343,12 @@ export default function Modulos() {
                       <CircuitBoard className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-2xl font-bold text-foreground">Controlador</CardTitle>
-                      <p className="text-muted-foreground mt-1">Adicione ou edite o controlador do projeto</p>
+                      <CardTitle className="text-2xl font-bold text-foreground">Adicionar Controlador</CardTitle>
+                      <p className="text-muted-foreground mt-1">Adicione um novo controlador ao projeto</p>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {controller ? (
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="controller-name">Nome do Controlador</Label>
-                        <Input
-                          id="controller-name"
-                          value={controller.nome}
-                          onChange={(e) => setController({ ...controller, nome: e.target.value })}
-                          className="mt-2 h-12 px-4 rounded-xl border-border"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="controller-ip">Endereço IP</Label>
-                        <Input
-                          id="controller-ip"
-                          value={controller.ip_address || ""}
-                          onChange={(e) => setController({ ...controller, ip_address: e.target.value })}
-                          className="mt-2 h-12 px-4 rounded-xl border-border"
-                        />
-                      </div>
-                      <Button onClick={handleUpdateController} className="w-full h-12">Salvar Controlador</Button>
-                    </div>
-                  ) : (
                     <form className="space-y-6" onSubmit={handleCreateController}>
                       <div>
                         <Label htmlFor="controller-type">Tipo de Controlador *</Label>
@@ -434,9 +387,18 @@ export default function Modulos() {
                           title="Por favor, insira um endereço IP válido (ex: 192.168.0.1)."
                         />
                       </div>
+                      <div className="flex items-center space-x-2 pt-2">
+                        <Checkbox
+                          id="is-logic-server"
+                          checked={isLogicServer}
+                          onCheckedChange={(checked) => setIsLogicServer(!!checked)}
+                        />
+                        <Label htmlFor="is-logic-server" className="font-medium">
+                          Definir como Logic Server
+                        </Label>
+                      </div>
                       <Button type="submit" className="w-full h-12">Adicionar Controlador</Button>
                     </form>
-                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -530,7 +492,7 @@ export default function Modulos() {
               </Card>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+            <div className="lg:col-span-2">
               <Card className="bg-card/95 backdrop-blur-sm border border-border shadow-xl shadow-primary/10 dark:bg-card/85 dark:shadow-primary/20">
                 <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
@@ -554,7 +516,7 @@ export default function Modulos() {
                       <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent mb-4"></div>
                       <p className="text-muted-foreground font-medium">Carregando módulos...</p>
                     </div>
-                  ) : regularModules.length === 0 ? (
+                  ) : modulos.length === 0 ? (
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -568,14 +530,14 @@ export default function Modulos() {
                       </h4>
                       <p className="text-muted-foreground max-w-sm mx-auto">
                         {projetoSelecionado === true
-                          ? "Comece adicionando seu primeiro módulo usando o formulário ao lado."
+                          ? "Comece adicionando seu primeiro módulo ou controlador."
                           : "Selecione um projeto para visualizar e gerenciar os módulos."}
                       </p>
                     </motion.div>
                   ) : (
-                    <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
                       <AnimatePresence>
-                        {regularModules.map((m, index) => (
+                        {modulos.map((m, index) => (
                           <motion.li
                             key={m.id}
                             initial={{ opacity: 0, y: 20 }}
@@ -585,10 +547,19 @@ export default function Modulos() {
                             className="group relative overflow-hidden rounded-2xl border border-border bg-card/85 backdrop-blur-sm p-4 hover:bg-card/90 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300 flex items-center justify-between"
                           >
                             <div className="flex-1 mr-4">
-                              <div className="flex items-center gap-3 mb-2">
+                               <div className="flex items-center gap-2 flex-wrap mb-2">
                                 <span className="text-sm font-mono text-muted-foreground/90 bg-muted px-2 py-1 rounded-lg">
                                   {m.tipo}
                                 </span>
+                                {m.is_logic_server && (
+                                  <Badge className="bg-green-100 text-green-800 border border-green-200 hover:bg-green-200">
+                                    <Server className="h-3 w-3 mr-1.5" />
+                                    Logic Server
+                                  </Badge>
+                                )}
+                                {m.is_controller && !m.is_logic_server && (
+                                  <Badge variant="outline">Controlador</Badge>
+                                )}
                                 {m.quadro_eletrico && (
                                   <Badge variant="secondary" className="bg-blue-100 text-blue-700 flex items-center gap-1">
                                     <CircuitBoard className="h-3 w-3" />
@@ -599,7 +570,9 @@ export default function Modulos() {
                               <h4 className="font-bold text-foreground text-lg mb-1">{m.nome}</h4>
                               <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                                 <Server className="h-4 w-4 text-muted-foreground/80" />
-                                <span className="font-medium">Canais: {m.quantidade_canais}</span>
+                                <span className="font-medium">
+                                  {m.is_controller ? `IP: ${m.ip_address || "N/A"}` : `Canais: ${m.quantidade_canais}`}
+                                </span>
                               </div>
                               {m.vinc_count && m.vinc_count > 0 && (
                                 <Badge className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 mt-1 w-fit">
@@ -634,7 +607,7 @@ export default function Modulos() {
                   )}
                 </CardContent>
               </Card>
-            </motion.div>
+            </div>
           </div>
 
           <NavigationButtons previousPath="/circuitos" nextPath="/vinculacao" />
@@ -656,17 +629,35 @@ export default function Modulos() {
                       }
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="edit-hsnet">HSNET</Label>
-                    <Input
-                      id="edit-hsnet"
-                      type="number"
-                      value={editingModulo.hsnet || ""}
-                      onChange={(e) =>
-                        setEditingModulo({ ...editingModulo, hsnet: Number(e.target.value) })
-                      }
-                    />
-                  </div>
+                  {CONTROLLER_TYPES.includes(editingModulo.tipo) && (
+                    <>
+                      <div>
+                        <Label htmlFor="edit-ip_address">Endereço IP</Label>
+                        <Input
+                          id="edit-ip_address"
+                          value={editingModulo.ip_address || ""}
+                          onChange={(e) =>
+                            setEditingModulo({ ...editingModulo, ip_address: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="flex items-center space-x-2 pt-2">
+                        <Checkbox
+                          id="edit-is-logic-server"
+                          checked={editingModulo.is_logic_server}
+                          onCheckedChange={(checked) =>
+                            setEditingModulo({
+                              ...editingModulo,
+                              is_logic_server: !!checked,
+                            })
+                          }
+                        />
+                        <Label htmlFor="edit-is-logic-server">
+                          Definir como Logic Server
+                        </Label>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <Label htmlFor="edit-quadro">Quadro Elétrico</Label>
                     <select
