@@ -352,7 +352,7 @@ export default function Circuitos() {
                       </div>
 
                       {tipo === 'luz' && (
-                        <div className="flex items-center space-x-2 p-3 bg-slate-50 rounded-xl border border-border">
+                        <div className="flex items-center space-x-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-border">
                           <input
                             type="checkbox"
                             id="dimerizavel"
@@ -360,7 +360,7 @@ export default function Circuitos() {
                             onChange={(e) => setDimerizavel(e.target.checked)}
                             className="h-4 w-4 text-blue-600 border-border rounded focus:ring-blue-500"
                           />
-                          <label htmlFor="dimerizavel" className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                          <label htmlFor="dimerizavel" className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
                             <Sparkles className="w-4 h-4 text-blue-500" />
                             Circuito dimerizável
                           </label>
