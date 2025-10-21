@@ -394,35 +394,14 @@ class RoehnProjectConverter:
             # A controladora padrão M4 do template inicial será usada.
             print("ERRO CRÍTICO: Nenhum Logic Server encontrado no projeto. O arquivo RWP pode estar incompleto.")
 
-        # Etapa 2: Processar módulos (exceto a controladora principal) em seus respectivos quadros
-        for area in projeto.areas:
-            for ambiente in area.ambientes:
-                for quadro in ambiente.quadros_eletricos:
-                    quadro_guid = self._quadro_guid_map.get(quadro.id)
-                    if not quadro_guid: continue
+        # Etapa 2: Processar todos os outros módulos (controladores ou não)
+        all_modules_db = self.db_session.query(Modulo).filter(Modulo.id != main_controller_id).all()
 
-                    for modulo in quadro.modulos:
-                        if modulo.id == main_controller_id:
-                            continue # Já processado
+        for modulo_db in all_modules_db:
+            quadro_guid = self._quadro_guid_map.get(modulo_db.quadro_eletrico_id)
+            self._ensure_module_exists(modulo_db, automation_board_guid=quadro_guid)
 
-                        print(f"Processando modulo no quadro '{quadro.nome}': {modulo.nome} ({modulo.tipo})")
-                        modulo_nome = self._ensure_module_exists(modulo, automation_board_guid=quadro_guid)
-
-                        if modulo_nome:
-                            self._add_module_to_specific_board(modulo_nome, quadro_guid)
-
-        # Etapa 3: Processar módulos órfãos (sem quadro)
-        for modulo in projeto.modulos:
-            if modulo.id == main_controller_id:
-                continue
-
-            modulo_em_quadro = getattr(modulo, 'quadro_eletrico_id', None) is not None
-            
-            if not modulo_em_quadro:
-                print(f"Processando modulo órfão (quadro padrão): {modulo.nome} ({modulo.tipo})")
-                self._ensure_module_exists(modulo)
-
-        # Etapa 4: Processar todos os circuitos e criar seus GUIDs e links físicos
+        # Etapa 3: Processar todos os circuitos e criar seus GUIDs e links físicos
         for area in projeto.areas:
             for ambiente in area.ambientes:
                 for circuito in ambiente.circuitos:
@@ -541,75 +520,49 @@ class RoehnProjectConverter:
         return new_board_guid
 
     def _verify_and_fix_acnet(self):
-        """Verifica e corrige o ACNET do M4 para incluir todos os módulos"""
+        """Verifica e corrige o ACNET de cada controlador para incluir seus módulos filhos."""
         try:
-            _, _, acnet_slot = self._get_m4_module_components()
-            if not acnet_slot:
-                return
-            
-            # Coletar todos os GUIDs de módulos do projeto (exceto o M4)
-            all_module_guids = set()
+            # Encontrar todos os controladores no projeto JSON
+            controllers_json = []
             for area in self.project_data["Areas"]:
                 for room in area.get("SubItems", []):
                     for board in room.get("AutomationBoards", []):
                         for module in board.get("ModulesList", []):
-                            guid = module.get("Guid")
-                            if guid and guid != self.zero_guid:
-                                # Não incluir o próprio M4
-                                if not module.get("Logicserver", False):
-                                    all_module_guids.add(guid)
+                            if module.get("DriverGuid") in ["80000000-0000-0000-0000-000000000016", "80000000-0000-0000-0000-000000000018", "80000000-0000-0000-0000-000000000004"]:
+                                controllers_json.append(module)
             
-            # Atualizar o ACNET
-            current_acnet_guids = set(acnet_slot.get("SubItemsGuid", []))
-            current_acnet_guids.discard(self.zero_guid)
-            
-            # Adicionar módulos que estão faltando
-            missing_guids = all_module_guids - current_acnet_guids
-            if missing_guids:
-                print(f"🔧 Corrigindo ACNET: Adicionando {len(missing_guids)} módulos faltantes")
+            # Mapear Nomes para GUIDs JSON
+            module_name_to_guid = {m.get("Name"): m.get("Guid") for area in self.project_data["Areas"] for room in area.get("SubItems", []) for board in room.get("AutomationBoards", []) for m in board.get("ModulesList", [])}
+
+            for controller_json in controllers_json:
+                controller_name = controller_json.get("Name")
+                print(f"🔧 Verificando ACNET para o controlador: {controller_name}")
                 
-                # Substituir os zeros pelos GUIDs faltantes
-                new_acnet_list = []
-                for guid in acnet_slot["SubItemsGuid"]:
-                    if guid == self.zero_guid and missing_guids:
-                        new_guid = missing_guids.pop()
-                        new_acnet_list.append(new_guid)
-                        # Log do módulo sendo adicionado
-                        module_name = "Desconhecido"
-                        for area in self.project_data["Areas"]:
-                            for room in area.get("SubItems", []):
-                                for board in room.get("AutomationBoards", []):
-                                    for module in board.get("ModulesList", []):
-                                        if module.get("Guid") == new_guid:
-                                            module_name = module.get("Name", "Sem nome")
-                                            break
-                        print(f"  ✅ Adicionado: {module_name} ({new_guid})")
-                    else:
-                        new_acnet_list.append(guid)
+                # Encontrar o controlador no DB para pegar os filhos
+                controller_db = self.db_session.query(Modulo).filter_by(nome=controller_name, projeto_id=self.project_data.get('id')).first()
+                if not controller_db:
+                    print(f"  AVISO: Controlador '{controller_name}' não encontrado no DB.")
+                    continue
+
+                # Coletar GUIDs dos módulos filhos
+                child_module_guids = set()
+                for child_db in controller_db.child_modules:
+                    child_guid = module_name_to_guid.get(child_db.nome)
+                    if child_guid:
+                        child_module_guids.add(child_guid)
+
+                acnet_slot = next((s for s in controller_json.get("Slots", []) if s.get("Name") == "ACNET/RNET"), None)
+                if not acnet_slot:
+                    print(f"  ERRO: Slot ACNET/RNET não encontrado para {controller_name}.")
+                    continue
+
+                # Limpar e preencher o ACNET
+                acnet_slot["SubItemsGuid"] = list(child_module_guids)
+                if len(acnet_slot["SubItemsGuid"]) < acnet_slot.get("SlotCapacity", 1):
+                    acnet_slot["SubItemsGuid"].append(self.zero_guid)
                 
-                # Adicionar quaisquer GUIDs restantes no final
-                for remaining_guid in missing_guids:
-                    new_acnet_list.append(remaining_guid)
-                    # Log do módulo sendo adicionado
-                    module_name = "Desconhecido"
-                    for area in self.project_data["Areas"]:
-                        for room in area.get("SubItems", []):
-                            for board in room.get("AutomationBoards", []):
-                                for module in board.get("ModulesList", []):
-                                    if module.get("Guid") == remaining_guid:
-                                        module_name = module.get("Name", "Sem nome")
-                                        break
-                    print(f"  ✅ Adicionado (final): {module_name} ({remaining_guid})")
-                
-                # Garantir que termina com um zero
-                if new_acnet_list and new_acnet_list[-1] != self.zero_guid:
-                    new_acnet_list.append(self.zero_guid)
-                
-                acnet_slot["SubItemsGuid"] = new_acnet_list
-                print(f"✅ ACNET corrigido com sucesso!")
-            else:
-                print(f"✅ ACNET já está correto - todos os {len(all_module_guids)} módulos estão registrados")
-                
+                print(f"  ✅ ACNET para '{controller_name}' atualizado com {len(child_module_guids)} módulos.")
+
         except Exception as e:
             print(f"❌ Erro ao verificar/corrigir ACNET: {e}")
             import traceback

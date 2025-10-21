@@ -33,11 +33,8 @@ pip install --upgrade pip
 pip install -r requirements.txt
 set -e # Reativa o modo de erro
 
-# A etapa de seed foi desativada para os testes de UI automatizados,
-# pois não é necessária e pode causar bloqueios.
-# O banco de dados será criado vazio, o que é suficiente para os testes.
-
-# python seed_db.py
+# Popular o banco de dados
+python seed_db.py
 
 # Verificar se o diretório da instância existe
 if [ ! -d "instance" ]; then

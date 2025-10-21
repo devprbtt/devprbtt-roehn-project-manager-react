@@ -100,7 +100,12 @@ class Modulo(db.Model):
     is_controller = db.Column(db.Boolean, default=False, nullable=False)
     is_logic_server = db.Column(db.Boolean, default=False, nullable=False)
     ip_address = db.Column(db.String(50), nullable=True)
-    quadro_eletrico_id = db.Column(db.Integer, db.ForeignKey('quadro_eletrico.id'), nullable=True)  # NOVO CAMPO
+    quadro_eletrico_id = db.Column(db.Integer, db.ForeignKey('quadro_eletrico.id'), nullable=True)
+
+    # Auto-relacionamento para vincular módulos a um controlador
+    parent_controller_id = db.Column(db.Integer, db.ForeignKey('modulo.id'), nullable=True)
+    child_modules = db.relationship('Modulo', backref=db.backref('parent_controller', remote_side=[id]), lazy=True)
+
     vinculacoes = db.relationship('Vinculacao', backref='modulo', lazy=True, cascade='all, delete-orphan')
 
     __table_args__ = (db.UniqueConstraint('nome', 'projeto_id', name='unique_modulo_por_projeto'),)
