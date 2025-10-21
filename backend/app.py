@@ -24,6 +24,7 @@ import json
 import re
 import os
 from datetime import datetime
+from sqlalchemy.orm import class_mapper
 from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao, Keypad, KeypadButton, QuadroEletrico, Cena, Acao, CustomAcao
 
 app = Flask(__name__, instance_relative_config=True)
@@ -4068,6 +4069,57 @@ def delete_cena(cena_id):
 
     return jsonify({"ok": True})
 
+
+def serialize_model(obj):
+    """Função auxiliar para serializar objetos SQLAlchemy para dicionários."""
+    if obj is None:
+        return None
+
+    data = {}
+    # Itera sobre as colunas do modelo
+    for c in obj.__table__.columns:
+        # Formata datas para ISO 8601
+        if isinstance(getattr(obj, c.name), datetime):
+            data[c.name] = getattr(obj, c.name).isoformat()
+        else:
+            data[c.name] = getattr(obj, c.name)
+
+    # Itera sobre os relacionamentos definidos no modelo
+    for rel in class_mapper(obj.__class__).relationships:
+        related_obj = getattr(obj, rel.key)
+        if related_obj is not None:
+            if rel.uselist: # Se for uma lista de objetos (one-to-many)
+                data[rel.key] = [serialize_model(item) for item in related_obj]
+            else: # Se for um único objeto (many-to-one)
+                data[rel.key] = serialize_model(related_obj)
+        else:
+            data[rel.key] = None if rel.uselist else None # Lista vazia ou objeto nulo
+
+    return data
+
+@app.route('/api/export-project-data/<int:projeto_id>')
+@login_required
+def export_project_data(projeto_id):
+    """Exporta todos os dados de um projeto em formato JSON para teste."""
+    projeto = Projeto.query.options(
+        joinedload('*') # Carrega todos os relacionamentos de forma recursiva (cuidado com performance)
+    ).get(projeto_id)
+
+    if not projeto:
+        return jsonify({"erro": "Projeto não encontrado"}), 404
+
+    if projeto.user_id != current_user.id and current_user.role != 'admin':
+        return jsonify({"ok": False, "error": "Acesso negado."}), 403
+
+    # Serializa o projeto e seus relacionamentos para um dicionário
+    projeto_dict = serialize_model(projeto)
+
+    # Retorna o dicionário como uma resposta JSON
+    return Response(
+        json.dumps(projeto_dict, indent=2, ensure_ascii=False),
+        mimetype="application/json",
+        headers={"Content-Disposition": f"attachment;filename=projeto_teste_{projeto.id}.json"}
+    )
 
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
