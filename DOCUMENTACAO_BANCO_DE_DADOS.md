@@ -149,8 +149,13 @@ Representa um módulo de hardware (ex: dimmer, switch) que controla os circuitos
 | `projeto_id` | Integer | Chave estrangeira para a tabela `Projeto`. |
 | `hsnet` | Integer | Endereço do módulo na rede HS-NET. |
 | `dev_id` | Integer | ID do dispositivo na rede. |
+| `is_controller` | Boolean | Sinalizador que indica se o módulo é um controlador. |
+| `is_logic_server` | Boolean | Sinalizador que indica se o módulo atua como o servidor lógico principal. |
+| `ip_address` | String | Endereço IP do módulo, se aplicável. |
 | `quadro_eletrico_id`| Integer | Chave estrangeira para o `QuadroEletrico` onde o módulo está instalado. |
+| `parent_controller_id` | Integer | Chave estrangeira autorreferenciada (`modulo.id`) para vincular um módulo a um controlador pai. |
 | `vinculacoes` | Relationship | Relacionamento com as `Vinculacao`s, que ligam seus canais a circuitos. |
+| `child_modules` | Relationship | Relacionamento autorreferenciado para acessar os módulos filhos de um controlador. |
 
 ---
 
