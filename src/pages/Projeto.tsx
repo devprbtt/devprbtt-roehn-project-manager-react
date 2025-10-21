@@ -374,7 +374,7 @@ export default function Projeto() {
                                 }, {} as Record<string, typeof ambiente.circuitos>);
 
                                 return (
-                                <div key={ambiente.id} className="border-l-2 border-border pl-3 sm:pl-4 relative before:content-[''] before:absolute before:left-0 before:top-3 before:w-3 sm:before:w-4 before:h-px before:bg-slate-200 dark:before:bg-slate-700">
+                                <div key={ambiente.id} className="border-l-2 border-slate-200 dark:border-slate-600 pl-3 sm:pl-4 relative before:content-[''] before:absolute before:left-0 before:top-3 before:w-3 sm:before:w-4 before:h-px before:bg-slate-200 dark:before:bg-slate-600">
                                   <h4 className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 text-sm sm:text-base">
                                     {ambiente.nome}
                                   </h4>
