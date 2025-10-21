@@ -342,6 +342,7 @@ class RoehnProjectConverter:
         self._quadro_guid_map = {}
         self._room_guid_map = {}
         main_controller_id = None
+        self.projeto_id_db = projeto.id
 
         # Etapa PRE-1: Criar toda a estrutura de Areas, Ambientes e Quadros primeiro
         # para que possamos encontrar o quadro da controladora pelo seu GUID.
@@ -539,7 +540,7 @@ class RoehnProjectConverter:
                 print(f"🔧 Verificando ACNET para o controlador: {controller_name}")
                 
                 # Encontrar o controlador no DB para pegar os filhos
-                controller_db = self.db_session.query(Modulo).filter_by(nome=controller_name, projeto_id=self.project_data.get('id')).first()
+                controller_db = self.db_session.query(Modulo).filter_by(nome=controller_name, projeto_id=self.projeto_id_db).first()
                 if not controller_db:
                     print(f"  AVISO: Controlador '{controller_name}' não encontrado no DB.")
                     continue
@@ -558,8 +559,7 @@ class RoehnProjectConverter:
 
                 # Limpar e preencher o ACNET
                 acnet_slot["SubItemsGuid"] = list(child_module_guids)
-                if len(acnet_slot["SubItemsGuid"]) < acnet_slot.get("SlotCapacity", 1):
-                    acnet_slot["SubItemsGuid"].append(self.zero_guid)
+                acnet_slot["SubItemsGuid"].append(self.zero_guid)
                 
                 print(f"  ✅ ACNET para '{controller_name}' atualizado com {len(child_module_guids)} módulos.")
 
@@ -899,21 +899,21 @@ class RoehnProjectConverter:
         elif "DIM8" in key or "ADP-DIM8" in key:
             self._create_dim8_module(module_name, hsnet, dev_id, target_board)
         elif "AQL-GV-M4" in key:
-            self._create_controller_as_module("AQL-GV-M4", module_name, hsnet, dev_id, target_board)
+            self._create_controller_as_module("AQL-GV-M4", module_name, hsnet, dev_id, target_board, ip_address=modulo_obj.ip_address if modulo_obj else '0.0.0.0')
         elif "ADP-M8" in key:
-            self._create_controller_as_module("ADP-M8", module_name, hsnet, dev_id, target_board)
+            self._create_controller_as_module("ADP-M8", module_name, hsnet, dev_id, target_board, ip_address=modulo_obj.ip_address if modulo_obj else '0.0.0.0')
         elif "ADP-M16" in key:
-            self._create_controller_as_module("ADP-M16", module_name, hsnet, dev_id, target_board)
+            self._create_controller_as_module("ADP-M16", module_name, hsnet, dev_id, target_board, ip_address=modulo_obj.ip_address if modulo_obj else '0.0.0.0')
         else:
             print(f"Tipo de módulo desconhecido '{key}', criando como ADP-RL12 por padrão.")
             self._create_rl12_module(module_name, hsnet, dev_id, target_board)
 
         return module_name
 
-    def _create_controller_as_module(self, controller_type, name, hsnet_address, dev_id, target_board=None):
+    def _create_controller_as_module(self, controller_type, name, hsnet_address, dev_id, target_board=None, ip_address='0.0.0.0'):
         """Cria um módulo que é um tipo de controlador, mas com Logicserver=False."""
         controller_info = {
-            'm4_ip': '0.0.0.0',
+            'm4_ip': ip_address,
             'm4_hsnet': hsnet_address,
             'm4_devid': dev_id,
         }

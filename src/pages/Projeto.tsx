@@ -568,30 +568,6 @@ export default function Projeto() {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
                           <div className="md:col-span-3">
-                            <Label htmlFor="m4_quadro_id">Quadro do Módulo M4</Label>
-                            {quadroOptions.length > 0 ? (
-                              <div className="space-y-2">
-                                <Select value={m4QuadroId} onValueChange={setM4QuadroId}>
-                                  <SelectTrigger id="m4_quadro_id" className="text-sm">
-                                    <SelectValue placeholder="Selecione um quadro" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {quadroOptions.map((option) => (
-                                      <SelectItem key={option.id} value={String(option.id)}>
-                                        {option.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <p className="text-xs text-muted-foreground">
-                                  O módulo M4 será configurado dentro do quadro escolhido.
-                                </p>
-                              </div>
-                            ) : (
-                              <p className="text-sm text-muted-foreground">
-                                Nenhum quadro cadastrado. O M4 permanecerá no quadro técnico padrão.
-                              </p>
-                            )}
                           </div>
                         </div>
                       </section>

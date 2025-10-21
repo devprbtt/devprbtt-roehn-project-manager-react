@@ -60,6 +60,7 @@ export default function Modulos() {
   const [tipo, setTipo] = useState<string>("");
   const [nome, setNome] = useState("");
   const [parentControllerId, setParentControllerId] = useState<number | "">("");
+  const [quadroEletricoId, setQuadroEletricoId] = useState<number | "">("");
   const lastParentControllerId = useRef<number | "">("");
 
   // form state for controllers
@@ -164,7 +165,7 @@ export default function Modulos() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!tipo || !nome.trim() || !parentControllerId) {
+    if (!tipo || !nome.trim() || !parentControllerId || !quadroEletricoId) {
       toast({ variant: "destructive", title: "Erro", description: "Todos os campos para o módulo são obrigatórios." });
       return;
     }
@@ -174,10 +175,11 @@ export default function Modulos() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ 
-          tipo, 
+        body: JSON.stringify({
+          tipo,
           nome: nome.trim(),
           parent_controller_id: parentControllerId,
+          quadro_eletrico_id: quadroEletricoId,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -185,6 +187,7 @@ export default function Modulos() {
         setTipo("");
         setNome("");
         setParentControllerId("");
+        setQuadroEletricoId("");
         await fetchModulos();
         toast({ title: "Sucesso!", description: "Módulo adicionado." });
       } else {
@@ -293,6 +296,16 @@ export default function Modulos() {
     }
   }
 
+  const sortedModulos = useMemo(() => {
+    return [...modulos].sort((a, b) => {
+      if (a.is_controller && !b.is_controller) return -1;
+      if (!a.is_controller && b.is_controller) return 1;
+      if (a.is_logic_server && !b.is_logic_server) return -1;
+      if (!a.is_logic_server && b.is_logic_server) return 1;
+      return a.nome.localeCompare(b.nome);
+    });
+  }, [modulos]);
+
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 dark:from-background dark:via-background/40 dark:to-primary/25">
@@ -337,7 +350,7 @@ export default function Modulos() {
                     <form className="space-y-6" onSubmit={handleCreateController}>
                       <div>
                         <Label htmlFor="controller-type">Tipo *</Label>
-                        <select id="controller-type" className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background" value={controllerType} onChange={(e) => setControllerType(e.target.value)} required>
+                        <select id="controller-type" className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background" value={controllerType} onChange={(e) => { setControllerType(e.target.value); setControllerName(e.target.value); }} required>
                           <option value="">Selecione o tipo</option>
                           {CONTROLLER_TYPES.map(ct => <option key={ct} value={ct}>{ct}</option>)}
                         </select>
@@ -389,6 +402,13 @@ export default function Modulos() {
                         </select>
                       </div>
                       <div>
+                        <Label htmlFor="module-quadro">Quadro Elétrico *</Label>
+                        <select id="module-quadro" className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background" value={quadroEletricoId} onChange={(e) => setQuadroEletricoId(Number(e.target.value))} required>
+                          <option value="">Selecione um quadro</option>
+                          {quadros.map((quadro) => <option key={quadro.id} value={quadro.id}>{quadro.nome} ({quadro.ambiente.nome})</option>)}
+                        </select>
+                      </div>
+                      <div>
                         <Label htmlFor="tipo">Tipo *</Label>
                         <select id="tipo" className="mt-2 h-12 w-full px-4 rounded-xl border border-border bg-background" value={tipo} onChange={(e) => setTipo(e.target.value)} required disabled={isLocked}>
                           <option value="">Selecione o tipo</option>
@@ -430,14 +450,20 @@ export default function Modulos() {
                   ) : (
                     <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
                       <AnimatePresence>
-                        {modulos.map((m, index) => (
+                        {sortedModulos.map((m, index) => (
                           <motion.li
                             key={m.id}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                             transition={{ delay: index * 0.05 }}
-                            className={`group relative overflow-hidden rounded-2xl border bg-card/85 backdrop-blur-sm p-4 hover:bg-card/90 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300 flex items-center justify-between ${m.is_controller ? 'border-purple-300 dark:border-purple-700' : 'border-border'}`}
+                            className={`group relative overflow-hidden rounded-2xl border bg-card/85 backdrop-blur-sm p-4 hover:bg-card/90 hover:shadow-lg hover:shadow-slate-900/5 transition-all duration-300 flex items-center justify-between ${
+                              m.is_logic_server 
+                                ? 'border-green-300 dark:border-green-700' 
+                                : m.is_controller 
+                                  ? 'border-purple-300 dark:border-purple-700' 
+                                  : 'border-border'
+                            }`}
                           >
                             <div className="flex-1 mr-4">
                                <div className="flex items-center gap-2 flex-wrap mb-2">
