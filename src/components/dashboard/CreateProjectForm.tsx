@@ -11,7 +11,8 @@ import { motion } from "framer-motion";
 type FormData = {
   name: string;
   description?: string;
-  status: "active" | "inactive" | "completed";
+  status: string;
+  controlador: string;
 };
 
 type Props = {
@@ -22,7 +23,8 @@ type Props = {
 const defaultForm: FormData = {
   name: "",
   description: "",
-  status: "active"
+  status: "active",
+  controlador: "AQL-GV-M4",
 };
 
 const CreateProjectForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
@@ -30,7 +32,7 @@ const CreateProjectForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim() || !formData.controlador) return;
     onSubmit(formData);
   };
 
@@ -66,7 +68,7 @@ const CreateProjectForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
         
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-sm font-semibold text-slate-700">
                   Nome do Projeto *
@@ -80,14 +82,33 @@ const CreateProjectForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
                   required
                 />
               </div>
-              
+
+              <div className="space-y-2">
+                <Label htmlFor="controlador" className="text-sm font-semibold text-slate-700">
+                  Controlador Lógico *
+                </Label>
+                <Select
+                  value={formData.controlador}
+                  onValueChange={(value) => setFormData({ ...formData, controlador: value })}
+                >
+                  <SelectTrigger className="h-12 rounded-xl border-border focus:border-blue-500 focus:ring-blue-500/20">
+                    <SelectValue placeholder="Selecione o controlador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AQL-GV-M4">AQL-GV-M4</SelectItem>
+                    <SelectItem value="ADP-M8">ADP-M8</SelectItem>
+                    <SelectItem value="ADP-M16">ADP-M16</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="status" className="text-sm font-semibold text-slate-700">
                   Status
                 </Label>
                 <Select 
                   value={formData.status} 
-                  onValueChange={(value: "active" | "inactive" | "completed") => setFormData({ ...formData, status: value })}
+                  onValueChange={(value: string) => setFormData({ ...formData, status: value })}
                 >
                   <SelectTrigger className="h-12 rounded-xl border-border focus:border-blue-500 focus:ring-blue-500/20">
                     <SelectValue placeholder="Selecione o status" />

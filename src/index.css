@@ -157,5 +157,6 @@
 
   .dark .border-slate-200, .dark .border-slate-200\/60, .dark .border-slate-300 {
     border-color: hsl(0deg 0% 100% / 20%) !important;
+    background-color: hsl(224deg 10% 14% / 0%) !important;
   }
 }

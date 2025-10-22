@@ -9,12 +9,13 @@ import CurrentProjectAlert from "@/components/dashboard/CurrentProjectAlert";
 import ImportProjectSection from "@/components/dashboard/ImportProjectSection";
 import NavigationGuide from "@/components/dashboard/NavigationGuide";
 import type { Project, ProjectStatus } from '@/types/project';
+import { useToast } from "@/components/ui/use-toast";
 
 import { Download, Plus, Search, Filter, Upload } from "lucide-react";
 
 
 const Dashboard: React.FC = () => {
-
+  const { toast } = useToast();
   const location = useLocation();
   const { user, loading: authLoading, fetchSession } = useAuth();
   const { setProjeto, clearProjeto } = useProject();
