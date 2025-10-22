@@ -98,7 +98,7 @@ class RoehnProjectConverter:
                 "DevID": 1,
                 "ACNET_SlotCapacity": 24,
                 "Scene_SlotCapacity": 96,
-                "UnitIds": [39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57]
+                "UnitIds": [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76]
             },
             "ADP-M8": {
                 "Name": "ADP-M8",
@@ -106,7 +106,7 @@ class RoehnProjectConverter:
                 "DevID": 3,
                 "ACNET_SlotCapacity": 250,
                 "Scene_SlotCapacity": 256,
-                "UnitIds": [59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77]
+                "UnitIds": [59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77] # Estes IDs podem precisar de ajuste
             },
             "ADP-M16": {
                 "Name": "ADP-M16",
@@ -114,7 +114,7 @@ class RoehnProjectConverter:
                 "DevID": 5,
                 "ACNET_SlotCapacity": 250,
                 "Scene_SlotCapacity": 256,
-                "UnitIds": [104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122]
+                "UnitIds": [104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122] # Estes IDs podem precisar de ajuste
             }
         }
 
@@ -161,18 +161,18 @@ class RoehnProjectConverter:
 
         controller_module = {
             "$type": "Module",
-            "Name": config["Name"],
+            "Name": project_info.get('nome') or config["Name"],
             "DriverGuid": config["DriverGuid"],
             "Guid": str(uuid.uuid4()),
-            "IpAddress": project_info.get('m4_ip'),
-            "HsnetAddress": int(project_info.get('m4_hsnet') or 245),
+            "IpAddress": project_info.get('ip_address'),
+            "HsnetAddress": int(project_info.get('hsnet') or 245),
             "PollTiming": 0,
             "Disabled": False,
             "RemotePort": 0,
-            "RemoteIpAddress": project_info.get('m4_ip'),
+            "RemoteIpAddress": project_info.get('ip_address'),
             "Notes": None,
             "Logicserver": True,
-            "DevID": config["DevID"],
+            "DevID": project_info.get('dev_id') or config["DevID"],
             "DevIDSlave": 0,
             "UnitComposers": unit_composers,
             "Slots": [
@@ -210,6 +210,7 @@ class RoehnProjectConverter:
         print(f"Numero de areas: {len(project_json.get('areas', []))}")
 
         self._circuit_guid_map = {}
+        self._scene_guid_map = {}
         self._quadro_guid_map = {}
         self._room_guid_map = {}
         main_controller_id = None
@@ -224,60 +225,30 @@ class RoehnProjectConverter:
                     quadro_guid = self._ensure_automation_board_exists(area.get('nome'), ambiente.get('nome'), quadro.get('nome'))
                     self._quadro_guid_map[quadro.get('id')] = quadro_guid
 
-        # Etapa 1: Encontrar o controlador "Logic Server" e colocá-lo no quadro correto
-        logic_server_module = None
-        for modulo in project_json.get('modulos', []):
-            if modulo.get('is_logic_server'):
-                logic_server_module = modulo
-                break
+        # Etapa 1 e 2: Processar todos os módulos (controladores ou não)
 
-        if logic_server_module:
-            print(f"Logic Server encontrado: {logic_server_module.get('nome')} ({logic_server_module.get('tipo')})")
-            main_controller_id = logic_server_module.get('id')
-            controller_info = {
-                'm4_ip': logic_server_module.get('ip_address'),
-                'm4_hsnet': logic_server_module.get('hsnet'),
-                'm4_devid': logic_server_module.get('dev_id'),
-            }
-            controller_module_json = self._create_controller_module(logic_server_module.get('tipo'), controller_info)
+        # Primeiro, limpa a lista de módulos padrão
+        self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"] = []
 
-            # Remover a controladora padrão que vem na criação do projeto
-            default_board_modules = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"]
-            self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"] = [
-                m for m in default_board_modules if m.get("Logicserver") is not True
-            ]
-
-            # Encontrar o quadro elétrico associado ao controlador
-            target_board_id = logic_server_module.get('quadro_eletrico_id')
-            if target_board_id and target_board_id in self._quadro_guid_map:
-                target_board_guid = self._quadro_guid_map[target_board_id]
-                target_board_json = self._find_automation_board_by_guid(target_board_guid)
-                if target_board_json:
-                    # Encontrar nome do quadro para log
-                    quadro_nome = "Desconhecido"
-                    for area in project_json.get('areas', []):
-                        for amb in area.get('ambientes', []):
-                            for quad in amb.get('quadros_eletricos', []):
-                                if quad.get('id') == target_board_id:
-                                    quadro_nome = quad.get('nome')
-                                    break
-                    print(f"Logic Server alocado no quadro: {quadro_nome}")
-                    target_board_json.setdefault("ModulesList", []).insert(0, controller_module_json)
-                else:
-                    print(f"AVISO: Quadro com GUID {target_board_guid} não encontrado. Alocando no quadro padrão.")
-                    self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"].insert(0, controller_module_json)
-            else:
-                print("Logic Server não associado a um quadro. Alocando no quadro padrão.")
-                self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"].insert(0, controller_module_json)
-        else:
-            print("ERRO CRÍTICO: Nenhum Logic Server encontrado no projeto. O arquivo RWP pode estar incompleto.")
-
-        # Etapa 2: Processar todos os outros módulos (controladores ou não)
-        all_modules = [m for m in project_json.get('modulos', []) if m.get('id') != main_controller_id]
-
+        all_modules = project_json.get('modulos', [])
         for modulo in all_modules:
             quadro_guid = self._quadro_guid_map.get(modulo.get('quadro_eletrico_id'))
-            self._ensure_module_exists(modulo, automation_board_guid=quadro_guid)
+
+            if modulo.get('is_controller'):
+                # Cria o módulo controlador com as informações corretas
+                controller_module_json = self._create_controller_module(modulo.get('tipo'), modulo)
+                controller_module_json['Logicserver'] = modulo.get('is_logic_server', False)
+
+                # Aloca no quadro correto
+                target_board_json = self._find_automation_board_by_guid(quadro_guid) if quadro_guid else None
+                if target_board_json:
+                    target_board_json.setdefault("ModulesList", []).append(controller_module_json)
+                else:
+                    # Fallback para o quadro padrão
+                    self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"].append(controller_module_json)
+            else:
+                # Garante que módulos não-controladores sejam criados
+                self._ensure_module_exists(modulo, automation_board_guid=quadro_guid)
 
         # Etapa 3: Processar todos os circuitos e criar seus GUIDs e links físicos
         for area in project_json.get('areas', []):
@@ -325,17 +296,17 @@ class RoehnProjectConverter:
                         traceback.print_exc()
                         continue
 
-        # Etapa 4: Processar Keypads e Cenas
+        # Etapa 4: Processar Cenas e depois Keypads
         for area in project_json.get('areas', []):
             for ambiente in area.get('ambientes', []):
-                self._add_keypads_for_room(area.get('nome'), ambiente)
                 self._add_scenes_for_room(area.get('nome'), ambiente)
+                self._add_keypads_for_room(area.get('nome'), ambiente)
 
         # Etapa 5: Verificação final do ACNET
         print("Realizando verificação final do ACNET...")
         self._verify_and_fix_acnet(project_json)
 
-        # ⭐⭐⭐ NOVO: Log do estado final do ACNET
+        # Log do estado final do ACNET
         self._log_acnet_status()
 
         print("✅ Processamento do projeto concluído!")
@@ -1304,11 +1275,16 @@ class RoehnProjectConverter:
         primary_ports = [1, 2, 3, 4]
         secondary_ports = [5, 6, 7, 8]
 
-        for button in sorted(keypad.get('buttons', []), key=lambda b: b.get('ordem') or 0):
-            ordem = button.get('ordem')
-            if ordem and ordem > button_count:
+        buttons_data = list(keypad.get('buttons', []))
+        while len(buttons_data) < button_count:
+            buttons_data.append({'button_index': len(buttons_data) + 1})
+
+        for button in sorted(buttons_data, key=lambda b: b.get('button_index', 0)):
+            button_index = button.get('button_index')
+            if not button_index or button_index > button_count:
                 continue
-            index = (ordem - 1) if ordem else 0
+
+            index = button_index - 1
             primary_port = primary_ports[index % len(primary_ports)]
             secondary_port = secondary_ports[index % len(secondary_ports)]
 
@@ -1317,21 +1293,39 @@ class RoehnProjectConverter:
             unit_secondary_key = make_composer("UnitSecondaryKey", secondary_port, 300, 0, 0)
             unit_secondary_led = make_composer("UnitSecondaryLed", secondary_port, 200, 1, 1)
 
+            # --- Nova Lógica para ler a configuração do botão ---
             target_guid = zero_guid
-            circuito = button.get('circuito')
-            cena = button.get('cena')
+            modo = 3  # Default Toggle
+            command_on = 1
+            command_off = 0
+            engraver_text = ""
 
-            if cena:
-                target_guid = cena.get('guid')
-                print(f"      - Button {ordem}: Linked to scene '{cena.get('nome')}' (ID: {cena.get('id')}) -> GUID: {target_guid}")
-            elif circuito and circuito.get('id') in self._circuit_guid_map:
-                target_guid = self._circuit_guid_map[circuito.get('id')]
-                print(f"      - Button {ordem}: Linked to circuit '{circuito.get('nome')}' (ID: {circuito.get('id')}) -> GUID: {target_guid}")
+            json_config = button.get('json_config', {})
+            action = json_config.get('action', {})
+            engraver_text = json_config.get('EngraverText', '')
+
+            target_type = action.get('target_type')
+            target_id = action.get('target_id')
+            action_type = action.get('type')
+
+            if action_type == 'Toggle':
+                modo = 3
+                command_on = 1
+                command_off = 0
+            # Adicionar mais tipos de ação aqui se necessário
+
+            if target_type == 'circuito' and target_id is not None and target_id in self._circuit_guid_map:
+                target_guid = self._circuit_guid_map[target_id]
+                print(f"      - Button {button_index}: Linked to circuit ID {target_id} -> GUID: {target_guid}")
+            elif target_type == 'cena' and target_id is not None and target_id in self._scene_guid_map:
+                target_guid = self._scene_guid_map[target_id]
+                modo = 1  # Ativar Cena
+                command_on = 0
+                command_off = 0
+                print(f"      - Button {button_index}: Linked to scene ID {target_id} -> GUID: {target_guid}")
             else:
-                if circuito:
-                    print(f"      - Button {ordem}: WARNING - Circuit '{circuito.get('nome')}' (ID: {circuito.get('id')}) found but its GUID is not in the map.")
-                else:
-                    print(f"      - Button {ordem}: Not linked.")
+                 print(f"      - Button {button_index}: Not linked.")
+            # --- Fim da Nova Lógica ---
 
             style_properties = None
             button_style_guid = zero_guid
@@ -1370,9 +1364,9 @@ class RoehnProjectConverter:
                 "CanHold": bool(button.get('can_hold')),
                 "Guid": button.get('guid') or str(uuid.uuid4()),
                 "TargetObjectGuid": target_guid,
-                "Modo": button.get('modo'),
-                "CommandOn": button.get('command_on'),
-                "CommandOff": button.get('command_off'),
+                "Modo": modo,
+                "CommandOn": command_on,
+                "CommandOff": command_off,
                 "PortNumber": 0,
                 "UnitControleLed": 0,
                 "LedColor": 0,
@@ -1383,7 +1377,7 @@ class RoehnProjectConverter:
                 "UnitSecondaryKey": unit_secondary_key,
                 "UnitSecondaryLed": unit_secondary_led,
                 "ButtonStyleGuid": button_style_guid,
-                "EngraverText": button.get('engraver_text'),
+                "EngraverText": engraver_text,
                 "Automode": True,
             }
             payload["ListKeypadButtons"].append(button_payload)
@@ -1725,9 +1719,13 @@ class RoehnProjectConverter:
         for cena_data in cenas:
             next_unit_id = self._find_max_unit_id() + 1
 
+            cena_guid = cena_data.get('guid') or str(uuid.uuid4())
+            if 'id' in cena_data:
+                self._scene_guid_map[cena_data['id']] = cena_guid
+
             scene_payload = {
                 "$type": "Scene",
-                "Guid": cena_data.get('guid'),
+                "Guid": cena_guid,
                 "Operator": 6 if cena_data.get('scene_movers') else 1,
                 "ParentSlot": None,
                 "Unit": {
@@ -1820,14 +1818,16 @@ if __name__ == '__main__':
         with open(args.input_json, 'r', encoding='utf-8') as f:
             project_data_from_json = json.load(f)
 
-        # Assume que a estrutura do seu JSON de entrada tem uma chave 'projeto' que contém os dados
-        # Se o seu JSON já é o objeto do projeto, use project_data_from_json diretamente
-        project_details = project_data_from_json.get('projeto', project_data_from_json)
+        # A estrutura do JSON de entrada é a própria raiz do projeto
+        project_details = project_data_from_json
 
-        # Criar uma instância do conversor e do projeto base
+        # Criar uma instância do conversor
         converter = RoehnProjectConverter()
-        # Os detalhes como nome do projeto, cliente, etc., devem estar no JSON de entrada
-        converter.create_project(project_details)
+
+        # Usar os detalhes do projeto do JSON para criar a estrutura base
+        # A chave 'projeto' dentro do seu JSON contém os metadados
+        project_metadata = project_details.get('projeto', {'project_name': 'Projeto Importado'})
+        converter.create_project(project_metadata)
 
         # Processar os dados do JSON para preencher o projeto Roehn
         converter.convert_project_from_json(project_details)
