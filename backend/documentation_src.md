@@ -66,128 +66,129 @@ erDiagram
 # 📋 Tabelas do Schema - Banco de Dados Roehn
 
 ### projetos
-| Campo | Tipo | Restrições | Valores Aceitos | Default |
-|-------|------|------------|-----------------|---------|
-| `id` | bigint PK | auto-increment | - | - |
-| `nome` | varchar(120) | `NOT NULL` | Qualquer string | - |
-| `user_id` | bigint FK | `NOT NULL` → `users(id)` | - | - |
-| `tech_area` | varchar(100) | `NULL` | Nome da área técnica | 'Área Técnica' |
-| `tech_room` | varchar(100) | `NULL` | Nome da sala técnica | 'Sala Técnica' |
-| `board_name` | varchar(100) | `NULL` | Nome do quadro | 'Quadro Elétrico' |
-| `software_version` | varchar(20) | `NULL` | '1.0.8.67' ou similar | '1.0.8.67' |
-| `timezone_id` | varchar(50) | `NULL` | 'America/Bahia' ou similar | 'America/Bahia' |
-| `lat` | decimal(10,6) | `NULL` | -90.0 a 90.0 | 0.0 |
-| `lon` | decimal(10,6) | `NULL` | -180.0 a 180.0 | 0.0 |
+| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
+|-------|------|------------|-----------------|---------|-------------|
+| `id` | bigint PK | auto-increment | - | - | ✅ |
+| `nome` | varchar(120) | `NOT NULL` | Qualquer string | - | ✅ |
+| `user_id` | bigint FK | `NOT NULL` → `users(id)` | - | - | ✅ |
+| `tech_area` | varchar(100) | `NULL` | Nome da área técnica | 'Área Técnica' | ❌ |
+| `tech_room` | varchar(100) | `NULL` | Nome da sala técnica | 'Sala Técnica' | ❌ |
+| `board_name` | varchar(100) | `NULL` | Nome do quadro | 'Quadro Elétrico' | ❌ |
+| `software_version` | varchar(20) | `NULL` | '1.0.8.67' ou similar | '1.0.8.67' | ❌ |
+| `timezone_id` | varchar(50) | `NULL` | 'America/Bahia' ou similar | 'America/Bahia' | ❌ |
+| `lat` | decimal(10,6) | `NULL` | -90.0 a 90.0 | 0.0 | ❌ |
+| `lon` | decimal(10,6) | `NULL` | -180.0 a 180.0 | 0.0 | ❌ |
 
 ### areas
-| Campo | Tipo | Restrições | Valores Aceitos | Default |
-|-------|------|------------|-----------------|---------|
-| `id` | bigint PK | auto-increment | - | - |
-| `nome` | varchar(100) | `NOT NULL` | Nome da área | - |
-| `projeto_id` | bigint FK | `NOT NULL` → `projetos(id)` | - | - |
+| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
+|-------|------|------------|-----------------|---------|-------------|
+| `id` | bigint PK | auto-increment | - | - | ✅ |
+| `nome` | varchar(100) | `NOT NULL` | Nome da área | - | ✅ |
+| `projeto_id` | bigint FK | `NOT NULL` → `projetos(id)` | - | - | ✅ |
 
 ### ambientes
-| Campo | Tipo | Restrições | Valores Aceitos | Default |
-|-------|------|------------|-----------------|---------|
-| `id` | bigint PK | auto-increment | - | - |
-| `nome` | varchar(100) | `NOT NULL` | Nome do ambiente | - |
-| `area_id` | bigint FK | `NOT NULL` → `areas(id)` | - | - |
+| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
+|-------|------|------------|-----------------|---------|-------------|
+| `id` | bigint PK | auto-increment | - | - | ✅ |
+| `nome` | varchar(100) | `NOT NULL` | Nome do ambiente | - | ✅ |
+| `area_id` | bigint FK | `NOT NULL` → `areas(id)` | - | - | ✅ |
 
 ### quadros_eletricos
-| Campo | Tipo | Restrições | Valores Aceitos | Default |
-|-------|------|------------|-----------------|---------|
-| `id` | bigint PK | auto-increment | - | - |
-| `nome` | varchar(100) | `NOT NULL` | Nome do quadro | - |
-| `projeto_id` | bigint FK | `NOT NULL` → `projetos(id)` | - | - |
-| `ambiente_id` | bigint FK | `NULL` → `ambientes(id)` | - | - |
+| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
+|-------|------|------------|-----------------|---------|-------------|
+| `id` | bigint PK | auto-increment | - | - | ✅ |
+| `nome` | varchar(100) | `NOT NULL` | Nome do quadro | - | ✅ |
+| `projeto_id` | bigint FK | `NOT NULL` → `projetos(id)` | - | - | ✅ |
+| `ambiente_id` | bigint FK | `NULL` → `ambientes(id)` | - | - | ❌ |
 
 ### modulos
-| Campo | Tipo | Restrições | Valores Aceitos | Default |
-|-------|------|------------|-----------------|---------|
-| `id` | bigint PK | auto-increment | - | - |
-| `nome` | varchar(100) | `NOT NULL` | Qualquer string | - |
-| `tipo` | varchar(50) | `NOT NULL` | 'ADP-RL12', 'AQL-GV-RL4', 'ADP-LX4', 'AQL-GV-SA1', 'ADP-DIM8', 'AQL-GV-M4', 'ADP-M8', 'ADP-M16' | - |
-| `is_controller` | boolean | - | true/false | false |
-| `is_logic_server` | boolean | - | true/false | false |
-| `ip_address` | varchar(45) | `NULL` | IPv4 válido ou vazio | - |
-| `hsnet` | integer | `NULL`, `UNIQUE(projeto_id, hsnet)` | 1-254 | - |
-| `dev_id` | integer | `NULL` | 1-255 | - |
-| `projeto_id` | bigint FK | `NOT NULL` → `projetos(id)` | - | - |
-| `quadro_eletrico_id` | bigint FK | `NULL` → `quadros_eletricos(id)` | - | - |
-| `parent_controller_id` | bigint FK | `NULL` → `modulos(id)` | - | - |
+| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
+|-------|------|------------|-----------------|---------|-------------|
+| `id` | bigint PK | auto-increment | - | - | ✅ |
+| `nome` | varchar(100) | `NOT NULL` | Qualquer string | - | ✅ |
+| `tipo` | varchar(50) | `NOT NULL` | 'ADP-RL12', 'AQL-GV-RL4', 'ADP-LX4', 'AQL-GV-SA1', 'ADP-DIM8', 'AQL-GV-M4', 'ADP-M8', 'ADP-M16' | - | ✅ |
+| `is_controller` | boolean | - | true/false | false | ❌ |
+| `is_logic_server` | boolean | - | true/false | false | ❌ |
+| `ip_address` | varchar(45) | `NULL` | IPv4 válido ou vazio | - | ❌ |
+| `hsnet` | integer | `NULL`, `UNIQUE(projeto_id, hsnet)` | 1-254 | - | ❌ |
+| `dev_id` | integer | `NULL` | 1-255 | - | ❌ |
+| `projeto_id` | bigint FK | `NOT NULL` → `projetos(id)` | - | - | ✅ |
+| `quadro_eletrico_id` | bigint FK | `NULL` → `quadros_eletricos(id)` | - | - | ❌ |
+| `parent_controller_id` | bigint FK | `NULL` → `modulos(id)` | - | - | ❌ |
 
 ### circuitos
-| Campo | Tipo | Restrições | Valores Aceitos | Default |
-|-------|------|------------|-----------------|---------|
-| `id` | bigint PK | auto-increment | - | - |
-| `identificador` | varchar(20) | `NOT NULL` | Tag curto (ex: "L1") | - |
-| `nome` | varchar(100) | `NOT NULL` | Nome descritivo | - |
-| `tipo` | varchar(20) | `NOT NULL` | 'luz', 'persiana', 'hvac' | - |
-| `dimerizavel` | boolean | - | true/false | false |
-| `potencia` | double precision | - | ≥ 0.0 | 0.0 |
-| `ambiente_id` | bigint FK | `NOT NULL` → `ambientes(id)` | - | - |
+| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
+|-------|------|------------|-----------------|---------|-------------|
+| `id` | bigint PK | auto-increment | - | - | ✅ |
+| `identificador` | varchar(20) | `NOT NULL` | Tag curto (ex: "L1") | - | ✅ |
+| `nome` | varchar(100) | `NOT NULL` | Nome descritivo | - | ✅ |
+| `tipo` | varchar(20) | `NOT NULL` | 'luz', 'persiana', 'hvac' | - | ✅ |
+| `dimerizavel` | boolean | - | true/false | false | ❌ |
+| `potencia` | double precision | - | ≥ 0.0 | 0.0 | ❌ |
+| `ambiente_id` | bigint FK | `NOT NULL` → `ambientes(id)` | - | - | ✅ |
 
 ### circuito_vinculacoes
-| Campo | Tipo | Restrições | Valores Aceitos | Default |
-|-------|------|------------|-----------------|---------|
-| `id` | bigint PK | auto-increment | - | - |
-| `canal` | integer | `NOT NULL` | ≥ 1 | - |
-| `circuito_id` | bigint FK | `NOT NULL`, `UNIQUE` → `circuitos(id)` | - | - |
-| `modulo_id` | bigint FK | `NOT NULL` → `modulos(id)` | - | - |
+| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
+|-------|------|------------|-----------------|---------|-------------|
+| `id` | bigint PK | auto-increment | - | - | ✅ |
+| `canal` | integer | `NOT NULL` | ≥ 1 | - | ✅ |
+| `circuito_id` | bigint FK | `NOT NULL`, `UNIQUE` → `circuitos(id)` | - | - | ✅ |
+| `modulo_id` | bigint FK | `NOT NULL` → `modulos(id)` | - | - | ✅ |
 
 ### keypads
-| Campo | Tipo | Restrições | Valores Aceitos | Default |
-|-------|------|------------|-----------------|---------|
-| `id` | bigint PK | auto-increment | - | - |
-| `nome` | varchar(100) | `NOT NULL` | Nome do keypad | - |
-| `modelo` | varchar(50) | `NULL` | Qualquer string | 'RQR-K' |
-| `color` | varchar(20) | `NULL` | 'WHITE', 'BLACK', 'SILVER', 'GOLD', 'BRONZE' | 'WHITE' |
-| `button_color` | varchar(20) | `NULL` | 'WHITE', 'BLACK', 'SILVER', 'GOLD', 'BRONZE' | 'WHITE' |
-| `button_count` | integer | `NOT NULL` | 1, 2, 4 | - |
-| `hsnet` | integer | `NOT NULL`, `UNIQUE` | 1-254 | - |
-| `dev_id` | integer | `NOT NULL`, `UNIQUE` | 1-255 | - |
-| `ambiente_id` | bigint FK | `NOT NULL` → `ambientes(id)` | - | - |
+| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
+|-------|------|------------|-----------------|---------|-------------|
+| `id` | bigint PK | auto-increment | - | - | ✅ |
+| `nome` | varchar(100) | `NOT NULL` | Nome do keypad | - | ✅ |
+| `modelo` | varchar(50) | `NULL` | Qualquer string | 'RQR-K' | ❌ |
+| `color` | varchar(20) | `NULL` | 'WHITE', 'BLACK', 'SILVER', 'GOLD', 'BRONZE' | 'WHITE' | ❌ |
+| `button_color` | varchar(20) | `NULL` | 'WHITE', 'BLACK' | 'WHITE' | ❌ |
+| `button_count` | integer | `NOT NULL` | 1, 2, 4 | - | ✅ |
+| `hsnet` | integer | `NOT NULL`, `UNIQUE` | 1-254 | - | ✅ |
+| `dev_id` | integer | `NOT NULL`, `UNIQUE` | 1-255 | - | ✅ |
+| `ambiente_id` | bigint FK | `NOT NULL` → `ambientes(id)` | - | - | ✅ |
 
 ### keypad_buttons
-| Campo | Tipo | Restrições | Valores Aceitos | Default |
-|-------|------|------------|-----------------|---------|
-| `id` | bigint PK | auto-increment | - | - |
-| `button_index` | integer | `NOT NULL` | ≥ 1 | - |
-| `icon` | varchar(50) | `NULL` | 'abajour', 'arandela', 'bright', 'cascata', 'churrasco', 'clean room', 'concierge', 'curtains', 'curtains preset 1', 'curtains preset 2', 'day', 'dim penumbra', 'dinner', 'do not disturb', 'door', 'doorbell', 'fan', 'fireplace', 'garage', 'gate', 'good night', 'gym1', 'gym2', 'gym3', 'hvac', 'irrigação', 'jardim1', 'jardim2', 'lampada', 'laundry', 'leaving', 'light preset 1', 'light preset 2', 'lower shades', 'luminaria de piso', 'medium', 'meeting', 'movie', 'music', 'night', 'onoff', 'padlock', 'party', 'pendant', 'piscina 1', 'piscina 2', 'pizza', 'raise shades', 'reading', 'shades', 'shades preset 1', 'shades preset 2', 'spot', 'steam room', 'turned off', 'tv', 'volume', 'welcome', 'wine' | - |
-| `is_rocker` | boolean | - | true/false | false |
-| `rocker_style` | varchar(20) | `NULL` | 'up-down', 'left-right', 'previous-next' | - |
-| `json_config` | jsonb | `NULL` | `{"EngraverText": "texto", "action": {"type": "Toggle/Activate", "target_type": "circuito/cena", "target_id": number}}` | - |
-| `keypad_id` | bigint FK | `NOT NULL` → `keypads(id)` | - | - |
+| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
+|-------|------|------------|-----------------|---------|-------------|
+| `id` | bigint PK | auto-increment | - | - | ✅ |
+| `button_index` | integer | `NOT NULL` | ≥ 1 | - | ✅ |
+| `icon` | varchar(50) | `NULL` | 'abajour', 'arandela', 'bright', 'cascata', 'churrasco', 'clean room', 'concierge', 'curtains', 'curtains preset 1', 'curtains preset 2', 'day', 'dim penumbra', 'dinner', 'do not disturb', 'door', 'doorbell', 'fan', 'fireplace', 'garage', 'gate', 'good night', 'gym1', 'gym2', 'gym3', 'hvac', 'irrigação', 'jardim1', 'jardim2', 'lampada', 'laundry', 'leaving', 'light preset 1', 'light preset 2', 'lower shades', 'luminaria de piso', 'medium', 'meeting', 'movie', 'music', 'night', 'onoff', 'padlock', 'party', 'pendant', 'piscina 1', 'piscina 2', 'pizza', 'raise shades', 'reading', 'shades', 'shades preset 1', 'shades preset 2', 'spot', 'steam room', 'turned off', 'tv', 'volume', 'welcome', 'wine' | - | ❌ |
+| `is_rocker` | boolean | - | true/false | false | ❌ |
+| `rocker_style` | varchar(20) | `NULL` | 'up-down', 'left-right', 'previous-next' | - | ❌ |
+| `json_config` | jsonb | `NULL` | `{"EngraverText": "texto", "action": {"type": "Toggle/Activate", "target_type": "circuito/cena", "target_id": number}}` | - | ❌ |
+| `keypad_id` | bigint FK | `NOT NULL` → `keypads(id)` | - | - | ✅ |
 
 ### cenas
-| Campo | Tipo | Restrições | Valores Aceitos | Default |
-|-------|------|------------|-----------------|---------|
-| `id` | bigint PK | auto-increment | - | - |
-| `guid` | varchar(36) | `NOT NULL`, `UNIQUE` | UUID válido | - |
-| `nome` | varchar(100) | `NOT NULL` | Nome da cena | - |
-| `scene_movers` | boolean | - | true/false | false |
-| `ambiente_id` | bigint FK | `NOT NULL` → `ambientes(id)` | - | - |
+| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
+|-------|------|------------|-----------------|---------|-------------|
+| `id` | bigint PK | auto-increment | - | - | ✅ |
+| `guid` | varchar(36) | `NOT NULL`, `UNIQUE` | UUID válido | - | ✅ |
+| `nome` | varchar(100) | `NOT NULL` | Nome da cena | - | ✅ |
+| `scene_movers` | boolean | - | true/false | false | ❌ |
+| `ambiente_id` | bigint FK | `NOT NULL` → `ambientes(id)` | - | - | ✅ |
 
 ### cena_acoes
-| Campo | Tipo | Restrições | Valores Aceitos | Default |
-|-------|------|------------|-----------------|---------|
-| `id` | bigint PK | auto-increment | - | - |
-| `action_type` | integer | `NOT NULL` | 0 (circuito), 7 (ambiente) | - |
-| `level` | integer | - | 0-100 | 100 |
-| `target_id` | integer | `NOT NULL` | ID válido | - |
-| `cena_id` | bigint FK | `NOT NULL` → `cenas(id)` | - | - |
+| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
+|-------|------|------------|-----------------|---------|-------------|
+| `id` | bigint PK | auto-increment | - | - | ✅ |
+| `action_type` | integer | `NOT NULL` | 0 (circuito), 7 (ambiente) | - | ✅ |
+| `level` | integer | - | 0-100 | 100 | ❌ |
+| `target_id` | integer | `NOT NULL` | ID válido | - | ✅ |
+| `cena_id` | bigint FK | `NOT NULL` → `cenas(id)` | - | - | ✅ |
 
 ### users
-| Campo | Tipo | Restrições | Valores Aceitos | Default |
-|-------|------|------------|-----------------|---------|
-| `id` | bigint PK | auto-increment | - | - |
-| `username` | varchar(80) | `NOT NULL`, `UNIQUE` | Nome de usuário | - |
+| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
+|-------|------|------------|-----------------|---------|-------------|
+| `id` | bigint PK | auto-increment | - | - | ✅ |
+| `username` | varchar(80) | `NOT NULL`, `UNIQUE` | Nome de usuário | - | ✅ |
 
 ---
 
 ## 🛡️ Constraints de Negócio
 
-```sql
+
+``` sql
 -- Circuitos dimerizáveis apenas para tipo 'luz'
 ALTER TABLE circuitos ADD CONSTRAINT chk_dimerizavel_apenas_luz 
 CHECK (tipo = 'luz' OR dimerizavel = false);
@@ -199,7 +200,7 @@ CHECK (NOT is_controller OR ip_address IS NOT NULL);
 -- Button_index não pode exceder button_count do keypad
 ALTER TABLE keypad_buttons ADD CONSTRAINT chk_button_index_valido 
 CHECK (button_index <= (SELECT button_count FROM keypads WHERE id = keypad_id));
----
+```
 
 ## Relacionamentos (resumo)
 
