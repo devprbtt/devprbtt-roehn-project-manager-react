@@ -1,6 +1,6 @@
 # Banco de Dados — Gerador RWP (Roehn Wizard)
 
-> Este schema alimenta o `src.py`, que converte o **payload JSON** em um projeto `.rwp`.  
+> Este schema alimenta o `standalone_roehn_converter.py`, que converte o **payload JSON** em um projeto `.rwp`.  
 > O foco desta documentação é: **o que cada campo significa, restrições, quando é obrigatório e como o script utiliza**.
 
 ## Sumário
