@@ -1,6 +1,5 @@
 # standalone_roehn_converter.py
 import json
-import csv
 import uuid
 import io
 import sys
@@ -12,10 +11,10 @@ class RoehnProjectConverter:
         self.project_data = initial_project_data if initial_project_data else {}
         self.modules_info = {
             'ADP-RL12': {'driver_guid': '80000000-0000-0000-0000-000000000006', 'slots': {'Load ON/OFF': 12}},
-            'RL4': {'driver_guid': '80000000-0000-0000-0000-000000000010', 'slots': {'Load ON/OFF': 4}},
-            'LX4': {'driver_guid': '80000000-0000-0000-0000-000000000003', 'slots': {'Shade': 4}},
-            'SA1': {'driver_guid': '80000000-0000-0000-0000-000000000013', 'slots': {'IR': 1}},
-            'DIM8': {'driver_guid': '80000000-0000-0000-0000-000000000001', 'slots': {'Load Dim': 8}}
+            'AQL-GV-RL4': {'driver_guid': '80000000-0000-0000-0000-000000000010', 'slots': {'Load ON/OFF': 4}},
+            'ADP-LX4': {'driver_guid': '80000000-0000-0000-0000-000000000003', 'slots': {'Shade': 4}},
+            'AQL-GV-SA1': {'driver_guid': '80000000-0000-0000-0000-000000000013', 'slots': {'IR': 1}},
+            'ADP-DIM8': {'driver_guid': '80000000-0000-0000-0000-000000000001', 'slots': {'Load Dim': 8}}
         }
         self.zero_guid = "00000000-0000-0000-0000-000000000000"
         self.m4_target_quadro_id = None
@@ -547,59 +546,6 @@ class RoehnProjectConverter:
         
         return self.project_data
 
-    def process_csv(self, csv_content):
-        """Processa o conteúdo CSV e adiciona os circuitos ao projeto"""
-        if not self.project_data:
-            raise ValueError("Projeto não inicializado. Chame create_project primeiro.")
-        
-        # Converter conteúdo CSV para lista de dicionários
-        csv_file = io.StringIO(csv_content)
-        reader = csv.DictReader(csv_file)
-        
-        shades_seen = set()
-        
-        for row in reader:
-            circuito = (row.get("Circuito") or "").strip()
-            tipo = (row.get("Tipo") or "").strip().lower()
-            nome = (row.get("Nome") or "").strip()
-            area = (row.get("Area") or "").strip()
-            ambiente = (row.get("Ambiente") or "").strip()
-            canal = (row.get("Canal") or "").strip()
-            modulo = (row.get("Modulo") or "").strip()
-            id_modulo = (row.get("id Modulo") or row.get("id_modulo") or "").strip()
-
-            if not area or not ambiente or not modulo or not id_modulo or not canal:
-                continue
-                
-            try:
-                canal = int(canal)
-            except ValueError:
-                continue
-
-            self._ensure_area_exists(area)
-            self._ensure_room_exists(area, ambiente)
-            # Para CSV, ainda usamos o formato antigo para compatibilidade
-            modulo_nome = self._ensure_module_exists(modulo, f"{modulo}_{id_modulo}")
-
-            if tipo == "luz":
-                # ⭐⭐⭐ NOVO: Tentar obter informação de dimerizável do CSV (se existir)
-                dimerizavel_csv = row.get("Dimerizavel", "").strip().lower()
-                dimerizavel = dimerizavel_csv in ["sim", "true", "1", "yes"]
-                
-                guid = self._add_load(area, ambiente, nome or circuito or "Load", dimerizavel=dimerizavel)
-                self._link_load_to_module(guid, modulo_nome, canal, dimerizavel=dimerizavel)
-            elif tipo == "persiana":
-                key = f"{area}|{ambiente}|{nome or circuito or 'Persiana'}"
-                if key not in shades_seen:
-                    guid = self._add_shade(area, ambiente, nome or circuito or "Persiana")
-                    self._link_shade_to_module(guid, modulo_nome, canal)
-                    shades_seen.add(key)
-            elif tipo == "hvac":
-                guid = self._add_hvac(area, ambiente, nome or "Ar-Condicionado")
-                self._link_hvac_to_module(guid, modulo_nome, canal)
-        
-        return self.project_data
-
     def _ensure_area_exists(self, area_name):
         """Garante que uma área existe no projeto Roehn"""
         for area in self.project_data["Areas"]:
@@ -742,15 +688,15 @@ class RoehnProjectConverter:
 
         # Criar módulo baseado no tipo
         key = (model_key or module_name).upper()
-        if "RL12" in key:
+        if "ADP-RL12" in key:
             self._create_rl12_module(module_name, hsnet, dev_id, target_board)
-        elif "RL4" in key:
+        elif "AQL-GV-RL4" in key:
             self._create_rl4_module(module_name, hsnet, dev_id, target_board)
-        elif "LX4" in key:
+        elif "ADP-LX4" in key:
             self._create_lx4_module(module_name, hsnet, dev_id, target_board)
-        elif "SA1" in key:
+        elif "AQL-GV-SA1" in key:
             self._create_sa1_module(module_name, hsnet, dev_id, target_board)
-        elif "DIM8" in key or "ADP-DIM8" in key:
+        elif "ADP-DIM8" in key:
             self._create_dim8_module(module_name, hsnet, dev_id, target_board)
         elif "AQL-GV-M4" in key:
             self._create_controller_as_module("AQL-GV-M4", module_name, hsnet, dev_id, target_board, ip_address=modulo_obj.ip_address if modulo_obj else '0.0.0.0')
@@ -1621,7 +1567,7 @@ class RoehnProjectConverter:
             profile_guid = "10000000-0000-0000-0000-000000000002"
             description = "Dimmer"
         else:
-            load_type = 0
+            load_type = 1
             profile_guid = "10000000-0000-0000-0000-000000000001"
             description = "ON/OFF"
 
@@ -1629,7 +1575,7 @@ class RoehnProjectConverter:
             "$type": "Circuit",
             "LoadType": load_type,
             "IconPath": 0,
-            "Power": power,  # ⭐⭐⭐ AGORA USA A POTÊNCIA REAL
+            "Power": power,
             "ProfileGuid": profile_guid,
             "Unit": {
                 "$type": "Unit",
@@ -1683,7 +1629,6 @@ class RoehnProjectConverter:
             return False
 
         try:
-            # ... lógica de vinculação existente ...
             if dimerizavel:
                 slot_priority = ['Load Dim', 'Load ON/OFF']
             else:
