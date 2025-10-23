@@ -121,7 +121,7 @@ erDiagram
 |-----------------------|-------------|-----------------------------------------------------------------------------|-----------|------------------|
 | `id`                  | bigint PK   | auto-increment                                                              | Identificador. | **Sim** (nó físico/log. ACNET). |
 | `nome`                | varchar(100)| `NOT NULL`                                                                  | Rótulo do módulo. | **Sim** (exibição/lookup). |
-| `tipo`                | varchar(50) | `NOT NULL`                                                                  | Ex.: `ADP-RL12`, `RL4`, `LX4`, `DIM8`, `AQL-GV-M4`, `ADP-M8`… | **Sim** (mapeia capacidades). |
+| `tipo`                | varchar(50) | `NOT NULL`                                                                  | Ex.: `ADP-RL12`, `AQL-GV-RL4`, `ADP-LX4`, `AQL-GV-SA1`, `ADP-DIM8`, `AQL-GV-M4`, `ADP-M8`,   `ADP-M16` | **Sim** (mapeia capacidades). |
 | `is_controller`       | boolean     | `DEFAULT false`                                                             | Marca controladores (M4/M8/M16). | **Sim** (topologia). |
 | `is_logic_server`     | boolean     | `DEFAULT false`                                                             | Indica Logic Server. | **Opcional**. |
 | `ip_address`          | varchar(45) | `NULL`                                                                      | IP do controlador quando aplicável. | **Opcional**. |
