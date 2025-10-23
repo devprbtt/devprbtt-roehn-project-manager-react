@@ -1,27 +1,30 @@
-# roehn_converter_standalone.py
+# standalone_roehn_converter.py
 import json
+import csv
 import uuid
+import io
+import sys
+import argparse
 from datetime import datetime
 
-class RoehnStandaloneConverter:
-    def __init__(self):
-        self.zero_guid = "00000000-0000-0000-0000-000000000000"
-        self.keypad_driver_guid = "90000000-0000-0000-0000-000000000004"
-        self.keypad_profile_guid = "40000000-0000-0000-0000-000000000001"
-        
-        # Mapeamento de tipos de módulos
+class RoehnProjectConverter:
+    def __init__(self, initial_project_data=None):
+        self.project_data = initial_project_data if initial_project_data else {}
         self.modules_info = {
             'ADP-RL12': {'driver_guid': '80000000-0000-0000-0000-000000000006', 'slots': {'Load ON/OFF': 12}},
             'RL4': {'driver_guid': '80000000-0000-0000-0000-000000000010', 'slots': {'Load ON/OFF': 4}},
             'LX4': {'driver_guid': '80000000-0000-0000-0000-000000000003', 'slots': {'Shade': 4}},
             'SA1': {'driver_guid': '80000000-0000-0000-0000-000000000013', 'slots': {'IR': 1}},
-            'DIM8': {'driver_guid': '80000000-0000-0000-0000-000000000001', 'slots': {'Load Dim': 8}},
-            'AQL-GV-M4': {'driver_guid': '80000000-0000-0000-0000-000000000016', 'slots': {'ACNET/RNET': 24, 'Scene': 96}},
-            'ADP-M8': {'driver_guid': '80000000-0000-0000-0000-000000000018', 'slots': {'ACNET/RNET': 250, 'Scene': 256}},
-            'ADP-M16': {'driver_guid': '80000000-0000-0000-0000-000000000004', 'slots': {'ACNET/RNET': 250, 'Scene': 256}}
+            'DIM8': {'driver_guid': '80000000-0000-0000-0000-000000000001', 'slots': {'Load Dim': 8}}
         }
-        
-        # Ícones para keypads
+        self.zero_guid = "00000000-0000-0000-0000-000000000000"
+        self.m4_target_quadro_id = None
+        self.keypad_driver_guid = "90000000-0000-0000-0000-000000000004"
+        self.keypad_profile_guid = "40000000-0000-0000-0000-000000000001"
+        self.rocker_icon_guid_up_down = "11000000-0000-0000-0000-000000000001"
+        self.rocker_icon_guid_left_right = "11000000-0000-0000-0000-000000000002"
+        self.rocker_icon_guid_previous_next = "11000000-0000-0000-0000-000000000003"
+        self.keypad_button_layouts = {1: 1, 2: 6, 4: 7}
         self.icon_guids = {
             "abajour": "11000000-0000-0000-0000-000000000026",
             "arandela": "11000000-0000-0000-0000-000000000028",
@@ -83,18 +86,358 @@ class RoehnStandaloneConverter:
             "welcome": "11000000-0000-0000-0000-000000000006",
             "wine": "11000000-0000-0000-0000-000000000012",
         }
-        
-        self.project_data = None
-        self.circuit_guid_map = {}
-        self.room_guid_map = {}
-        self.board_guid_map = {}
-        self.module_guid_map = {}
+        self._quadro_guid_map = {}
 
-    def create_base_project(self, project_info):
-        """Cria a estrutura base do projeto Roehn"""
+    def _create_controller_module(self, controller_type, project_info):
+        """Creates the main controller module based on its type."""
+
+        controller_configs = {
+            "AQL-GV-M4": {
+                "Name": "AQL-GV-M4",
+                "DriverGuid": "80000000-0000-0000-0000-000000000016",
+                "DevID": 1,
+                "ACNET_SlotCapacity": 24,
+                "Scene_SlotCapacity": 96,
+                "UnitIds": [58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76]
+            },
+            "ADP-M8": {
+                "Name": "ADP-M8",
+                "DriverGuid": "80000000-0000-0000-0000-000000000018",
+                "DevID": 3,
+                "ACNET_SlotCapacity": 250,
+                "Scene_SlotCapacity": 256,
+                "UnitIds": [59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77] # Estes IDs podem precisar de ajuste
+            },
+            "ADP-M16": {
+                "Name": "ADP-M16",
+                "DriverGuid": "80000000-0000-0000-0000-000000000004",
+                "DevID": 5,
+                "ACNET_SlotCapacity": 250,
+                "Scene_SlotCapacity": 256,
+                "UnitIds": [104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122] # Estes IDs podem precisar de ajuste
+            }
+        }
+
+        config = controller_configs.get(controller_type, controller_configs["AQL-GV-M4"])
+
+        unit_composers_data = [
+            {"Name": "Ativo", "PortNumber": 1, "PortType": 0, "IO": 0, "Kind": 0, "NotProgrammable": False},
+            {"Name": "Modulos HSNET ativos", "PortNumber": 1, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Modulos HSNET registrados", "PortNumber": 2, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Data", "PortNumber": 3, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
+            {"Name": "Hora", "PortNumber": 4, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
+            {"Name": "DST", "PortNumber": 2, "PortType": 0, "IO": 0, "Kind": 0, "NotProgrammable": False},
+            {"Name": "Nascer do Sol", "PortNumber": 5, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
+            {"Name": "Por do sol", "PortNumber": 6, "PortType": 600, "IO": 1, "Kind": 1, "NotProgrammable": True},
+            {"Name": "Posição Solar", "PortNumber": 7, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Flag RTC", "PortNumber": 8, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Flag SNTP", "PortNumber": 9, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Flag MYIP", "PortNumber": 10, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Flag DDNS", "PortNumber": 11, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Web IP", "PortNumber": 1, "PortType": 1100, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Ultima inicializacao", "PortNumber": 2, "PortType": 1100, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Tensao", "PortNumber": 12, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Corrente", "PortNumber": 13, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Power", "PortNumber": 14, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+            {"Name": "Temperatura", "PortNumber": 15, "PortType": 600, "IO": 0, "Kind": 1, "NotProgrammable": False},
+        ]
+
+        unit_composers = []
+        for i, composer_data in enumerate(unit_composers_data):
+            unit_composers.append({
+                "$type": "UnitComposer",
+                "Name": composer_data["Name"],
+                "PortNumber": composer_data["PortNumber"],
+                "PortType": composer_data["PortType"],
+                "IO": composer_data["IO"],
+                "Kind": composer_data["Kind"],
+                "NotProgrammable": composer_data["NotProgrammable"],
+                "Unit": {
+                    "$type": "Unit", "Id": config["UnitIds"][i], "Event": 0, "Scene": 0,
+                    "Disabled": False, "Logged": False, "Memo": False, "Increment": False
+                },
+                "Value": 0
+            })
+
+        controller_module = {
+            "$type": "Module",
+            "Name": project_info.get('nome') or config["Name"],
+            "DriverGuid": config["DriverGuid"],
+            "Guid": str(uuid.uuid4()),
+            "IpAddress": project_info.get('ip_address'),
+            "HsnetAddress": int(project_info.get('hsnet') or 245),
+            "PollTiming": 0,
+            "Disabled": False,
+            "RemotePort": 0,
+            "RemoteIpAddress": project_info.get('ip_address'),
+            "Notes": None,
+            "Logicserver": True,
+            "DevID": project_info.get('dev_id') or config["DevID"],
+            "DevIDSlave": 0,
+            "UnitComposers": unit_composers,
+            "Slots": [
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": config["ACNET_SlotCapacity"],
+                    "SlotType": 0,
+                    "InitialPort": 1,
+                    "IO": 0,
+                    "UnitComposers": None,
+                    "SubItemsGuid": [self.zero_guid],
+                    "Name": "ACNET/RNET",
+                },
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": config["Scene_SlotCapacity"],
+                    "SlotType": 8,
+                    "InitialPort": 1,
+                    "IO": 1,
+                    "UnitComposers": None,
+                    "SubItemsGuid": [self.zero_guid] * config["Scene_SlotCapacity"],
+                    "Name": "Scene",
+                },
+            ],
+            "SmartGroup": 1,
+            "UserInterfaceGuid": self.zero_guid,
+            "PIRSensorReportEnable": False,
+            "PIRSensorReportID": 0,
+        }
+        return controller_module
+
+    def convert_project_from_json(self, project_json):
+        """Processa os dados do projeto a partir de um dicionário JSON para o formato Roehn"""
+        print(f"Processando projeto: {project_json.get('nome')}")
+        print(f"Numero de areas: {len(project_json.get('areas', []))}")
+
+        self._circuit_guid_map = {}
+        self._scene_guid_map = {}
+        self._quadro_guid_map = {}
+        self._room_guid_map = {}
+        main_controller_id = None
+        self.projeto_id_db = project_json.get('id') # Manter para referência, se necessário
+
+        # Etapa PRE-1: Criar toda a estrutura de Areas, Ambientes e Quadros primeiro
+        for area in project_json.get('areas', []):
+            self._ensure_area_exists(area.get('nome'))
+            for ambiente in area.get('ambientes', []):
+                self._ensure_room_exists(area.get('nome'), ambiente.get('nome'), ambiente.get('id'))
+                for quadro in ambiente.get('quadros_eletricos', []):
+                    quadro_guid = self._ensure_automation_board_exists(area.get('nome'), ambiente.get('nome'), quadro.get('nome'))
+                    self._quadro_guid_map[quadro.get('id')] = quadro_guid
+
+        # Etapa 1 e 2: Processar todos os módulos (controladores ou não)
+        
+        # Primeiro, limpa a lista de módulos padrão
+        self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"] = []
+        
+        all_modules = project_json.get('modulos', [])
+        for modulo in all_modules:
+            quadro_guid = self._quadro_guid_map.get(modulo.get('quadro_eletrico_id'))
+            
+            if modulo.get('is_controller'):
+                # Cria o módulo controlador com as informações corretas
+                controller_module_json = self._create_controller_module(modulo.get('tipo'), modulo)
+                controller_module_json['Logicserver'] = modulo.get('is_logic_server', False)
+
+                # Aloca no quadro correto
+                target_board_json = self._find_automation_board_by_guid(quadro_guid) if quadro_guid else None
+                if target_board_json:
+                    target_board_json.setdefault("ModulesList", []).append(controller_module_json)
+                else:
+                    # Fallback para o quadro padrão
+                    self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"].append(controller_module_json)
+            else:
+                # Garante que módulos não-controladores sejam criados
+                self._ensure_module_exists(modulo, automation_board_guid=quadro_guid)
+
+        # Etapa 3: Processar todos os circuitos e criar seus GUIDs e links físicos
+        for area in project_json.get('areas', []):
+            for ambiente in area.get('ambientes', []):
+                for circuito in ambiente.get('circuitos', []):
+                    print(f"Processando circuito: {circuito.get('identificador')} ({circuito.get('tipo')})")
+                    guid = None
+                    try:
+                        if circuito.get('tipo') == 'luz':
+                            guid = self._add_load(
+                                area.get('nome'),
+                                ambiente.get('nome'),
+                                circuito.get('nome') or circuito.get('identificador'),
+                                power=circuito.get('potencia', 0.0),
+                                dimerizavel=circuito.get('dimerizavel', False)
+                            )
+                        elif circuito.get('tipo') == 'persiana':
+                            guid = self._add_shade(area.get('nome'), ambiente.get('nome'), circuito.get('nome') or circuito.get('identificador'))
+                        elif circuito.get('tipo') == 'hvac':
+                            guid = self._add_hvac(area.get('nome'), ambiente.get('nome'), circuito.get('nome') or circuito.get('identificador'))
+                        else:
+                            print(f"Tipo de circuito nao suportado: {circuito.get('tipo')}")
+
+                        if guid:
+                            self._circuit_guid_map[circuito.get('id')] = guid
+                        
+                        vinculacao = circuito.get('vinculacao')
+                        if vinculacao:
+                            modulo_nome = vinculacao.get('modulo', {}).get('nome')
+                            canal = vinculacao.get('canal')
+                            
+                            if modulo_nome and guid:
+                                if circuito.get('tipo') == 'luz':
+                                    self._link_load_to_module(guid, modulo_nome, canal, circuito.get('dimerizavel', False))
+                                elif circuito.get('tipo') == 'persiana':
+                                    self._link_shade_to_module(guid, modulo_nome, canal)
+                                elif circuito.get('tipo') == 'hvac':
+                                    self._link_hvac_to_module(guid, modulo_nome, canal)
+                            elif not modulo_nome:
+                                print(f"Circuito {circuito.get('identificador')} com vinculação, mas sem módulo associado.")
+                        
+                    except Exception as exc:
+                        print(f"Erro ao processar circuito {circuito.get('id')}: {exc}")
+                        import traceback
+                        traceback.print_exc()
+                        continue
+        
+        # Etapa 4: Processar Cenas e depois Keypads
+        for area in project_json.get('areas', []):
+            for ambiente in area.get('ambientes', []):
+                self._add_scenes_for_room(area.get('nome'), ambiente)
+                self._add_keypads_for_room(area.get('nome'), ambiente)
+
+        # Etapa 5: Verificação final do ACNET
+        print("Realizando verificação final do ACNET...")
+        self._verify_and_fix_acnet(project_json)
+        
+        # Log do estado final do ACNET
+        self._log_acnet_status()
+        
+        print("✅ Processamento do projeto concluído!")
+
+    def _log_acnet_status(self):
+        """Log do estado atual do ACNET para debugging"""
+        try:
+            _, _, acnet_slot = self._get_m4_module_components()
+            if not acnet_slot:
+                return
+            
+            acnet_guids = [guid for guid in acnet_slot.get("SubItemsGuid", []) if guid != self.zero_guid]
+            print(f"📊 Status do ACNET: {len(acnet_guids)} módulos registrados")
+            
+            # Mapear GUIDs para nomes de módulos
+            for i, guid in enumerate(acnet_slot.get("SubItemsGuid", [])):
+                if guid != self.zero_guid:
+                    module_name = "Desconhecido"
+                    for area in self.project_data["Areas"]:
+                        for room in area.get("SubItems", []):
+                            for board in room.get("AutomationBoards", []):
+                                for module in board.get("ModulesList", []):
+                                    if module.get("Guid") == guid:
+                                        module_name = module.get("Name", "Sem nome")
+                                        break
+                    print(f"  {i+1}. {guid} -> {module_name}")
+        except Exception as e:
+            print(f"Erro ao logar status do ACNET: {e}")
+
+    def _ensure_automation_board_exists(self, area_name, room_name, board_name):
+        """Garante que um AutomationBoard existe em um ambiente"""
+        area = self._ensure_area_exists(area_name)
+        room = self._ensure_room_exists(area_name, room_name)
+        
+        # Verificar se o quadro já existe
+        for board in room.get("AutomationBoards", []):
+            if board["Name"] == board_name:
+                return board["Guid"]
+        
+        # Criar novo quadro elétrico
+        new_board_guid = str(uuid.uuid4())
+        new_board = {
+            "$type": "AutomationBoard",
+            "Name": board_name,
+            "Notes": None,
+            "ModulesList": [],
+            "Guid": new_board_guid
+        }
+        
+        if "AutomationBoards" not in room:
+            room["AutomationBoards"] = []
+        room["AutomationBoards"].append(new_board)
+        
+        return new_board_guid
+
+    def _verify_and_fix_acnet(self, project_json):
+        """Verifica e corrige o ACNET de cada controlador para incluir seus módulos filhos."""
+        try:
+            controllers_json = []
+            for area in self.project_data["Areas"]:
+                for room in area.get("SubItems", []):
+                    for board in room.get("AutomationBoards", []):
+                        for module in board.get("ModulesList", []):
+                            if module.get("DriverGuid") in ["80000000-0000-0000-0000-000000000016", "80000000-0000-0000-0000-000000000018", "80000000-0000-0000-0000-000000000004"]:
+                                controllers_json.append(module)
+            
+            module_name_to_guid = {m.get("Name"): m.get("Guid") for area in self.project_data["Areas"] for room in area.get("SubItems", []) for board in room.get("AutomationBoards", []) for m in board.get("ModulesList", [])}
+
+            # Criar um mapa de ID de módulo para objeto de módulo do JSON de entrada
+            all_modules_map = {m['id']: m for m in project_json.get('modulos', [])}
+
+            for controller_json in controllers_json:
+                controller_name = controller_json.get("Name")
+                print(f"🔧 Verificando ACNET para o controlador: {controller_name}")
+
+                # Encontrar o controlador correspondente no JSON de entrada para obter seus filhos
+                controller_in_json = next((m for m in project_json.get('modulos', []) if m.get('nome') == controller_name), None)
+                if not controller_in_json:
+                    print(f"  AVISO: Controlador '{controller_name}' não encontrado no JSON de entrada.")
+                    continue
+
+                child_module_guids = set()
+                # Acessar módulos filhos através da chave 'child_modules' se existir
+                if 'child_modules' in controller_in_json:
+                    for child_module_info in controller_in_json['child_modules']:
+                         # O child_module_info pode ser apenas o ID ou um dict completo
+                        child_id = child_module_info if isinstance(child_module_info, int) else child_module_info.get('id')
+                        if child_id and child_id in all_modules_map:
+                            child_name = all_modules_map[child_id].get('nome')
+                            child_guid = module_name_to_guid.get(child_name)
+                            if child_guid:
+                                child_module_guids.add(child_guid)
+                
+                # Lógica alternativa se a relação pai-filho for definida no filho
+                parent_controller_id = controller_in_json.get('id')
+                for module in project_json.get('modulos', []):
+                    if module.get('parent_controller_id') == parent_controller_id:
+                        child_guid = module_name_to_guid.get(module.get('nome'))
+                        if child_guid:
+                            child_module_guids.add(child_guid)
+
+
+                acnet_slot = next((s for s in controller_json.get("Slots", []) if s.get("Name") == "ACNET/RNET"), None)
+                if not acnet_slot:
+                    print(f"  ERRO: Slot ACNET/RNET não encontrado para {controller_name}.")
+                    continue
+
+                acnet_slot["SubItemsGuid"] = list(child_module_guids)
+                acnet_slot["SubItemsGuid"].append(self.zero_guid)
+                
+                print(f"  ✅ ACNET para '{controller_name}' atualizado com {len(child_module_guids)} módulos.")
+
+        except Exception as e:
+            print(f"❌ Erro ao verificar/corrigir ACNET: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def create_project(self, project_info):
+        """Cria um projeto base compatível com o ROEHN Wizard"""
         project_guid = str(uuid.uuid4())
         now_iso = datetime.now().isoformat()
+        raw_target_board = project_info.get('m4_quadro_id')
+        try:
+            self.m4_target_quadro_id = int(raw_target_board) if raw_target_board not in (None, "", False) else None
+        except (TypeError, ValueError):
+            self.m4_target_quadro_id = None
         
+        # No método create_project, substitua a definição do m4_module por:
+
+        m4_module = self._create_controller_module("AQL-GV-M4", project_info)
+
         # SpecialActions padrão
         def default_special_actions():
             return [
@@ -120,7 +463,7 @@ class RoehnStandaloneConverter:
             "Id": 1,
         }
 
-        # Montagem do projeto base
+        # Montagem do projeto
         self.project_data = {
             "$type": "Project",
             "Areas": [
@@ -150,8 +493,7 @@ class RoehnStandaloneConverter:
                                     "$type": "AutomationBoard",
                                     "Name": project_info.get('board_name', 'Quadro Elétrico'),
                                     "Notes": None,
-                                    "ModulesList": [],
-                                    "Guid": str(uuid.uuid4())
+                                    "ModulesList": [m4_module],
                                 }
                             ],
                             "SpecialActions": default_special_actions(),
@@ -196,7 +538,7 @@ class RoehnStandaloneConverter:
             },
             "ProjectSchemaVersion": 1,
             "SoftwareVersion": project_info.get('software_version', '1.0.8.67'),
-            "SelectedTimeZoneID": project_info.get('timezone_id', 'America/Sao_Paulo'),
+            "SelectedTimeZoneID": project_info.get('timezone_id', 'America/Bahia'),
             "Latitude": float(project_info.get('lat', 0.0)),
             "Longitude": float(project_info.get('lon', 0.0)),
             "Notes": None,
@@ -205,84 +547,103 @@ class RoehnStandaloneConverter:
         
         return self.project_data
 
-    def process_json_project(self, json_data):
-        """Processa o JSON completo e gera o projeto RWP"""
-        try:
-            # Criar projeto base
-            project_info = {
-                'project_name': json_data.get('nome', 'Projeto Importado'),
-                'client_name': json_data.get('client_info', {}).get('client_name', 'Cliente'),
-                'client_email': json_data.get('client_info', {}).get('client_email', ''),
-                'client_phone': json_data.get('client_info', {}).get('client_phone', ''),
-                'programmer_name': json_data.get('programmer_info', {}).get('programmer_name', 'Programador'),
-                'programmer_email': json_data.get('programmer_info', {}).get('programmer_email', ''),
-                'programmer_guid': json_data.get('programmer_info', {}).get('programmer_guid', str(uuid.uuid4())),
-                'software_version': json_data.get('software_version', '1.0.8.67'),
-                'timezone_id': json_data.get('timezone_id', 'America/Sao_Paulo'),
-                'lat': json_data.get('lat', 0.0),
-                'lon': json_data.get('lon', 0.0),
-                'tech_area': json_data.get('tech_area', 'Área Técnica'),
-                'tech_room': json_data.get('tech_room', 'Sala Técnica'),
-                'board_name': json_data.get('board_name', 'Quadro Principal')
-            }
-            
-            self.create_base_project(project_info)
-            
-            # Processar estrutura do projeto
-            self._process_areas(json_data.get('areas', []))
-            self._process_modules(json_data.get('modulos', []))
-            self._process_circuits_and_links(json_data.get('areas', []))
-            self._process_keypads(json_data.get('areas', []))
-            
-            # Configurar controlador principal
-            self._setup_main_controller(json_data.get('modulos', []))
-            
-            print("✅ Projeto RWP gerado com sucesso!")
-            return self.project_data
-            
-        except Exception as e:
-            print(f"❌ Erro ao processar projeto: {e}")
-            import traceback
-            traceback.print_exc()
-            return None
-
-    def _process_areas(self, areas_data):
-        """Processa áreas, ambientes e quadros elétricos"""
-        for area_data in areas_data:
-            area_name = area_data.get('nome')
-            area_guid = str(uuid.uuid4())
-            
-            # Criar área
-            new_area = {
-                "$type": "Area",
-                "Scenes": [],
-                "Scripts": [],
-                "Variables": [],
-                "SpecialActions": self._get_default_special_actions(),
-                "Guid": area_guid,
-                "Name": area_name,
-                "Notes": "",
-                "NotDisplayOnROEHNApp": False,
-                "SubItems": []
-            }
-            
-            self.project_data["Areas"].append(new_area)
-            
-            # Processar ambientes
-            for ambiente_data in area_data.get('ambientes', []):
-                self._process_ambiente(new_area, ambiente_data)
-
-    def _process_ambiente(self, area_json, ambiente_data):
-        """Processa um ambiente específico"""
-        ambiente_name = ambiente_data.get('nome')
-        ambiente_guid = str(uuid.uuid4())
-        self.room_guid_map[ambiente_data.get('id')] = ambiente_guid
+    def process_csv(self, csv_content):
+        """Processa o conteúdo CSV e adiciona os circuitos ao projeto"""
+        if not self.project_data:
+            raise ValueError("Projeto não inicializado. Chame create_project primeiro.")
         
-        # Criar ambiente
+        # Converter conteúdo CSV para lista de dicionários
+        csv_file = io.StringIO(csv_content)
+        reader = csv.DictReader(csv_file)
+        
+        shades_seen = set()
+        
+        for row in reader:
+            circuito = (row.get("Circuito") or "").strip()
+            tipo = (row.get("Tipo") or "").strip().lower()
+            nome = (row.get("Nome") or "").strip()
+            area = (row.get("Area") or "").strip()
+            ambiente = (row.get("Ambiente") or "").strip()
+            canal = (row.get("Canal") or "").strip()
+            modulo = (row.get("Modulo") or "").strip()
+            id_modulo = (row.get("id Modulo") or row.get("id_modulo") or "").strip()
+
+            if not area or not ambiente or not modulo or not id_modulo or not canal:
+                continue
+                
+            try:
+                canal = int(canal)
+            except ValueError:
+                continue
+
+            self._ensure_area_exists(area)
+            self._ensure_room_exists(area, ambiente)
+            # Para CSV, ainda usamos o formato antigo para compatibilidade
+            modulo_nome = self._ensure_module_exists(modulo, f"{modulo}_{id_modulo}")
+
+            if tipo == "luz":
+                # ⭐⭐⭐ NOVO: Tentar obter informação de dimerizável do CSV (se existir)
+                dimerizavel_csv = row.get("Dimerizavel", "").strip().lower()
+                dimerizavel = dimerizavel_csv in ["sim", "true", "1", "yes"]
+                
+                guid = self._add_load(area, ambiente, nome or circuito or "Load", dimerizavel=dimerizavel)
+                self._link_load_to_module(guid, modulo_nome, canal, dimerizavel=dimerizavel)
+            elif tipo == "persiana":
+                key = f"{area}|{ambiente}|{nome or circuito or 'Persiana'}"
+                if key not in shades_seen:
+                    guid = self._add_shade(area, ambiente, nome or circuito or "Persiana")
+                    self._link_shade_to_module(guid, modulo_nome, canal)
+                    shades_seen.add(key)
+            elif tipo == "hvac":
+                guid = self._add_hvac(area, ambiente, nome or "Ar-Condicionado")
+                self._link_hvac_to_module(guid, modulo_nome, canal)
+        
+        return self.project_data
+
+    def _ensure_area_exists(self, area_name):
+        """Garante que uma área existe no projeto Roehn"""
+        for area in self.project_data["Areas"]:
+            if area["Name"] == area_name:
+                return area
+        
+        # Se a área não existe, cria uma nova
+        new_area = {
+            "$type": "Area",
+            "Scenes": [],
+            "Scripts": [],
+            "Variables": [],
+            "SpecialActions": [
+                {"$type": "SpecialAction", "Name": "All HVAC", "Guid": str(uuid.uuid4()), "Type": 4},
+                {"$type": "SpecialAction", "Name": "All Lights", "Guid": str(uuid.uuid4()), "Type": 2},
+                {"$type": "SpecialAction", "Name": "All Shades", "Guid": str(uuid.uuid4()), "Type": 3},
+                {"$type": "SpecialAction", "Name": "OFF", "Guid": str(uuid.uuid4()), "Type": 0},
+                {"$type": "SpecialAction", "Name": "Volume", "Guid": str(uuid.uuid4()), "Type": 1}
+            ],
+            "Guid": str(uuid.uuid4()),
+            "Name": area_name,
+            "Notes": "",
+            "NotDisplayOnROEHNApp": False,
+            "SubItems": []
+        }
+        self.project_data["Areas"].append(new_area)
+        return new_area
+
+    def _ensure_room_exists(self, area_name, room_name, room_id=None):
+        """Garante que um ambiente existe em uma área"""
+        area = self._ensure_area_exists(area_name)
+        
+        for room in area["SubItems"]:
+            if room["Name"] == room_name:
+                if room_id and room_id not in self._room_guid_map:
+                    self._room_guid_map[room_id] = room["Guid"]
+                return room
+        
+        # Se o ambiente não existe, cria um novo
+        new_room_guid = str(uuid.uuid4())
         new_room = {
             "$type": "Room",
             "NotDisplayOnROEHNApp": False,
-            "Name": ambiente_name,
+            "Name": room_name,
             "Notes": None,
             "Scenes": [],
             "Scripts": [],
@@ -290,363 +651,610 @@ class RoehnStandaloneConverter:
             "LoadOutputs": [],
             "UserInterfaces": [],
             "AutomationBoards": [],
-            "SpecialActions": self._get_default_special_actions(),
-            "Guid": ambiente_guid
-        }
-        
-        area_json["SubItems"].append(new_room)
-        
-        # Processar quadros elétricos
-        for quadro_data in ambiente_data.get('quadros_eletricos', []):
-            self._process_quadro(new_room, quadro_data)
-
-    def _process_quadro(self, room_json, quadro_data):
-        """Processa um quadro elétrico"""
-        quadro_name = quadro_data.get('nome')
-        quadro_guid = str(uuid.uuid4())
-        self.board_guid_map[quadro_data.get('id')] = quadro_guid
-        
-        new_board = {
-            "$type": "AutomationBoard",
-            "Name": quadro_name,
-            "Notes": None,
-            "ModulesList": [],
-            "Guid": quadro_guid
-        }
-        
-        room_json.setdefault("AutomationBoards", []).append(new_board)
-
-    def _process_modules(self, modules_data):
-        """Processa todos os módulos do projeto"""
-        # Primeiro, processar o controlador principal
-        main_controller = next((m for m in modules_data if m.get('is_logic_server')), None)
-        if main_controller:
-            self._create_main_controller(main_controller)
-        
-        # Processar módulos filhos
-        for module_data in modules_data:
-            if not module_data.get('is_logic_server'):
-                self._create_module(module_data)
-
-    def _create_main_controller(self, controller_data):
-        """Cria o controlador principal (Logic Server)"""
-        controller_type = controller_data.get('tipo', 'AQL-GV-M4')
-        controller_name = controller_data.get('nome')
-        
-        # Configurações baseadas no tipo de controlador
-        controller_configs = {
-            "AQL-GV-M4": {
-                "DriverGuid": "80000000-0000-0000-0000-000000000016",
-                "DevID": 1,
-                "ACNET_SlotCapacity": 24,
-                "Scene_SlotCapacity": 96,
-            },
-            "ADP-M8": {
-                "DriverGuid": "80000000-0000-0000-0000-000000000018",
-                "DevID": 3,
-                "ACNET_SlotCapacity": 250,
-                "Scene_SlotCapacity": 256,
-            },
-            "ADP-M16": {
-                "DriverGuid": "80000000-0000-0000-0000-000000000004",
-                "DevID": 5,
-                "ACNET_SlotCapacity": 250,
-                "Scene_SlotCapacity": 256,
-            }
-        }
-        
-        config = controller_configs.get(controller_type, controller_configs["AQL-GV-M4"])
-        
-        # Criar módulo controlador
-        controller_module = {
-            "$type": "Module",
-            "Name": controller_name,
-            "DriverGuid": config["DriverGuid"],
-            "Guid": str(uuid.uuid4()),
-            "IpAddress": controller_data.get('ip_address', '192.168.1.100'),
-            "HsnetAddress": controller_data.get('hsnet', 245),
-            "PollTiming": 0,
-            "Disabled": False,
-            "RemotePort": 0,
-            "RemoteIpAddress": controller_data.get('ip_address', '192.168.1.100'),
-            "Notes": None,
-            "Logicserver": True,
-            "DevID": config["DevID"],
-            "DevIDSlave": 0,
-            "UnitComposers": self._create_controller_unit_composers(),
-            "Slots": [
-                {
-                    "$type": "Slot",
-                    "SlotCapacity": config["ACNET_SlotCapacity"],
-                    "SlotType": 0,
-                    "InitialPort": 1,
-                    "IO": 0,
-                    "UnitComposers": None,
-                    "SubItemsGuid": [self.zero_guid],
-                    "Name": "ACNET/RNET",
-                },
-                {
-                    "$type": "Slot",
-                    "SlotCapacity": config["Scene_SlotCapacity"],
-                    "SlotType": 8,
-                    "InitialPort": 1,
-                    "IO": 1,
-                    "UnitComposers": None,
-                    "SubItemsGuid": [self.zero_guid] * config["Scene_SlotCapacity"],
-                    "Name": "Scene",
-                },
+            "SpecialActions": [
+                {"$type": "SpecialAction", "Name": "All HVAC", "Guid": str(uuid.uuid4()), "Type": 4},
+                {"$type": "SpecialAction", "Name": "All Lights", "Guid": str(uuid.uuid4()), "Type": 2},
+                {"$type": "SpecialAction", "Name": "All Shades", "Guid": str(uuid.uuid4()), "Type": 3},
+                {"$type": "SpecialAction", "Name": "OFF", "Guid": str(uuid.uuid4()), "Type": 0},
+                {"$type": "SpecialAction", "Name": "Volume", "Guid": str(uuid.uuid4()), "Type": 1}
             ],
-            "SmartGroup": 1,
-            "UserInterfaceGuid": self.zero_guid,
-            "PIRSensorReportEnable": False,
-            "PIRSensorReportID": 0,
+            "Guid": new_room_guid
         }
-        
-        # Adicionar ao quadro correto
-        quadro_id = controller_data.get('quadro_eletrico_id')
-        if quadro_id and quadro_id in self.board_guid_map:
-            board_guid = self.board_guid_map[quadro_id]
-            board = self._find_board_by_guid(board_guid)
-            if board:
-                board["ModulesList"].insert(0, controller_module)
-        else:
-            # Adicionar ao quadro padrão
-            self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"].insert(0, controller_module)
-        
-        self.module_guid_map[controller_data.get('id')] = controller_module["Guid"]
+        area["SubItems"].append(new_room)
+        if room_id:
+            self._room_guid_map[room_id] = new_room_guid
+        return new_room
 
-    def _create_module(self, module_data):
-        """Cria um módulo comum"""
-        module_type = module_data.get('tipo')
-        module_name = module_data.get('nome')
+    def _find_automation_board_by_guid(self, guid):
+        """Encontra um AutomationBoard pelo GUID em todo o projeto"""
+        for area in self.project_data["Areas"]:
+            for room in area.get("SubItems", []):
+                for board in room.get("AutomationBoards", []):
+                    if board.get("Guid") == guid:
+                        return board
+        return None
+
+    def _ensure_module_exists(self, model, module_name=None, automation_board_guid=None):
+        """Garantir que um modulo existe no projeto Roehn, opcionalmente em um quadro específico"""
+        # Determinar onde colocar o módulo
+        target_board = None
+        if automation_board_guid:
+            # Encontrar o AutomationBoard específico
+            target_board = self._find_automation_board_by_guid(automation_board_guid)
+            if not target_board:
+                print(f"Quadro elétrico {automation_board_guid} não encontrado, usando quadro padrão")
+                automation_board_guid = None
         
-        if module_type not in self.modules_info:
-            print(f"⚠️ Tipo de módulo desconhecido: {module_type}, usando ADP-RL12 como padrão")
-            module_type = 'ADP-RL12'
+        if not automation_board_guid:
+            # Usar o quadro padrão (sala técnica)
+            target_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
         
-        module_info = self.modules_info[module_type]
-        module_guid = str(uuid.uuid4())
-        
-        # Configurações básicas do módulo
+        modules_list = target_board["ModulesList"]
+
+        modulo_obj = None
+        desired_hsnet = None
+        desired_dev_id = None
+
+        if isinstance(model, dict):
+            modulo_obj = model
+            module_name = modulo_obj.get('nome')
+            model_key = (modulo_obj.get('tipo') or "").upper()
+            desired_hsnet = modulo_obj.get('hsnet')
+            desired_dev_id = modulo_obj.get('dev_id')
+        else:
+            model_key = (model or "").upper()
+            if module_name is None:
+                module_name = model_key
+
+        if not module_name:
+            module_name = "Modulo"
+
+        # Verificar se o módulo já existe NO QUADRO ESPECÍFICO
+        for module in modules_list:
+            if module.get("Name") == module_name:
+                if modulo_obj:
+                    if desired_hsnet is not None:
+                        module["HsnetAddress"] = desired_hsnet
+                    if desired_dev_id is not None:
+                        module["DevID"] = desired_dev_id
+                return module_name
+
+        # Se o módulo existe em outro quadro, movê-lo para este quadro
+        existing_module, existing_board = self._find_module_in_any_board(module_name)
+        if existing_module and existing_board != target_board:
+            existing_board["ModulesList"] = [m for m in existing_board.get("ModulesList", []) if m.get("Name") != module_name]
+            modules_list.append(existing_module)
+            print(f"Módulo {module_name} movido de {existing_board.get('Name')} para {target_board.get('Name')}")
+            return module_name
+
+        # Encontrar HSNET disponível
+        if desired_hsnet is not None and not self._is_hsnet_duplicate(desired_hsnet):
+            hsnet = desired_hsnet
+        else:
+            hsnet = self._find_max_hsnet() + 1
+            while self._is_hsnet_duplicate(hsnet):
+                hsnet += 1
+
+        if desired_dev_id is not None:
+            dev_id = desired_dev_id
+        else:
+            dev_id = self._find_max_dev_id() + 1
+
+        # Criar módulo baseado no tipo
+        key = (model_key or module_name).upper()
+        if "RL12" in key:
+            self._create_rl12_module(module_name, hsnet, dev_id, target_board)
+        elif "RL4" in key:
+            self._create_rl4_module(module_name, hsnet, dev_id, target_board)
+        elif "LX4" in key:
+            self._create_lx4_module(module_name, hsnet, dev_id, target_board)
+        elif "SA1" in key:
+            self._create_sa1_module(module_name, hsnet, dev_id, target_board)
+        elif "DIM8" in key or "ADP-DIM8" in key:
+            self._create_dim8_module(module_name, hsnet, dev_id, target_board)
+        elif "AQL-GV-M4" in key:
+            self._create_controller_as_module("AQL-GV-M4", module_name, hsnet, dev_id, target_board, ip_address=modulo_obj.ip_address if modulo_obj else '0.0.0.0')
+        elif "ADP-M8" in key:
+            self._create_controller_as_module("ADP-M8", module_name, hsnet, dev_id, target_board, ip_address=modulo_obj.ip_address if modulo_obj else '0.0.0.0')
+        elif "ADP-M16" in key:
+            self._create_controller_as_module("ADP-M16", module_name, hsnet, dev_id, target_board, ip_address=modulo_obj.ip_address if modulo_obj else '0.0.0.0')
+        else:
+            print(f"Tipo de módulo desconhecido '{key}', criando como ADP-RL12 por padrão.")
+            self._create_rl12_module(module_name, hsnet, dev_id, target_board)
+
+        return module_name
+
+    def _create_controller_as_module(self, controller_type, name, hsnet_address, dev_id, target_board=None, ip_address='0.0.0.0'):
+        """Cria um módulo que é um tipo de controlador, mas com Logicserver=False."""
+        controller_info = {
+            'm4_ip': ip_address,
+            'm4_hsnet': hsnet_address,
+            'm4_devid': dev_id,
+        }
+
+        module_json = self._create_controller_module(controller_type, controller_info)
+
+        module_json["Logicserver"] = False
+        module_json["Name"] = name
+        module_json["Guid"] = str(uuid.uuid4())
+
+        self._add_module_to_project(module_json, module_json["Guid"], target_board)
+
+    def _create_rl4_module(self, name, hsnet_address, dev_id, target_board=None):
+        """Cria um módulo RL4"""
+        new_module_guid = str(uuid.uuid4())
         new_module = {
             "$type": "Module",
-            "Name": module_name,
-            "DriverGuid": module_info['driver_guid'],
-            "Guid": module_guid,
+            "Name": name,
+            "DriverGuid": "80000000-0000-0000-0000-000000000010",
+            "Guid": new_module_guid,
             "IpAddress": "",
-            "HsnetAddress": module_data.get('hsnet', self._find_next_hsnet()),
+            "HsnetAddress": hsnet_address,
             "PollTiming": 0,
             "Disabled": False,
             "RemotePort": 0,
             "RemoteIpAddress": "",
             "Notes": None,
             "Logicserver": False,
-            "DevID": module_data.get('dev_id', self._find_next_dev_id()),
+            "DevID": dev_id,
             "DevIDSlave": 0,
             "UnitComposers": None,
-            "Slots": [],
+            "Slots": [
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": 4,
+                    "SlotType": 1,
+                    "InitialPort": 1,
+                    "IO": 1,
+                    "UnitComposers": None,
+                    "SubItemsGuid": ["00000000-0000-0000-0000-000000000000"] * 4,
+                    "Name": "Load ON/OFF"
+                }
+            ],
             "SmartGroup": 1,
-            "UserInterfaceGuid": self.zero_guid,
+            "UserInterfaceGuid": "00000000-0000-0000-0000-000000000000",
             "PIRSensorReportEnable": False,
-            "PIRSensorReportID": 0,
+            "PIRSensorReportID": 0
         }
-        
-        # Adicionar slots baseados no tipo de módulo
-        for slot_name, slot_capacity in module_info['slots'].items():
-            slot_type = self._get_slot_type(slot_name)
-            new_module["Slots"].append({
-                "$type": "Slot",
-                "SlotCapacity": slot_capacity,
-                "SlotType": slot_type,
-                "InitialPort": 1,
-                "IO": 1,
-                "UnitComposers": None,
-                "SubItemsGuid": [self.zero_guid] * slot_capacity,
-                "Name": slot_name
+        self._add_module_to_project(new_module, new_module_guid, target_board)
+
+    def _create_lx4_module(self, name, hsnet_address, dev_id, target_board=None):
+        """Cria um módulo LX4"""
+        next_unit_id = self._find_max_unit_id() + 1
+        unit_composers = []
+        for i in range(4):
+            for j in range(4):
+                unit_composers.append({
+                    "$type": "UnitComposer",
+                    "Name": f"Opening Percentage {i+1} {j+1}",
+                    "Unit": {
+                        "$type": "Unit",
+                        "Id": next_unit_id,
+                        "Event": 0,
+                        "Scene": 0,
+                        "Disabled": False,
+                        "Logged": False,
+                        "Memo": False,
+                        "Increment": False
+                    },
+                    "PortNumber": 1 if j % 2 == 0 else 5,
+                    "PortType": 6,
+                    "NotProgrammable": False,
+                    "Kind": 1,
+                    "IO": 1 if j % 2 == 0 else 0,
+                    "Value": 0
+                })
+                next_unit_id += 1
+
+        new_module_guid = str(uuid.uuid4())
+        new_module = {
+            "$type": "Module",
+            "Name": name,
+            "DriverGuid": "80000000-0000-0000-0000-000000000003",
+            "Guid": new_module_guid,
+            "IpAddress": "",
+            "HsnetAddress": hsnet_address,
+            "PollTiming": 0,
+            "Disabled": False,
+            "RemotePort": 0,
+            "RemoteIpAddress": "",
+            "Notes": None,
+            "Logicserver": False,
+            "DevID": dev_id,
+            "DevIDSlave": 0,
+            "UnitComposers": unit_composers,
+            "Slots": [
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": 4,
+                    "SlotType": 7,
+                    "InitialPort": 1,
+                    "IO": 1,
+                    "UnitComposers": None,
+                    "SubItemsGuid": ["00000000-0000-0000-0000-000000000000"] * 4,
+                    "Name": "Shade"
+                },
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": 6,
+                    "SlotType": 6,
+                    "InitialPort": 1,
+                    "IO": 0,
+                    "UnitComposers": None,
+                    "SubItemsGuid": ["00000000-0000-0000-0000-000000000000"] * 6,
+                    "Name": "PNET"
+                }
+            ],
+            "SmartGroup": 1,
+            "UserInterfaceGuid": "00000000-0000-0000-0000-000000000000",
+            "PIRSensorReportEnable": False,
+            "PIRSensorReportID": 0
+        }
+        self._add_module_to_project(new_module, new_module_guid, target_board)
+
+    def _create_sa1_module(self, name, hsnet_address, dev_id, target_board=None):
+        """Cria um módulo SA1"""
+        next_unit_id = self._find_max_unit_id() + 1
+        unit_composers = []
+        composers_data = [
+            {"Name": "Power", "PortNumber": 1, "PortType": 600, "NotProgrammable": False, "Kind": 1, "IO": 1},
+            {"Name": "Mode", "PortNumber": 2, "PortType": 600, "NotProgrammable": False, "Kind": 1, "IO": 1},
+            {"Name": "Fan Speed", "PortNumber": 4, "PortType": 600, "NotProgrammable": False, "Kind": 1, "IO": 1},
+            {"Name": "Swing", "PortNumber": 5, "PortType": 600, "NotProgrammable": False, "Kind": 1, "IO": 1},
+            {"Name": "Temp Up", "PortNumber": 11, "PortType": 600, "NotProgrammable": False, "Kind": 1, "IO": 1},
+            {"Name": "Temp Down", "PortNumber": 12, "PortType": 600, "NotProgrammable": False, "Kind": 1, "IO": 1},
+            {"Name": "Display/Light", "PortNumber": 3, "PortType": 100, "NotProgrammable": False, "Kind": 0, "IO": 1},
+        ]
+        for composer in composers_data:
+            unit_composers.append({
+                "$type": "UnitComposer",
+                "Name": composer["Name"],
+                "Unit": {
+                    "$type": "Unit",
+                    "Id": next_unit_id,
+                    "Event": 0,
+                    "Scene": 0,
+                    "Disabled": False,
+                    "Logged": False,
+                    "Memo": False,
+                    "Increment": False
+                },
+                "PortNumber": composer["PortNumber"],
+                "PortType": composer["PortType"],
+                "NotProgrammable": composer["NotProgrammable"],
+                "Kind": composer["Kind"],
+                "IO": composer["IO"],
+                "Value": 0
             })
-        
-        # Adicionar ao quadro correto
-        quadro_id = module_data.get('quadro_eletrico_id')
-        if quadro_id and quadro_id in self.board_guid_map:
-            board_guid = self.board_guid_map[quadro_id]
-            board = self._find_board_by_guid(board_guid)
-            if board:
-                board["ModulesList"].append(new_module)
-        else:
-            # Adicionar ao quadro padrão
-            self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"].append(new_module)
-        
-        self.module_guid_map[module_data.get('id')] = module_guid
-        return module_guid
+            next_unit_id += 1
 
-    def _process_circuits_and_links(self, areas_data):
-        """Processa circuitos e suas vinculações com módulos"""
-        for area_data in areas_data:
-            for ambiente_data in area_data.get('ambientes', []):
-                for circuito_data in ambiente_data.get('circuitos', []):
-                    self._create_circuit(area_data, ambiente_data, circuito_data)
-                    
-                    # Processar vinculação se existir
-                    if 'vinculacao' in circuito_data:
-                        self._link_circuit_to_module(circuito_data)
+        new_module_guid = str(uuid.uuid4())
+        new_module = {
+            "$type": "ModuleHVAC",
+            "SubItemComposers": [unit_composers],
+            "GTWItemComposers": [],
+            "Name": name,
+            "DriverGuid": "80000000-0000-0000-0000-000000000013",
+            "Guid": new_module_guid,
+            "IpAddress": "",
+            "HsnetAddress": hsnet_address,
+            "PollTiming": 0,
+            "Disabled": False,
+            "RemotePort": 0,
+            "RemoteIpAddress": "",
+            "Notes": None,
+            "Logicserver": False,
+            "DevID": dev_id,
+            "DevIDSlave": 0,
+            "Slots": [
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": 1,
+                    "SlotType": 4,
+                    "InitialPort": 1,
+                    "IO": 1,
+                    "UnitComposers": None,
+                    "SubItemsGuid": ["00000000-0000-0000-0000-000000000000"],
+                    "Name": "IR"
+                }
+            ],
+            "SmartGroup": 1,
+            "UserInterfaceGuid": "00000000-0000-0000-0000-000000000000",
+            "PIRSensorReportEnable": False,
+            "PIRSensorReportID": 0
+        }
 
-    def _create_circuit(self, area_data, ambiente_data, circuito_data):
-        """Cria um circuito no projeto RWP"""
-        circuit_type = circuito_data.get('tipo')
-        circuit_name = circuito_data.get('nome', circuito_data.get('identificador'))
-        circuit_guid = str(uuid.uuid4())
-        
-        # Encontrar o ambiente no projeto RWP
-        area_name = area_data.get('nome')
-        room_name = ambiente_data.get('nome')
-        
-        area_json = next((a for a in self.project_data["Areas"] if a["Name"] == area_name), None)
-        if not area_json:
-            return None
-            
-        room_json = next((r for r in area_json["SubItems"] if r["Name"] == room_name), None)
-        if not room_json:
-            return None
-        
-        # Criar circuito baseado no tipo
-        if circuit_type == 'luz':
-            dimerizavel = circuito_data.get('dimerizavel', False)
-            power = circuito_data.get('potencia', 0.0)
-            
-            if dimerizavel:
-                load_type = 2
-                profile_guid = "10000000-0000-0000-0000-000000000002"
-                description = "Dimmer"
-            else:
-                load_type = 0
-                profile_guid = "10000000-0000-0000-0000-000000000001"
-                description = "ON/OFF"
-                
-            new_circuit = {
-                "$type": "Circuit",
-                "LoadType": load_type,
-                "IconPath": 0,
-                "Power": power,
-                "ProfileGuid": profile_guid,
-                "Unit": self._create_unit(),
-                "Name": circuit_name,
-                "Guid": circuit_guid,
-                "Description": description
-            }
-            
-        elif circuit_type == 'persiana':
-            new_circuit = {
-                "$type": "Shade",
-                "ShadeType": 0,
-                "ShadeIcon": 0,
-                "ProfileGuid": "20000000-0000-0000-0000-000000000001",
-                "UnitMovement": self._create_unit(),
-                "UnitOpenedPercentage": self._create_unit(),
-                "UnitCurrentPosition": self._create_unit(),
-                "Name": circuit_name,
-                "Guid": circuit_guid,
-                "Description": "Persiana"
-            }
-            
-        elif circuit_type == 'hvac':
-            new_circuit = {
-                "$type": "HVAC",
-                "ProfileGuid": "14000000-0000-0000-0000-000000000001",
-                "ControlModelGuid": "17000000-0000-0000-0000-000000000001",
-                "Unit": self._create_unit(),
-                "Name": circuit_name,
-                "Guid": circuit_guid,
-                "Description": "HVAC"
-            }
-        
-        else:
-            print(f"⚠️ Tipo de circuito não suportado: {circuit_type}")
-            return None
-        
-        room_json.setdefault("LoadOutputs", []).append(new_circuit)
-        self.circuit_guid_map[circuito_data.get('id')] = circuit_guid
-        return circuit_guid
+        self._add_module_to_project(new_module, new_module_guid, target_board)
 
-    def _link_circuit_to_module(self, circuito_data):
-        """Vincula um circuito a um módulo"""
-        vinculacao = circuito_data.get('vinculacao')
-        if not vinculacao:
-            return
-            
-        module_data = vinculacao.get('modulo')
-        if not module_data:
-            return
-            
-        module_id = module_data.get('id')
-        canal = vinculacao.get('canal', 1)
-        circuit_guid = self.circuit_guid_map.get(circuito_data.get('id'))
-        module_guid = self.module_guid_map.get(module_id)
-        
-        if not circuit_guid or not module_guid:
-            return
-            
-        # Encontrar o módulo e fazer a vinculação
-        module_json = self._find_module_by_guid(module_guid)
-        if not module_json:
-            return
-            
-        circuit_type = circuito_data.get('tipo')
-        slot_name = self._get_slot_name_for_circuit_type(circuit_type)
-        
-        # Encontrar o slot correto e fazer a vinculação
-        for slot in module_json.get('Slots', []):
-            if slot.get('Name') == slot_name:
-                if canal <= len(slot['SubItemsGuid']):
-                    slot['SubItemsGuid'][canal-1] = circuit_guid
-                    print(f"✅ Circuito {circuito_data.get('identificador')} vinculado ao módulo {module_data.get('nome')}, canal {canal}")
+    def _create_dim8_module(self, name, hsnet_address, dev_id, target_board=None):
+        """Cria um módulo DIM8"""
+        new_module_guid = str(uuid.uuid4())
+        zero = "00000000-0000-0000-0000-000000000000"
+
+        new_module = {
+            "$type": "Module",
+            "Name": name,
+            "DriverGuid": "80000000-0000-0000-0000-000000000001",
+            "Guid": new_module_guid,
+            "IpAddress": "",
+            "HsnetAddress": hsnet_address,
+            "PollTiming": 0,
+            "Disabled": False,
+            "RemotePort": 0,
+            "RemoteIpAddress": "",
+            "Notes": None,
+            "Logicserver": False,
+            "DevID": dev_id,
+            "DevIDSlave": 0,
+            "UnitComposers": None,
+            "Slots": [
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": 8,
+                    "SlotType": 2,
+                    "InitialPort": 1,
+                    "IO": 1,
+                    "UnitComposers": None,
+                    "SubItemsGuid": [zero] * 8,
+                    "Name": "Load Dim"
+                },
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": 6,
+                    "SlotType": 6,
+                    "InitialPort": 1,
+                    "IO": 1,
+                    "UnitComposers": None,
+                    "SubItemsGuid": [zero] * 6,
+                    "Name": "PNET"
+                }
+            ],
+            "SmartGroup": 1,
+            "UserInterfaceGuid": "00000000-0000-0000-0000-000000000000",
+            "PIRSensorReportEnable": False,
+            "PIRSensorReportID": 0
+        }
+
+        self._add_module_to_project(new_module, new_module_guid, target_board)
+
+    def _create_rl12_module(self, name, hsnet_address, dev_id, target_board=None):
+        """Cria um módulo RL12"""
+        new_module_guid = str(uuid.uuid4())
+        new_module = {
+            "$type": "Module",
+            "Name": name,
+            "DriverGuid": "80000000-0000-0000-0000-000000000006",
+            "Guid": new_module_guid,
+            "IpAddress": "",
+            "HsnetAddress": hsnet_address,
+            "PollTiming": 0,
+            "Disabled": False,
+            "RemotePort": 0,
+            "RemoteIpAddress": "",
+            "Notes": None,
+            "Logicserver": False,
+            "DevID": dev_id,
+            "DevIDSlave": 0,
+            "UnitComposers": None,
+            "Slots": [
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": 12,
+                    "SlotType": 1,
+                    "InitialPort": 1,
+                    "IO": 1,
+                    "UnitComposers": None,
+                    "SubItemsGuid": ["00000000-0000-0000-0000-000000000000"] * 12,
+                    "Name": "Load ON/OFF"
+                },
+                {
+                    "$type": "Slot",
+                    "SlotCapacity": 6,
+                    "SlotType": 6,
+                    "InitialPort": 1,
+                    "IO": 1,
+                    "UnitComposers": None,
+                    "SubItemsGuid": ["00000000-0000-0000-0000-000000000000"] * 6,
+                    "Name": "PNET"
+                }
+            ],
+            "SmartGroup": 1,
+            "UserInterfaceGuid": "00000000-0000-0000-0000-000000000000",
+            "PIRSensorReportEnable": False,
+            "PIRSensorReportID": 0
+        }
+        self._add_module_to_project(new_module, new_module_guid, target_board)
+
+    # Implementar métodos similares para outros tipos de módulos:
+    # _create_rl4_module, _create_lx4_module, _create_sa1_module, _create_dim8_module
+
+    def _find_module_in_any_board(self, module_name):
+        """Procura um módulo pelo nome em todos os quadros elétricos do projeto"""
+        for area in self.project_data["Areas"]:
+            for room in area.get("SubItems", []):
+                for board in room.get("AutomationBoards", []):
+                    for module in board.get("ModulesList", []):
+                        if module.get("Name") == module_name:
+                            return module, board
+        return None, None
+
+    def _get_m4_module_components(self):
+        """Retorna o módulo M4, o quadro em que ele está e o slot ACNET associado."""
+        for controller_name in ["AQL-GV-M4", "ADP-M8", "ADP-M16"]:
+            module, board = self._find_module_in_any_board(controller_name)
+            if module:
                 break
+        else:
+            return None, None, None
 
-    def _process_keypads(self, areas_data):
-        """Processa keypads e seus botões"""
-        for area_data in areas_data:
-            for ambiente_data in area_data.get('ambientes', []):
-                for keypad_data in ambiente_data.get('keypads', []):
-                    self._create_keypad(area_data, ambiente_data, keypad_data)
+        if not module:
+            return None, None, None
+        acnet_slot = None
+        for slot in module.get("Slots", []):
+            if slot.get("Name") == "ACNET":
+                acnet_slot = slot
+                break
+        return module, board, acnet_slot
 
-    def _create_keypad(self, area_data, ambiente_data, keypad_data):
-        """Cria um keypad no projeto RWP"""
-        area_name = area_data.get('nome')
-        room_name = ambiente_data.get('nome')
-        
-        area_json = next((a for a in self.project_data["Areas"] if a["Name"] == area_name), None)
-        if not area_json:
+    def _ensure_module_guid_registered_in_acnet(self, module_guid):
+        """Garante que um GUID de módulo esteja registrado no ACNET do M4."""
+        if not module_guid or module_guid == self.zero_guid:
             return
-            
-        room_json = next((r for r in area_json["SubItems"] if r["Name"] == room_name), None)
-        if not room_json:
+        _, _, acnet_slot = self._get_m4_module_components()
+        if not acnet_slot:
+            return
+        subitems = acnet_slot.setdefault("SubItemsGuid", [])
+        if module_guid in subitems:
+            return
+        for idx, guid in enumerate(subitems):
+            if guid == self.zero_guid:
+                subitems[idx] = module_guid
+                return
+        subitems.append(module_guid)
+        if subitems[-1] != self.zero_guid:
+            subitems.append(self.zero_guid)
+
+    def _move_m4_to_selected_board(self):
+        """Move o módulo M4 para o quadro elétrico selecionado, caso indicado pelo usuário."""
+        target_id = getattr(self, "m4_target_quadro_id", None)
+        if not target_id:
+            return
+        board_guid = self._quadro_guid_map.get(target_id)
+        if not board_guid:
+            print(f"⚠️  Quadro selecionado para o M4 (ID {target_id}) não encontrado no mapa de GUIDs.")
+            return
+        target_board = self._find_automation_board_by_guid(board_guid)
+        if not target_board:
+            print(f"⚠️  Quadro GUID {board_guid} não encontrado na estrutura do projeto.")
+            return
+        m4_module, current_board, _ = self._get_m4_module_components()
+        if not m4_module:
+            print("⚠️  Módulo M4 não encontrado no projeto Roehn.")
+            return
+        if current_board == target_board:
+            return
+
+        # Remover do quadro atual
+        if current_board:
+            current_board["ModulesList"] = [
+                m for m in current_board.get("ModulesList", [])
+                if m.get("Guid") != m4_module.get("Guid")
+            ]
+
+        # Adicionar ao quadro de destino
+        target_board.setdefault("ModulesList", [])
+        if not any(m.get("Guid") == m4_module.get("Guid") for m in target_board["ModulesList"]):
+            target_board["ModulesList"].insert(0, m4_module)
+            print(f"✅ Módulo M4 movido para o quadro {target_board.get('Name')}")
+
+    def _add_module_to_project(self, new_module, new_module_guid, target_board=None):
+        """Adiciona um módulo ao AutomationBoard especificado e ao ACNET do M4"""
+        # Adicionar o módulo ao quadro especificado (ou ao padrão se nenhum for especificado)
+        if target_board is None:
+            target_board = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]
+        
+        target_board.setdefault("ModulesList", [])
+        modules_list = target_board["ModulesList"]
+        modules_list.append(new_module)
+
+        # Garantir que o módulo esteja registrado no ACNET do M4
+        self._ensure_module_guid_registered_in_acnet(new_module_guid)
+
+    def _add_keypads_for_room(self, area_name, ambiente):
+        keypads = ambiente.get("keypads", [])
+        if not keypads:
             return
         
+        print(f"Processing keypads for room: {ambiente.get('nome')} (ID: {ambiente.get('id')})")
+
+        try:
+            area_idx = next(i for i, area in enumerate(self.project_data["Areas"]) if area.get("Name") == area_name)
+        except StopIteration:
+            return
+
+        subitems = self.project_data["Areas"][area_idx].get("SubItems", [])
+        try:
+            room_idx = next(i for i, room in enumerate(subitems) if room.get("Name") == ambiente.get('nome'))
+        except StopIteration:
+            return
+
+        room = subitems[room_idx]
+        user_interfaces = room.setdefault("UserInterfaces", [])
+        for keypad in keypads:
+            print(f"  - Building payload for keypad: {keypad.get('nome')} (ID: {keypad.get('id')})")
+            payload = self._build_keypad_payload(area_idx, room_idx, keypad)
+            user_interfaces.append(payload)
+            self._register_user_interface_guid(payload["Guid"])
+
+    def _build_keypad_payload(self, area_idx, room_idx, keypad):
+        zero_guid = self.zero_guid
         keypad_guid = str(uuid.uuid4())
-        button_count = keypad_data.get('button_count', 4)
         
-        keypad_payload = {
+        print(f"    - Building keypad payload for: {keypad.get('nome')}")
+
+        base_unit_id = self._find_max_unit_id() + 1
+
+        def next_unit_id():
+            nonlocal base_unit_id
+            unit_id = base_unit_id
+            base_unit_id += 1
+            return unit_id
+
+        def make_unit(unit_id):
+            return {
+                "$type": "Unit",
+                "Id": unit_id,
+                "Event": 0,
+                "Scene": 0,
+                "Disabled": False,
+                "Logged": False,
+                "Memo": False,
+                "Increment": False,
+            }
+
+        def make_composer(name, port_number, port_type, kind, io):
+            return {
+                "$type": "UnitComposer",
+                "Name": name,
+                "Unit": make_unit(next_unit_id()),
+                "PortNumber": port_number,
+                "PortType": port_type,
+                "NotProgrammable": False,
+                "Kind": kind,
+                "IO": io,
+                "Value": 0,
+            }
+
+        color_value = (keypad.get('color') or "WHITE").upper()
+        button_color_value = (keypad.get('button_color') or "WHITE").upper()
+        button_count = int(keypad.get('button_count') or len(keypad.get('buttons', [])) or 1)
+        button_layout = self.keypad_button_layouts.get(button_count, button_count)
+        hsnet_address = keypad.get('hsnet') if keypad.get('hsnet') is not None else 0
+        dev_id = keypad.get('dev_id') if keypad.get('dev_id') is not None else hsnet_address
+
+        payload = {
             "$type": "Keypad",
             "DriverGuid": self.keypad_driver_guid,
             "ModuleInterface": False,
             "Keypad4x4": False,
-            "HsnetAddress": keypad_data.get('hsnet', self._find_next_hsnet()),
+            "HsnetAddress": hsnet_address,
             "TipoEntrada1ChaveLD": 0,
             "TipoEntrada2ChaveLD": 0,
-            "UnitEntradaDigital1": self._create_unit_composer("UnitEntradaDigital1", 1, 0, 0, 0),
-            "UnitEntradaDigital2": self._create_unit_composer("UnitEntradaDigital2", 2, 0, 0, 0),
-            "UnitAnyKey": self._create_unit_composer("UnitAnyKey", 3, 0, 0, 0),
+            "UnitEntradaDigital1": make_composer("UnitEntradaDigital1", 1, 0, 0, 0),
+            "UnitEntradaDigital2": make_composer("UnitEntradaDigital2", 2, 0, 0, 0),
+            "UnitAnyKey": make_composer("UnitAnyKey", 3, 0, 0, 0),
             "BrightUnit": 0,
-            "UnitBrightnessColor1": self._create_unit_composer("UnitBrightnessColor1", 1, 600, 1, 1),
-            "UnitBrightnessColor2": self._create_unit_composer("UnitBrightnessColor2", 2, 600, 1, 1),
-            "UnitBeepProfile": self._create_unit_composer("UnitBeepProfile", 3, 600, 1, 1),
-            "UnitVolumeProfile": self._create_unit_composer("UnitVolumeProfile", 4, 600, 1, 1),
-            "UnitVolumeKey": self._create_unit_composer("UnitVolumeKey", 5, 0, 0, 0),
-            "UnitBlockedKeypad": self._create_unit_composer("UnitBlockedKeypad", 1, 100, 0, 1),
-            "UnitPIN32": self._create_unit_composer("UnitPIN32", 1, 1100, 1, 0),
+            "UnitBrightnessColor1": make_composer("UnitBrightnessColor1", 1, 600, 1, 1),
+            "UnitBrightnessColor2": make_composer("UnitBrightnessColor2", 2, 600, 1, 1),
+            "UnitBeepProfile": make_composer("UnitBeepProfile", 3, 600, 1, 1),
+            "UnitVolumeProfile": make_composer("UnitVolumeProfile", 4, 600, 1, 1),
+            "UnitVolumeKey": make_composer("UnitVolumeKey", 5, 0, 0, 0),
+            "UnitBlockedKeypad": make_composer("UnitBlockedKeypad", 1, 100, 0, 1),
+            "UnitPIN32": make_composer("UnitPIN32", 1, 1100, 1, 0),
             "NightModeGroup": 0,
             "LightSensorMode": 0,
             "LightSensorMasterID": 0,
-            "DevID": keypad_data.get('dev_id', keypad_data.get('hsnet', self._find_next_dev_id())),
+            "DevID": dev_id,
             "ListKeypadButtons": [],
             "ListKeypadButtonsLayout2": [],
             "ProfileGuid": self.keypad_profile_guid,
@@ -654,270 +1262,593 @@ class RoehnStandaloneConverter:
             "ButtonLayout2": 0,
             "Slots": [],
             "hold": 0,
-            "ButtonLayout1": 7,  # Layout para 4 botões
-            "ModelName": keypad_data.get('modelo', 'RQR-K'),
-            "Color": keypad_data.get('color', 'WHITE'),
-            "ButtonColor": keypad_data.get('button_color', 'WHITE'),
-            "Name": keypad_data.get('nome', 'Keypad'),
-            "Notes": keypad_data.get('notes'),
+            "ButtonLayout1": button_layout,
+            "ModelName": keypad.get('modelo') or "RQR-K",
+            "Color": color_value,
+            "ButtonColor": button_color_value,
+            "Name": keypad.get('nome') or "RQR-K",
+            "Notes": keypad.get('notes'),
             "Guid": keypad_guid,
             "ButtonCount": button_count,
         }
-        
-        # Processar botões
-        for button_data in keypad_data.get('buttons', []):
-            button_payload = self._create_keypad_button(button_data, button_data.get('ordem', 1))
-            keypad_payload["ListKeypadButtons"].append(button_payload)
-        
-        room_json.setdefault("UserInterfaces", []).append(keypad_payload)
 
-    def _create_keypad_button(self, button_data, ordem):
-        """Cria um botão de keypad"""
-        # Determinar target_guid
-        target_guid = self.zero_guid
-        if button_data.get('cena'):
-            target_guid = button_data['cena'].get('guid', self.zero_guid)
-        elif button_data.get('circuito'):
-            circuit_id = button_data['circuito'].get('id')
-            target_guid = self.circuit_guid_map.get(circuit_id, self.zero_guid)
-        
-        # Configurar estilo do botão
-        button_style_guid = self.zero_guid
-        style_properties = None
-        
-        if button_data.get('is_rocker') and button_data.get('icon'):
-            button_style_guid = "13000000-0000-0000-0000-000000000003"
-            style_properties = {
-                "$type": "Dictionary`2",
-                "STYLE_PROP_ICON": self.icon_guids.get(button_data['icon'], self.zero_guid),
-            }
-        elif button_data.get('icon'):
-            button_style_guid = "13000000-0000-0000-0000-000000000002"
-            style_properties = {
-                "$type": "Dictionary`2",
-                "STYLE_PROP_ICON": self.icon_guids.get(button_data['icon'], self.zero_guid),
-            }
-        
-        button_payload = {
-            "$type": "RockerKeypadButton",
-            "StylePropertiesSerializable": style_properties,
-            "DoublePressDelay": False,
-            "TargetDoubleObjectGuid": self.zero_guid,
-            "ModoDoublePress": button_data.get('modo_double_press', 0),
-            "TargetObjectGuid": target_guid,
-            "ModoPress": button_data.get('modo_press', 0),
-            "TargetLongObjectGuid": self.zero_guid,
-            "ModoLongPress": button_data.get('modo_long_press', 0),
-            "TargetReleaseObjectGuid": self.zero_guid,
-            "ModoRelease": button_data.get('modo_release', 0),
-            "TargetDoubleReleaseObjectGuid": self.zero_guid,
-            "ModoDoubleRelease": button_data.get('modo_double_release', 0),
-            "TargetLongReleaseObjectGuid": self.zero_guid,
-            "ModoLongRelease": button_data.get('modo_long_release', 0),
-            "Name": button_data.get('nome', f'Botão {ordem}'),
-            "Guid": str(uuid.uuid4()),
-            "StyleGuid": button_style_guid,
-            "Order": ordem,
-        }
-        
-        return button_payload
+        primary_ports = [1, 2, 3, 4]
+        secondary_ports = [5, 6, 7, 8]
 
-    def _setup_main_controller(self, modules_data):
-        """Configura o controlador principal"""
-        main_controller = next((m for m in modules_data if m.get('is_logic_server')), None)
-        if not main_controller:
-            return
+        buttons_data = list(keypad.get('buttons', []))
+        while len(buttons_data) < button_count:
+            buttons_data.append({'button_index': len(buttons_data) + 1})
+
+        for button in sorted(buttons_data, key=lambda b: b.get('button_index', 0)):
+            button_index = button.get('button_index')
+            if not button_index or button_index > button_count:
+                continue
+
+            index = button_index - 1
+            primary_port = primary_ports[index % len(primary_ports)]
+            secondary_port = secondary_ports[index % len(secondary_ports)]
+
+            unit_key = make_composer("UnitKey", primary_port, 300, 0, 0)
+            unit_led = make_composer("UnitLed", primary_port, 200, 1, 1)
+            unit_secondary_key = make_composer("UnitSecondaryKey", secondary_port, 300, 0, 0)
+            unit_secondary_led = make_composer("UnitSecondaryLed", secondary_port, 200, 1, 1)
+
+            # --- Nova Lógica para ler a configuração do botão ---
+            target_guid = zero_guid
+            modo = 3  # Default Toggle
+            command_on = 1
+            command_off = 0
+            engraver_text = ""
             
-        # Configurar o controlador como Logic Server
-        controller_guid = self.module_guid_map.get(main_controller.get('id'))
-        if not controller_guid:
-            return
+            json_config = button.get('json_config', {})
+            action = json_config.get('action', {})
+            engraver_text = json_config.get('EngraverText', '')
             
-        controller_json = self._find_module_by_guid(controller_guid)
-        if controller_json:
-            controller_json["Logicserver"] = True
+            target_type = action.get('target_type')
+            target_id = action.get('target_id')
+            action_type = action.get('type')
 
-    # Métodos auxiliares
-    def _get_default_special_actions(self):
-        return [
-            {"$type": "SpecialAction", "Name": "All HVAC",  "Guid": str(uuid.uuid4()), "Type": 4},
-            {"$type": "SpecialAction", "Name": "All Lights","Guid": str(uuid.uuid4()), "Type": 2},
-            {"$type": "SpecialAction", "Name": "All Shades","Guid": str(uuid.uuid4()), "Type": 3},
-            {"$type": "SpecialAction", "Name": "OFF",       "Guid": str(uuid.uuid4()), "Type": 0},
-            {"$type": "SpecialAction", "Name": "Volume",    "Guid": str(uuid.uuid4()), "Type": 1},
-        ]
+            if action_type == 'Toggle':
+                modo = 3
+                command_on = 1
+                command_off = 0
+            # Adicionar mais tipos de ação aqui se necessário
+            
+            if target_type == 'circuito' and target_id is not None and target_id in self._circuit_guid_map:
+                target_guid = self._circuit_guid_map[target_id]
+                print(f"      - Button {button_index}: Linked to circuit ID {target_id} -> GUID: {target_guid}")
+            elif target_type == 'cena' and target_id is not None and target_id in self._scene_guid_map:
+                target_guid = self._scene_guid_map[target_id]
+                modo = 1  # Ativar Cena
+                command_on = 0
+                command_off = 0
+                print(f"      - Button {button_index}: Linked to scene ID {target_id} -> GUID: {target_guid}")
+            else:
+                 print(f"      - Button {button_index}: Not linked.")
+            # --- Fim da Nova Lógica ---
 
-    def _create_unit(self):
-        return {
-            "$type": "Unit",
-            "UnitGuid": self.zero_guid,
-            "UnitType": 0,
-            "UnitNumber": 0,
-            "UnitPort": 0,
-            "UnitIO": 0,
-            "UnitSlot": 0,
-            "UnitModuleGuid": self.zero_guid,
-            "UnitModuleName": None,
-            "UnitModuleType": 0,
-        }
+            style_properties = None
+            button_style_guid = zero_guid
+            icon = button.get('icon')
+            is_rocker = button.get('is_rocker')
+            rocker_style = button.get('rocker_style')
 
-    def _create_unit_composer(self, name, unit_number, unit_type, unit_port, unit_io):
-        return {
-            "$type": "UnitComposer",
-            "Name": name,
-            "UnitGuid": self.zero_guid,
-            "UnitType": unit_type,
-            "UnitNumber": unit_number,
-            "UnitPort": unit_port,
-            "UnitIO": unit_io,
-            "UnitSlot": 0,
-            "UnitModuleGuid": self.zero_guid,
-            "UnitModuleName": None,
-            "UnitModuleType": 0,
-        }
+            if is_rocker and icon and icon in self.icon_guids:
+                button_style_guid = "13000000-0000-0000-0000-000000000003"
+                rocker_icon_guid = self.rocker_icon_guid_up_down
+                if rocker_style == 'left-right':
+                    rocker_icon_guid = self.rocker_icon_guid_left_right
+                elif rocker_style == 'previous-next':
+                    rocker_icon_guid = self.rocker_icon_guid_previous_next
+                style_properties = {"$type": "Dictionary`2", "STYLE_PROP_ICON": self.icon_guids[icon], "STYLE_PROP_ROCKER_ICON": rocker_icon_guid}
+            elif is_rocker:
+                button_style_guid = "13000000-0000-0000-0000-000000000004"
+                rocker_icon_guid = self.rocker_icon_guid_up_down
+                if rocker_style == 'left-right':
+                    rocker_icon_guid = self.rocker_icon_guid_left_right
+                elif rocker_style == 'previous-next':
+                    rocker_icon_guid = self.rocker_icon_guid_previous_next
+                style_properties = {"$type": "Dictionary`2", "STYLE_PROP_ICON": None, "STYLE_PROP_ROCKER_ICON": rocker_icon_guid}
+            elif icon and icon in self.icon_guids:
+                button_style_guid = "13000000-0000-0000-0000-000000000002"
+                style_properties = {"$type": "Dictionary`2", "STYLE_PROP_ICON": self.icon_guids[icon], "STYLE_PROP_ROCKER_ICON": None}
 
-    def _create_controller_unit_composers(self):
-        return [
-            self._create_unit_composer("UnitLogicServer", 1, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer2", 2, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer3", 3, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer4", 4, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer5", 5, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer6", 6, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer7", 7, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer8", 8, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer9", 9, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer10", 10, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer11", 11, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer12", 12, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer13", 13, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer14", 14, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer15", 15, 0, 0, 0),
-            self._create_unit_composer("UnitLogicServer16", 16, 0, 0, 0),
-        ]
+            button_payload = {
+                "$type": "RockerKeypadButton",
+                "StylePropertiesSerializable": style_properties,
+                "DoublePressDelay": False,
+                "TargetDoubleObjectGuid": zero_guid,
+                "ModoDoublePress": button.get('modo_double_press') or 3,
+                "CommandDoublePress": button.get('command_double_press') or 0,
+                "PortNumberDoublePress": 0,
+                "CanHold": bool(button.get('can_hold')),
+                "Guid": button.get('guid') or str(uuid.uuid4()),
+                "TargetObjectGuid": target_guid,
+                "Modo": modo,
+                "CommandOn": command_on,
+                "CommandOff": command_off,
+                "PortNumber": 0,
+                "UnitControleLed": 0,
+                "LedColor": 0,
+                "Vincled": False,
+                "TimeFeedBack": 0,
+                "UnitKey": unit_key,
+                "UnitLed": unit_led,
+                "UnitSecondaryKey": unit_secondary_key,
+                "UnitSecondaryLed": unit_secondary_led,
+                "ButtonStyleGuid": button_style_guid,
+                "EngraverText": engraver_text,
+                "Automode": True,
+            }
+            payload["ListKeypadButtons"].append(button_payload)
 
-    def _get_slot_type(self, slot_name):
-        slot_types = {
-            'Load ON/OFF': 0,
-            'Load Dim': 1,
-            'Shade': 2,
-            'IR': 3,
-            'ACNET/RNET': 4,
-            'Scene': 8
-        }
-        return slot_types.get(slot_name, 0)
+        return payload
 
-    def _get_slot_name_for_circuit_type(self, circuit_type):
-        slot_mapping = {
-            'luz': 'Load ON/OFF',
-            'dimmer': 'Load Dim',
-            'persiana': 'Shade',
-            'hvac': 'ACNET/RNET'
-        }
-        return slot_mapping.get(circuit_type, 'Load ON/OFF')
+    def _register_user_interface_guid(self, ui_guid):
+        try:
+            modules_list = self.project_data["Areas"][0]["SubItems"][0]["AutomationBoards"][0]["ModulesList"]
+        except (KeyError, IndexError):
+            return
+        if not modules_list:
+            return
 
-    def _find_board_by_guid(self, board_guid):
-        for area in self.project_data["Areas"]:
-            for room in area.get("SubItems", []):
-                for board in room.get("AutomationBoards", []):
-                    if board["Guid"] == board_guid:
-                        return board
-        return None
+        acnet_slot = None
+        for slot in modules_list[0].get("Slots", []):
+            if slot.get("Name") == "ACNET":
+                acnet_slot = slot
+                break
+        if acnet_slot is None:
+            return
 
-    def _find_module_by_guid(self, module_guid):
-        for area in self.project_data["Areas"]:
-            for room in area.get("SubItems", []):
-                for board in room.get("AutomationBoards", []):
-                    for module in board.get("ModulesList", []):
-                        if module["Guid"] == module_guid:
-                            return module
-        return None
+        subitems = acnet_slot.setdefault("SubItemsGuid", [])
+        if ui_guid in subitems:
+            return
 
-    def _find_next_hsnet(self):
-        used_hsnets = set()
-        for area in self.project_data["Areas"]:
-            for room in area.get("SubItems", []):
-                for board in room.get("AutomationBoards", []):
-                    for module in board.get("ModulesList", []):
-                        used_hsnets.add(module.get("HsnetAddress", 0))
-                for ui in room.get("UserInterfaces", []):
-                    used_hsnets.add(ui.get("HsnetAddress", 0))
-        
-        next_hsnet = 1
-        while next_hsnet in used_hsnets:
-            next_hsnet += 1
-        return next_hsnet
+        for index, guid in enumerate(subitems):
+            if guid == self.zero_guid:
+                subitems[index] = ui_guid
+                break
+        else:
+            subitems.append(ui_guid)
 
-    def _find_next_dev_id(self):
-        used_dev_ids = set()
-        for area in self.project_data["Areas"]:
-            for room in area.get("SubItems", []):
-                for board in room.get("AutomationBoards", []):
-                    for module in board.get("ModulesList", []):
-                        used_dev_ids.add(module.get("DevID", 0))
-                for ui in room.get("UserInterfaces", []):
-                    used_dev_ids.add(ui.get("DevID", 0))
-        
-        next_dev_id = 1
-        while next_dev_id in used_dev_ids:
-            next_dev_id += 1
-        return next_dev_id
+        if subitems and subitems[-1] != self.zero_guid:
+            subitems.append(self.zero_guid)
 
-    def save_rwp_file(self, filename):
-        """Salva o projeto como arquivo RWP"""
+    def _find_max_dev_id(self):
+        """Encontra o maior DevID atual"""
+        max_id = 0
         if not self.project_data:
-            print("❌ Nenhum projeto para salvar")
-            return False
+            return max_id
             
         try:
-            with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(self.project_data, f, indent=2, ensure_ascii=False)
-            print(f"✅ Arquivo RWP salvo como: {filename}")
-            return True
-        except Exception as e:
-            print(f"❌ Erro ao salvar arquivo RWP: {e}")
+            modules = self.project_data['Areas'][0]['SubItems'][0]['AutomationBoards'][0]['ModulesList']
+            for module in modules:
+                if 'DevID' in module and module['DevID'] > max_id:
+                    max_id = module['DevID']
+        except (KeyError, IndexError):
+            pass
+            
+        return max_id
+
+    def _find_max_hsnet(self):
+        """Encontra o maior HSNET em TODO o projeto"""
+        max_addr = 100
+        
+        for area in self.project_data["Areas"]:
+            for room in area.get("SubItems", []):
+                # Verificar módulos nos quadros elétricos
+                for board in room.get("AutomationBoards", []):
+                    for module in board.get("ModulesList", []):
+                        addr = module.get("HsnetAddress", 0)
+                        if addr > max_addr:
+                            max_addr = addr
+                
+                # Verificar keypads no ambiente
+                for ui in room.get("UserInterfaces", []):
+                    addr = ui.get("HsnetAddress", 0)
+                    if addr > max_addr:
+                        max_addr = addr
+        
+        return max_addr
+
+    def _is_hsnet_duplicate(self, hsnet_address):
+        """Verifica se um endereço HSNET já está em uso em TODO o projeto"""
+        # Verificar em todos os quadros elétricos
+        for area in self.project_data["Areas"]:
+            for room in area.get("SubItems", []):
+                # Verificar módulos nos quadros elétricos
+                for board in room.get("AutomationBoards", []):
+                    for module in board.get("ModulesList", []):
+                        if module.get("HsnetAddress") == hsnet_address:
+                            return True
+                
+                # Verificar keypads no ambiente
+                for ui in room.get("UserInterfaces", []):
+                    if ui.get("HsnetAddress") == hsnet_address:
+                        return True
+        
+        return False
+
+    def _add_shade(self, area, ambiente, name, description="Persiana"):
+        """Adiciona uma persiana ao projeto"""
+        area_idx = next(i for i, a in enumerate(self.project_data["Areas"]) if a["Name"] == area)
+        room_idx = next(i for i, r in enumerate(self.project_data["Areas"][area_idx]["SubItems"]) if r["Name"] == ambiente)
+
+        next_unit_id = self._find_max_unit_id() + 1
+
+        new_shade = {
+            "$type": "Shade",
+            "ShadeType": 0,
+            "ShadeIcon": 0,
+            "ProfileGuid": "20000000-0000-0000-0000-000000000001",
+            "UnitMovement": {
+                "$type": "Unit",
+                "Id": next_unit_id,
+                "Event": 0,
+                "Scene": 0,
+                "Disabled": False,
+                "Logged": False,
+                "Memo": False,
+                "Increment": False
+            },
+            "UnitOpenedPercentage": {
+                "$type": "Unit",
+                "Id": next_unit_id + 1,
+                "Event": 0,
+                "Scene": 0,
+                "Disabled": False,
+                "Logged": False,
+                "Memo": False,
+                "Increment": False
+            },
+            "UnitCurrentPosition": {
+                "$type": "Unit",
+                "Id": next_unit_id + 2,
+                "Event": 0,
+                "Scene": 0,
+                "Disabled": False,
+                "Logged": False,
+                "Memo": False,
+                "Increment": False
+            },
+            "Name": name,
+            "Guid": str(uuid.uuid4()),
+            "Description": description
+        }
+        self.project_data["Areas"][area_idx]["SubItems"][room_idx]["LoadOutputs"].append(new_shade)
+        return new_shade["Guid"]
+
+    def _add_hvac(self, area, ambiente, name, description="HVAC"):
+        """Adiciona um HVAC ao projeto"""
+        area_idx = next(i for i, a in enumerate(self.project_data["Areas"]) if a["Name"] == area)
+        room_idx = next(i for i, r in enumerate(self.project_data["Areas"][area_idx]["SubItems"]) if r["Name"] == ambiente)
+
+        new_hvac = {
+            "$type": "HVAC",
+            "ProfileGuid": "14000000-0000-0000-0000-000000000001",
+            "ControlModelGuid": "17000000-0000-0000-0000-000000000001",
+            "Unit": None,
+            "Name": name,
+            "Guid": str(uuid.uuid4()),
+            "Description": description
+        }
+
+        self.project_data["Areas"][area_idx]["SubItems"][room_idx]["LoadOutputs"].append(new_hvac)
+        return new_hvac["Guid"]
+
+    def _link_shade_to_module(self, shade_guid, module_name, canal):
+        """Vincula uma persiana a um módulo (em qualquer quadro)"""
+        module, board = self._find_module_in_any_board(module_name)
+        if not module:
+            print(f"Módulo {module_name} não encontrado para vinculação de persiana")
             return False
 
-def main():
-    """Função principal para uso standalone"""
-    import sys
-    import os
-    
-    if len(sys.argv) != 2:
-        print("Uso: python roehn_converter_standalone.py <arquivo_json>")
-        sys.exit(1)
-    
-    json_file = sys.argv[1]
-    
-    if not os.path.exists(json_file):
-        print(f"❌ Arquivo não encontrado: {json_file}")
-        sys.exit(1)
-    
-    try:
-        # Carregar JSON
-        with open(json_file, 'r', encoding='utf-8') as f:
-            json_data = json.load(f)
-        
-        # Converter
-        converter = RoehnStandaloneConverter()
-        project_data = converter.process_json_project(json_data)
-        
-        if project_data:
-            # Gerar nome do arquivo de saída
-            base_name = os.path.splitext(json_file)[0]
-            output_file = f"{base_name}.rwp"
+        try:
+            # Para persianas, procurar slots do tipo Shade
+            slot_priority = ['Shade', 'Load ON/OFF']  # Fallback para ON/OFF se necessário
             
-            # Salvar arquivo RWP
-            converter.save_rwp_file(output_file)
+            for wanted_slot in slot_priority:
+                for slot in module.get('Slots', []):
+                    if slot.get('Name') == wanted_slot:
+                        # Garantir que o slot tem capacidade suficiente
+                        while len(slot['SubItemsGuid']) < slot.get('SlotCapacity', 0):
+                            slot['SubItemsGuid'].append("00000000-0000-0000-0000-000000000000")
+                        
+                        # Verificar se o canal é válido
+                        if canal < 1 or canal > len(slot['SubItemsGuid']):
+                            print(f"Canal {canal} inválido para slot {wanted_slot} (capacidade: {len(slot['SubItemsGuid'])})")
+                            continue
+                        
+                        # Vincular a persiana ao canal
+                        slot['SubItemsGuid'][canal-1] = shade_guid
+                        print(f"Persiana vinculada ao módulo {module_name}, slot: {wanted_slot}, canal: {canal}")
+                        return True
+            
+            # Se não encontrou slot compatível, tentar fallback genérico
+            print(f"Nenhum slot compatível encontrado para persiana no módulo {module_name}")
+            return False
+            
+        except Exception as e:
+            print(f"Erro ao linkar persiana: {e}")
+            return False
+
+    def _link_hvac_to_module(self, hvac_guid, module_name, canal):
+        """Vincula um HVAC a um módulo (em qualquer quadro)"""
+        module, board = self._find_module_in_any_board(module_name)
+        if not module:
+            print(f"Módulo {module_name} não encontrado para vinculação de HVAC")
+            return False
+
+        try:
+            # Para HVAC, procurar slots do tipo IR
+            slot_priority = ['IR', 'Load ON/OFF']  # Fallback para ON/OFF se necessário
+            
+            for wanted_slot in slot_priority:
+                for slot in module.get('Slots', []):
+                    if slot.get('Name') == wanted_slot:
+                        # Garantir que o slot tem capacidade suficiente
+                        while len(slot['SubItemsGuid']) < slot.get('SlotCapacity', 0):
+                            slot['SubItemsGuid'].append("00000000-0000-0000-0000-000000000000")
+                        
+                        # Verificar se o canal é válido
+                        if canal < 1 or canal > len(slot['SubItemsGuid']):
+                            print(f"Canal {canal} inválido para slot {wanted_slot} (capacidade: {len(slot['SubItemsGuid'])})")
+                            continue
+                        
+                        # Vincular o HVAC ao canal
+                        slot['SubItemsGuid'][canal-1] = hvac_guid
+                        print(f"HVAC vinculado ao módulo {module_name}, slot: {wanted_slot}, canal: {canal}")
+                        return True
+            
+            # Se não encontrou slot compatível, tentar fallback genérico
+            print(f"Nenhum slot compatível encontrado para HVAC no módulo {module_name}")
+            return False
+            
+        except Exception as e:
+            print(f"Erro ao linkar HVAC: {e}")
+            return False
+
+
+    def _add_load(self, area, ambiente, name, power=0.0, description="ON/OFF", dimerizavel=False):
+        """Adiciona um circuito de iluminação"""
+        area_idx = next(i for i, a in enumerate(self.project_data["Areas"]) if a["Name"] == area)
+        room_idx = next(i for i, r in enumerate(self.project_data["Areas"][area_idx]["SubItems"]) if r["Name"] == ambiente)
+
+        next_unit_id = self._find_max_unit_id() + 1
+
+        if dimerizavel:
+            load_type = 2
+            profile_guid = "10000000-0000-0000-0000-000000000002"
+            description = "Dimmer"
         else:
-            print("❌ Falha na conversão do projeto")
-            sys.exit(1)
+            load_type = 0
+            profile_guid = "10000000-0000-0000-0000-000000000001"
+            description = "ON/OFF"
+
+        new_load = {
+            "$type": "Circuit",
+            "LoadType": load_type,
+            "IconPath": 0,
+            "Power": power,  # ⭐⭐⭐ AGORA USA A POTÊNCIA REAL
+            "ProfileGuid": profile_guid,
+            "Unit": {
+                "$type": "Unit",
+                "Id": next_unit_id,
+                "Event": 0,
+                "Scene": 0,
+                "Disabled": False,
+                "Logged": False,
+                "Memo": False,
+                "Increment": False
+            },
+            "Name": name,
+            "Guid": str(uuid.uuid4()),
+            "Description": description
+        }
+        self.project_data["Areas"][area_idx]["SubItems"][room_idx]["LoadOutputs"].append(new_load)
+        return new_load["Guid"]
+
+
+    def _find_max_unit_id(self):
+        """Encontra o maior Unit ID atual, considerando UnitComposers"""
+        max_id = 0
+        
+        def find_ids(data):
+            nonlocal max_id
+            if isinstance(data, dict):
+                if data.get("$type") == "Unit" and "Id" in data:
+                    max_id = max(max_id, data["Id"])
+                # Também procurar em UnitComposers
+                if "UnitComposers" in data and isinstance(data["UnitComposers"], list):
+                    for composer in data["UnitComposers"]:
+                        if isinstance(composer, dict) and "Unit" in composer:
+                            unit = composer["Unit"]
+                            if isinstance(unit, dict) and "Id" in unit:
+                                max_id = max(max_id, unit["Id"])
+                for value in data.values():
+                    find_ids(value)
+            elif isinstance(data, list):
+                for item in data:
+                    find_ids(item)
+        
+        find_ids(self.project_data)
+        return max_id
+
+    # Atualizar métodos de vinculação para procurar em todos os quadros
+    def _link_load_to_module(self, load_guid, module_name, canal, dimerizavel=False):
+        """Vincula um circuito de iluminação a um módulo (em qualquer quadro)"""
+        module, board = self._find_module_in_any_board(module_name)
+        if not module:
+            print(f"Módulo {module_name} não encontrado para vinculação")
+            return False
+
+        try:
+            # ... lógica de vinculação existente ...
+            if dimerizavel:
+                slot_priority = ['Load Dim', 'Load ON/OFF']
+            else:
+                slot_priority = ['Load ON/OFF', 'Load Dim']
             
+            for wanted_slot in slot_priority:
+                for slot in module.get('Slots', []):
+                    if slot.get('Name') == wanted_slot:
+                        while len(slot['SubItemsGuid']) < slot.get('SlotCapacity', 0):
+                            slot['SubItemsGuid'].append("00000000-0000-0000-0000-000000000000")
+                        slot['SubItemsGuid'][canal-1] = load_guid
+                        print(f"Circuito vinculado ao módulo {module_name}, slot: {wanted_slot}, canal: {canal}")
+                        return True
+        except Exception as e:
+            print(f"Erro ao linkar load: {e}")
+        return False
+
+    def _add_scenes_for_room(self, area_name, ambiente):
+        """Adiciona as cenas de um ambiente ao projeto Roehn"""
+        cenas = ambiente.get("cenas", [])
+        if not cenas:
+            return
+
+        try:
+            area_json = next(a for a in self.project_data["Areas"] if a.get("Name") == area_name)
+            room_json = next(r for r in area_json["SubItems"] if r.get("Name") == ambiente.get('nome'))
+        except StopIteration:
+            print(f"⚠️  Aviso: Não foi possível encontrar a área '{area_name}' ou o ambiente '{ambiente.get('nome')}' no JSON para adicionar cenas.")
+            return
+
+        scenes_list = room_json.setdefault("Scenes", [])
+
+        for cena_data in cenas:
+            next_unit_id = self._find_max_unit_id() + 1
+            
+            cena_guid = cena_data.get('guid') or str(uuid.uuid4())
+            if 'id' in cena_data:
+                self._scene_guid_map[cena_data['id']] = cena_guid
+
+            scene_payload = {
+                "$type": "Scene",
+                "Guid": cena_guid,
+                "Operator": 6 if cena_data.get('scene_movers') else 1,
+                "ParentSlot": None,
+                "Unit": {
+                    "$type": "Unit",
+                    "Id": next_unit_id,
+                    "Event": 0,
+                    "Scene": 0,
+                    "Disabled": False,
+                    "Logged": False,
+                    "Memo": False,
+                    "Increment": False,
+                },
+                "Name": cena_data.get('nome'),
+                "Delay": 0,
+                "Actions": [],
+                "SceneMovers": cena_data.get('scene_movers'),
+                "AutoProgrammedID": 0,
+                "AutoProgrammedScene": False,
+                "OnlyShades": 2,
+            }
+
+            for acao_data in cena_data.get('acoes', []):
+                action_payload = {
+                    "$type": "Action",
+                    "Level": acao_data.get('level'),
+                    "ActionType": acao_data.get('action_type'),
+                    "CustomActionValuesSerialized": None,
+                    "TargetGuid": None,
+                }
+
+                action_type = acao_data.get('action_type')
+                target_guid_str = str(acao_data.get('target_guid'))
+
+                if action_type == 0: # Circuit
+                    try:
+                        circuito_id = int(target_guid_str)
+                        target_guid_resolved = self._circuit_guid_map.get(circuito_id)
+                        if not target_guid_resolved:
+                            print(f"⚠️ Aviso: GUID para o circuito ID {circuito_id} não encontrado no mapa.")
+                            continue
+                        action_payload["TargetGuid"] = target_guid_resolved
+                    except (ValueError, TypeError):
+                        print(f"⚠️ Aviso: target_guid de circuito inválido para Acao ID {acao_data.get('id')}: {target_guid_str}")
+                        continue
+                elif action_type == 7: # Group (Room)
+                    try:
+                        ambiente_id = int(target_guid_str)
+                        target_guid_resolved = self._room_guid_map.get(ambiente_id)
+                        if not target_guid_resolved:
+                            print(f"⚠️ Aviso: GUID para o ambiente ID {ambiente_id} não encontrado no mapa.")
+                            continue
+                        action_payload["TargetGuid"] = target_guid_resolved
+                    except (ValueError, TypeError):
+                        print(f"⚠️ Aviso: target_guid de ambiente inválido para Acao ID {acao_data.get('id')}: {target_guid_str}")
+                        continue
+                else:
+                    action_payload["TargetGuid"] = target_guid_str
+
+                custom_values = { "$type": "CustomActionValueDictionary" }
+
+                # A lógica de `custom_acoes` precisaria de uma fonte de dados para `all_circuits_in_room`,
+                # que não está disponível aqui. Esta parte é simplificada.
+                # Para uma implementação completa, a estrutura do JSON de entrada precisaria incluir
+                # os circuitos de cada ambiente diretamente ou uma forma de consultá-los.
+
+                if len(custom_values) > 1:
+                    action_payload["CustomActionValuesSerialized"] = custom_values
+
+                scene_payload["Actions"].append(action_payload)
+
+            scenes_list.append(scene_payload)
+        print(f"✅ Cenas adicionadas para o ambiente: {ambiente.get('nome')}")
+
+    def export_project(self):
+        """Exporta o projeto como JSON (formato Roehn Wizard)"""
+        if not self.project_data:
+            raise ValueError("Nenhum projeto para exportar")
+            
+        return json.dumps(self.project_data, indent=2, ensure_ascii=False)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Converte um arquivo JSON de projeto para o formato .rwp.')
+    parser.add_argument('input_json', help='Caminho para o arquivo JSON de entrada.')
+    parser.add_argument('output_rwp', help='Caminho para o arquivo .rwp de saída.')
+    
+    args = parser.parse_args()
+
+    try:
+        print(f"Lendo o arquivo de entrada: {args.input_json}")
+        with open(args.input_json, 'r', encoding='utf-8') as f:
+            project_data_from_json = json.load(f)
+
+        # A estrutura do JSON de entrada é a própria raiz do projeto
+        project_details = project_data_from_json
+
+        # Criar uma instância do conversor
+        converter = RoehnProjectConverter()
+
+        # Usar os detalhes do projeto do JSON para criar a estrutura base
+        # A chave 'projeto' dentro do seu JSON contém os metadados
+        project_metadata = project_details.get('projeto', {'project_name': 'Projeto Importado'})
+        converter.create_project(project_metadata)
+
+        # Processar os dados do JSON para preencher o projeto Roehn
+        converter.convert_project_from_json(project_details)
+
+        # Exportar o resultado final
+        rwp_content = converter.export_project()
+
+        print(f"Escrevendo o arquivo de saída: {args.output_rwp}")
+        with open(args.output_rwp, 'w', encoding='utf-8') as f:
+            f.write(rwp_content)
+            
+        print("Conversão concluída com sucesso!")
+
+    except FileNotFoundError:
+        print(f"Erro: O arquivo de entrada '{args.input_json}' não foi encontrado.", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError:
+        print(f"Erro: O arquivo de entrada '{args.input_json}' não é um JSON válido.", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"❌ Erro: {e}")
+        print(f"Ocorreu um erro inesperado: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
         sys.exit(1)
-
-if __name__ == "__main__":
-    main()
