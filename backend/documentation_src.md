@@ -256,86 +256,288 @@ Exemplo **ilustrativo** de agregação dos dados para o gerador:
 
 ```json
 {
-  "projeto": {
-    "id": 1,
-    "nome": "Residência Exemplo",
-    "areas": [
-      {
-        "id": 10,
-        "nome": "Social",
-        "ambientes": [
-          {
-            "id": 100,
-            "nome": "Sala de Estar",
-            "quadros_eletricos": [
-              {
-                "id": 1000,
-                "nome": "QDG-Sala",
-                "modulos": [
-                  {
-                    "id": 2000,
-                    "nome": "ADP-RL12 Sala",
-                    "tipo": "ADP-RL12",
-                    "is_controller": false,
-                    "hsnet": 12,
-                    "dev_id": 512
-                  }
-                ]
-              }
-            ],
-            "circuitos": [
-              {
-                "id": 3000,
-                "identificador": "L1",
-                "nome": "Luz Principal",
-                "tipo": "luz",
-                "dimerizavel": true,
-                "potencia": 120.0,
-                "vinculacao": {
-                  "canal": 1,
-                  "modulo": { "id": 2000, "nome": "ADP-RL12 Sala" }
+  "id": 1,
+  "nome": "Projeto Cenario Simples",
+  "user_id": 1,
+  "status": "ATIVO",
+  "data_criacao": "2025-10-22T04:00:00.000000",
+  "data_ativo": "2025-10-22T04:00:00.000000",
+  "areas": [
+    {
+      "id": 1,
+      "nome": "PAV-1",
+      "projeto_id": 1,
+      "ambientes": [
+        {
+          "id": 1,
+          "nome": "Jantar",
+          "area_id": 1,
+          "circuitos": [
+            {
+              "id": 1,
+              "identificador": "JNT-L01",
+              "nome": "Luz Principal Jantar",
+              "tipo": "luz",
+              "dimerizavel": false,
+              "potencia": 100.0,
+              "ambiente_id": 1,
+              "vinculacao": {
+                "id": 1,
+                "circuito_id": 1,
+                "modulo_id": 2,
+                "canal": 1,
+                "modulo": {
+                  "id": 2,
+                  "nome": "Modulo RL12"
                 }
               }
-            ],
-            "keypads": [
-              {
-                "id": 4000,
-                "nome": "Teclado Sala 4B",
-                "modelo": "Rocker 4",
-                "color": "white",
-                "button_color": "gray",
-                "button_count": 4,
-                "hsnet": 21,
-                "dev_id": 600,
-                "buttons": [
-                  {
-                    "button_index": 1,
-                    "icon": "bulb",
-                    "is_rocker": false,
-                    "json_config": {
-                      "EngraverText": "Luz",
-                      "action": { "type": 0, "target_type": "circuito", "target_id": 3000 }
+            },
+            {
+              "id": 2,
+              "identificador": "JNT-L02",
+              "nome": "Luz Secundaria Jantar",
+              "tipo": "luz",
+              "dimerizavel": false,
+              "potencia": 100.0,
+              "ambiente_id": 1,
+              "vinculacao": {
+                "id": 2,
+                "circuito_id": 2,
+                "modulo_id": 2,
+                "canal": 2,
+                "modulo": {
+                  "id": 2,
+                  "nome": "Modulo RL12"
+                }
+              }
+            }
+          ],
+          "keypads": [
+            {
+              "id": 1,
+              "nome": "Keypad A",
+              "modelo": "RQR-K",
+              "color": "WHITE",
+              "button_color": "WHITE",
+              "button_count": 2,
+              "hsnet": 110,
+              "dev_id": 110,
+              "ambiente_id": 1,
+              "notes": null,
+              "created_at": "2025-10-21T17:57:08",
+              "updated_at": "2025-10-21T17:57:08",
+              "buttons": [
+                {
+                  "id": 1,
+                  "keypad_id": 1,
+                  "button_index": 1,
+                  "json_config": {
+                    "EngraverText": "Luz 1",
+                    "action": {
+                      "type": "Toggle",
+                      "target_type": "circuito",
+                      "target_id": 1
                     }
                   }
-                ]
-              }
-            ],
-            "cenas": [
-              {
-                "id": 5000,
-                "guid": "0b3a5d3e-6d6a-4a81-9f4c-1c2b7f1f0002",
-                "nome": "CENA FILME",
-                "scene_movers": false,
-                "acoes": [
-                  { "action_type": 0, "level": 30, "target_id": 3000 }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    ]
-  }
+                },
+                {
+                  "id": 2,
+                  "keypad_id": 1,
+                  "button_index": 2,
+                  "json_config": {
+                    "EngraverText": "Luz 2",
+                    "action": {
+                      "type": "Toggle",
+                      "target_type": "circuito",
+                      "target_id": 2
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "nome": "Keypad Cenas",
+              "modelo": "RQR-K",
+              "color": "WHITE",
+              "button_color": "WHITE",
+              "button_count": 2,
+              "hsnet": 111,
+              "dev_id": 111,
+              "ambiente_id": 1,
+              "notes": null,
+              "created_at": "2025-10-22T09:30:00",
+              "updated_at": "2025-10-22T09:30:00",
+              "buttons": [
+                {
+                  "id": 3,
+                  "keypad_id": 2,
+                  "button_index": 1,
+                  "json_config": {
+                    "EngraverText": "Cena 1",
+                    "action": {
+                      "type": "Activate",
+                      "target_type": "cena",
+                      "target_id": 1
+                    }
+                  }
+                },
+                {
+                  "id": 4,
+                  "keypad_id": 2,
+                  "button_index": 2,
+                  "json_config": {
+                    "EngraverText": "Tudo",
+                    "action": {
+                      "type": "Activate",
+                      "target_type": "cena",
+                      "target_id": 2
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": 3,
+              "nome": "Keypad Estiloso",
+              "modelo": "RQR-K",
+              "color": "WHITE",
+              "button_color": "WHITE",
+              "button_count": 4,
+              "hsnet": 112,
+              "dev_id": 112,
+              "ambiente_id": 1,
+              "notes": null,
+              "created_at": "2025-10-22T16:40:00",
+              "updated_at": "2025-10-22T16:40:00",
+              "buttons": [
+                {
+                  "id": 5,
+                  "keypad_id": 3,
+                  "button_index": 1,
+                  "json_config": {
+                    "EngraverText": "Jantar"
+                  }
+                },
+                {
+                  "id": 6,
+                  "keypad_id": 3,
+                  "button_index": 2,
+                  "icon": "wine"
+                },
+                {
+                  "id": 7,
+                  "keypad_id": 3,
+                  "button_index": 3,
+                  "is_rocker": true,
+                  "icon": "hvac"
+                },
+                {
+                  "id": 8,
+                  "keypad_id": 3,
+                  "button_index": 4,
+                  "is_rocker": true,
+                  "icon": "shades"
+                }
+              ]
+            }
+          ],
+          "cenas": [
+            {
+              "id": 1,
+              "guid": "a1b2c3d4-0001-4000-8000-111111111111",
+              "nome": "Cena Luz 1",
+              "scene_movers": false,
+              "acoes": [
+                {
+                  "id": 1,
+                  "action_type": 0,
+                  "target_guid": "1",
+                  "level": 100
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "guid": "a1b2c3d4-0002-4000-8000-222222222222",
+              "nome": "Cena Ligar Tudo",
+              "scene_movers": false,
+              "acoes": [
+                {
+                  "id": 2,
+                  "action_type": 7,
+                  "target_guid": "1",
+                  "level": 100
+                }
+              ]
+            }
+          ],
+          "quadros_eletricos": []
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "nome": "Area Tecnica",
+      "projeto_id": 1,
+      "ambientes": [
+        {
+          "id": 2,
+          "nome": "Quadro Geral",
+          "area_id": 2,
+          "circuitos": [],
+          "keypads": [],
+          "cenas": [],
+          "quadros_eletricos": [
+            {
+              "id": 1,
+              "nome": "Quadro Principal",
+              "ambiente_id": 2,
+              "projeto_id": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "modulos": [
+    {
+      "id": 1,
+      "nome": "Controlador M8",
+      "tipo": "ADP-M8",
+      "projeto_id": 1,
+      "is_controller": true,
+      "is_logic_server": true,
+      "ip_address": "192.168.0.245",
+      "quadro_eletrico_id": 1,
+      "parent_controller_id": null,
+      "child_modules": [
+        {
+          "id": 2,
+          "nome": "Modulo RL12",
+          "tipo": "ADP-RL12",
+          "projeto_id": 1,
+          "is_controller": false,
+          "is_logic_server": false,
+          "ip_address": null,
+          "quadro_eletrico_id": 1,
+          "parent_controller_id": 1
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "nome": "Modulo RL12",
+      "tipo": "ADP-RL12",
+      "projeto_id": 1,
+      "is_controller": false,
+      "is_logic_server": false,
+      "ip_address": null,
+      "quadro_eletrico_id": 1,
+      "parent_controller_id": 1
+    }
+  ],
+  "keypads": []
 }
 ```
 
