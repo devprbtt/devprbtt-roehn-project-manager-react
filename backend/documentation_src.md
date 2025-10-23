@@ -70,7 +70,6 @@ erDiagram
 |-------|------|------------|-----------------|---------|-------------|
 | `id` | bigint PK | auto-increment | - | - | ✅ |
 | `nome` | varchar(120) | `NOT NULL` | Qualquer string | - | ✅ |
-| `user_id` | bigint FK | `NOT NULL` → `users(id)` | - | - | ✅ |
 | `tech_area` | varchar(100) | `NULL` | Nome da área técnica | 'Área Técnica' | ❌ |
 | `tech_room` | varchar(100) | `NULL` | Nome da sala técnica | 'Sala Técnica' | ❌ |
 | `board_name` | varchar(100) | `NULL` | Nome do quadro | 'Quadro Elétrico' | ❌ |
@@ -110,7 +109,7 @@ erDiagram
 | `is_controller` | boolean | - | true/false | false | ❌ |
 | `is_logic_server` | boolean | - | true/false | false | ❌ |
 | `ip_address` | varchar(45) | `NULL` | IPv4 válido ou vazio | - | ❌ |
-| `hsnet` | integer | `NULL`, `UNIQUE(projeto_id, hsnet)` | 1-254 | - | ❌ |
+| `hsnet` | integer | `NULL` | 1-254 | - | ❌ |
 | `dev_id` | integer | `NULL` | 1-255 | - | ❌ |
 | `projeto_id` | bigint FK | `NOT NULL` → `projetos(id)` | - | - | ✅ |
 | `quadro_eletrico_id` | bigint FK | `NULL` → `quadros_eletricos(id)` | - | - | ❌ |
@@ -144,8 +143,8 @@ erDiagram
 | `color` | varchar(20) | `NULL` | 'WHITE', 'BLACK', 'SILVER', 'GOLD', 'BRONZE' | 'WHITE' | ❌ |
 | `button_color` | varchar(20) | `NULL` | 'WHITE', 'BLACK' | 'WHITE' | ❌ |
 | `button_count` | integer | `NOT NULL` | 1, 2, 4 | - | ✅ |
-| `hsnet` | integer | `NOT NULL`, `UNIQUE` | 1-254 | - | ✅ |
-| `dev_id` | integer | `NOT NULL`, `UNIQUE` | 1-255 | - | ✅ |
+| `hsnet` | integer | `NOT NULL` | 1-254 | - | ✅ |
+| `dev_id` | integer | `NOT NULL` | 1-255 | - | ✅ |
 | `ambiente_id` | bigint FK | `NOT NULL` → `ambientes(id)` | - | - | ✅ |
 
 ### keypad_buttons
@@ -163,7 +162,7 @@ erDiagram
 | Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
 |-------|------|------------|-----------------|---------|-------------|
 | `id` | bigint PK | auto-increment | - | - | ✅ |
-| `guid` | varchar(36) | `NOT NULL`, `UNIQUE` | UUID válido | - | ✅ |
+| `guid` | varchar(36) | `NOT NULL` | UUID válido | - | ✅ |
 | `nome` | varchar(100) | `NOT NULL` | Nome da cena | - | ✅ |
 | `scene_movers` | boolean | - | true/false | false | ❌ |
 | `ambiente_id` | bigint FK | `NOT NULL` → `ambientes(id)` | - | - | ✅ |
@@ -177,18 +176,11 @@ erDiagram
 | `target_id` | integer | `NOT NULL` | ID válido | - | ✅ |
 | `cena_id` | bigint FK | `NOT NULL` → `cenas(id)` | - | - | ✅ |
 
-### users
-| Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
-|-------|------|------------|-----------------|---------|-------------|
-| `id` | bigint PK | auto-increment | - | - | ✅ |
-| `username` | varchar(80) | `NOT NULL`, `UNIQUE` | Nome de usuário | - | ✅ |
-
 ---
 
-## 🛡️ Constraints de Negócio
+### Constraints de Negócio
 
-
-``` sql
+```sql
 -- Circuitos dimerizáveis apenas para tipo 'luz'
 ALTER TABLE circuitos ADD CONSTRAINT chk_dimerizavel_apenas_luz 
 CHECK (tipo = 'luz' OR dimerizavel = false);
