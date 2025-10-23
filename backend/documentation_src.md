@@ -109,8 +109,7 @@ erDiagram
 | `is_controller` | boolean | - | true/false | false | ❌ |
 | `is_logic_server` | boolean | - | true/false | false | ❌ |
 | `ip_address` | varchar(45) | `NULL` | IPv4 válido ou vazio | - | ❌ |
-| `hsnet` | integer | `NULL` | 1-254 | - | ❌ |
-| `dev_id` | integer | `NULL` | 1-255 | - | ❌ |
+| `hsnet` | integer | `NULL` | 1-380 | - | ❌ |
 | `projeto_id` | bigint FK | `NOT NULL` → `projetos(id)` | - | - | ✅ |
 | `quadro_eletrico_id` | bigint FK | `NULL` → `quadros_eletricos(id)` | - | - | ❌ |
 | `parent_controller_id` | bigint FK | `NULL` → `modulos(id)` | - | - | ❌ |
@@ -143,15 +142,14 @@ erDiagram
 | `color` | varchar(20) | `NULL` | 'WHITE', 'BLACK', 'SILVER', 'GOLD', 'BRONZE' | 'WHITE' | ❌ |
 | `button_color` | varchar(20) | `NULL` | 'WHITE', 'BLACK' | 'WHITE' | ❌ |
 | `button_count` | integer | `NOT NULL` | 1, 2, 4 | - | ✅ |
-| `hsnet` | integer | `NOT NULL` | 1-254 | - | ✅ |
-| `dev_id` | integer | `NOT NULL` | 1-255 | - | ✅ |
+| `hsnet` | integer | `NOT NULL` | 1-380 | - | ✅ |
 | `ambiente_id` | bigint FK | `NOT NULL` → `ambientes(id)` | - | - | ✅ |
 
 ### keypad_buttons
 | Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
 |-------|------|------------|-----------------|---------|-------------|
 | `id` | bigint PK | auto-increment | - | - | ✅ |
-| `button_index` | integer | `NOT NULL` | ≥ 1 | - | ✅ |
+| `button_index` | integer | `NOT NULL` | '1', '2', '3', '4' | - | ✅ |
 | `icon` | varchar(50) | `NULL` | 'abajour', 'arandela', 'bright', 'cascata', 'churrasco', 'clean room', 'concierge', 'curtains', 'curtains preset 1', 'curtains preset 2', 'day', 'dim penumbra', 'dinner', 'do not disturb', 'door', 'doorbell', 'fan', 'fireplace', 'garage', 'gate', 'good night', 'gym1', 'gym2', 'gym3', 'hvac', 'irrigação', 'jardim1', 'jardim2', 'lampada', 'laundry', 'leaving', 'light preset 1', 'light preset 2', 'lower shades', 'luminaria de piso', 'medium', 'meeting', 'movie', 'music', 'night', 'onoff', 'padlock', 'party', 'pendant', 'piscina 1', 'piscina 2', 'pizza', 'raise shades', 'reading', 'shades', 'shades preset 1', 'shades preset 2', 'spot', 'steam room', 'turned off', 'tv', 'volume', 'welcome', 'wine' | - | ❌ |
 | `is_rocker` | boolean | - | true/false | false | ❌ |
 | `rocker_style` | varchar(20) | `NULL` | 'up-down', 'left-right', 'previous-next' | - | ❌ |
@@ -162,7 +160,7 @@ erDiagram
 | Campo | Tipo | Restrições | Valores Aceitos | Default | Obrigatório |
 |-------|------|------------|-----------------|---------|-------------|
 | `id` | bigint PK | auto-increment | - | - | ✅ |
-| `guid` | varchar(36) | `NOT NULL` | UUID válido | - | ✅ |
+| `guid` | varchar(36) | `NOT NULL` | UUID válido | - | ❌ |
 | `nome` | varchar(100) | `NOT NULL` | Nome da cena | - | ✅ |
 | `scene_movers` | boolean | - | true/false | false | ❌ |
 | `ambiente_id` | bigint FK | `NOT NULL` → `ambientes(id)` | - | - | ✅ |
