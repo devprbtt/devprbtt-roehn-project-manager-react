@@ -26,7 +26,7 @@ import os
 from datetime import datetime
 from database import db, User, Projeto, Area, Ambiente, Circuito, Modulo, Vinculacao, Keypad, KeypadButton, QuadroEletrico, Cena, Acao, CustomAcao
 
-app = Flask(__name__, instance_relative_config=True)
+app = Flask(__name__, instance_relative_config=True, static_folder='static', static_url_path='')
 
 # Garante que a pasta da instância exista
 try:
@@ -4073,8 +4073,10 @@ def delete_cena(cena_id):
 @app.route("/<path:path>")
 def spa_catch_all(path):
     # Não intercepta APIs ou arquivos estáticos
-    if path.startswith("api/") or path.startswith("static/") or path.startswith("exportar-pdf/"):
+    if path.startswith("api/") or path.startswith("exportar-pdf/"):
         abort(404)
+    if os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
     return send_from_directory(app.static_folder, "index.html")
 
 
